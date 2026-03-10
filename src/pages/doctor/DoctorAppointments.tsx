@@ -59,7 +59,7 @@ export default function DoctorAppointments() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("appointments")
-        .select(`*, profiles!appointments_patient_id_fkey (full_name, avatar_url, email, phone)`)
+        .select(`*, profiles!appointments_patient_profile_fkey (full_name, avatar_url, email, phone)`)
         .eq("doctor_id", doctorRecord!.id)
         .order("appointment_date", { ascending: false });
       if (error) throw error;
