@@ -2,7 +2,7 @@ import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import {
-  Stethoscope, LogOut, LayoutDashboard, Search, CalendarDays, User,
+  Stethoscope, LogOut, LayoutDashboard, Search, CalendarDays, User, Clock, ClipboardList,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -13,17 +13,27 @@ const patientLinks = [
   { to: "/profile", label: "Profile", icon: User },
 ];
 
+const doctorLinks = [
+  { to: "/doctor/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/doctor/schedule", label: "My Schedule", icon: Clock },
+  { to: "/doctor/appointments", label: "Appointments", icon: ClipboardList },
+  { to: "/profile", label: "Profile", icon: User },
+];
+
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, signOut, hasRole } = useAuth();
   const location = useLocation();
-  const roleLabel = hasRole("admin") ? "Admin" : hasRole("doctor") ? "Doctor" : "Patient";
+  const isDoctor = hasRole("doctor");
+  const roleLabel = hasRole("admin") ? "Admin" : isDoctor ? "Doctor" : "Patient";
+  const links = isDoctor ? doctorLinks : patientLinks;
+  const homePath = isDoctor ? "/doctor/dashboard" : "/dashboard";
 
   return (
     <div className="min-h-screen bg-background">
       <header className="glass-strong border-b sticky top-0 z-50">
         <div className="container flex h-16 items-center justify-between">
           <div className="flex items-center gap-3">
-            <Link to="/dashboard" className="flex items-center gap-2">
+            <Link to={homePath} className="flex items-center gap-2">
               <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-primary to-info flex items-center justify-center">
                 <Stethoscope className="h-5 w-5 text-primary-foreground" />
               </div>
@@ -35,7 +45,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
 
           <nav className="hidden md:flex items-center gap-1">
-            {patientLinks.map((link) => (
+            {links.map((link) => (
               <Link
                 key={link.to}
                 to={link.to}
@@ -61,10 +71,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      {/* Mobile bottom nav */}
       <nav className="md:hidden fixed bottom-0 inset-x-0 z-50 glass-strong border-t">
         <div className="flex justify-around py-2">
-          {patientLinks.map((link) => (
+          {links.map((link) => (
             <Link
               key={link.to}
               to={link.to}
