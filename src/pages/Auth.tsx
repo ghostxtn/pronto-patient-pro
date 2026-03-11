@@ -51,7 +51,14 @@ export default function Auth() {
     }
   };
 
-  const handleSocialLogin = async (provider: "google" | "azure" | "facebook") => {
+  const handleGoogleLogin = async () => {
+    const { error } = await lovable.auth.signInWithOAuth("google", {
+      redirect_uri: window.location.origin,
+    });
+    if (error) toast.error(error.message);
+  };
+
+  const handleSocialLogin = async (provider: "azure" | "facebook") => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
       options: { redirectTo: `${window.location.origin}/dashboard` },
