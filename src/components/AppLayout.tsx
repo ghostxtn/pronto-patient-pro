@@ -32,10 +32,11 @@ const adminLinks = [
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, signOut, hasRole } = useAuth();
   const location = useLocation();
+  const isAdmin = hasRole("admin");
   const isDoctor = hasRole("doctor");
-  const roleLabel = hasRole("admin") ? "Admin" : isDoctor ? "Doctor" : "Patient";
-  const links = isDoctor ? doctorLinks : patientLinks;
-  const homePath = isDoctor ? "/doctor/dashboard" : "/dashboard";
+  const roleLabel = isAdmin ? "Admin" : isDoctor ? "Doctor" : "Patient";
+  const links = isAdmin ? adminLinks : isDoctor ? doctorLinks : patientLinks;
+  const homePath = isAdmin ? "/admin/dashboard" : isDoctor ? "/doctor/dashboard" : "/dashboard";
 
   return (
     <div className="min-h-screen bg-background">
