@@ -3,6 +3,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import {
   Stethoscope, LogOut, LayoutDashboard, Search, CalendarDays, User, Clock, ClipboardList,
+  Users, Settings, ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -20,13 +21,22 @@ const doctorLinks = [
   { to: "/profile", label: "Profile", icon: User },
 ];
 
+const adminLinks = [
+  { to: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/admin/doctors", label: "Doctors", icon: Stethoscope },
+  { to: "/admin/patients", label: "Patients", icon: Users },
+  { to: "/admin/appointments", label: "Appointments", icon: CalendarDays },
+  { to: "/admin/settings", label: "Settings", icon: Settings },
+];
+
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, signOut, hasRole } = useAuth();
   const location = useLocation();
+  const isAdmin = hasRole("admin");
   const isDoctor = hasRole("doctor");
-  const roleLabel = hasRole("admin") ? "Admin" : isDoctor ? "Doctor" : "Patient";
-  const links = isDoctor ? doctorLinks : patientLinks;
-  const homePath = isDoctor ? "/doctor/dashboard" : "/dashboard";
+  const roleLabel = isAdmin ? "Admin" : isDoctor ? "Doctor" : "Patient";
+  const links = isAdmin ? adminLinks : isDoctor ? doctorLinks : patientLinks;
+  const homePath = isAdmin ? "/admin/dashboard" : isDoctor ? "/doctor/dashboard" : "/dashboard";
 
   return (
     <div className="min-h-screen bg-background">
