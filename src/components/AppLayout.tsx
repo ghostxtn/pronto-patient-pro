@@ -3,6 +3,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import {
   Stethoscope, LogOut, LayoutDashboard, Search, CalendarDays, User, Clock, ClipboardList,
+  Users, Settings, ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -18,6 +19,14 @@ const doctorLinks = [
   { to: "/doctor/schedule", label: "My Schedule", icon: Clock },
   { to: "/doctor/appointments", label: "Appointments", icon: ClipboardList },
   { to: "/profile", label: "Profile", icon: User },
+];
+
+const adminLinks = [
+  { to: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/admin/doctors", label: "Doctors", icon: Stethoscope },
+  { to: "/admin/patients", label: "Patients", icon: Users },
+  { to: "/admin/appointments", label: "Appointments", icon: CalendarDays },
+  { to: "/admin/settings", label: "Settings", icon: Settings },
 ];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
