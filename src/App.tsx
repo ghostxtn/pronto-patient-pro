@@ -13,6 +13,11 @@ import MyAppointments from "./pages/MyAppointments";
 import DoctorDashboard from "./pages/doctor/DoctorDashboard";
 import DoctorSchedule from "./pages/doctor/DoctorSchedule";
 import DoctorAppointments from "./pages/doctor/DoctorAppointments";
+import AdminDashboard from "./pages/admin/AdminDashboard";
+import ManageDoctors from "./pages/admin/ManageDoctors";
+import ManagePatients from "./pages/admin/ManagePatients";
+import ManageAppointments from "./pages/admin/ManageAppointments";
+import ClinicSettings from "./pages/admin/ClinicSettings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
