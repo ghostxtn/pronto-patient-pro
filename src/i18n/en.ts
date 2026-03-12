@@ -281,4 +281,4 @@ export const en: Record<string, string> = {
   doctorsNav: "Doctors",
   patientsNav: "Patients",
   settingsNav: "Settings",
-} as const;
+};
