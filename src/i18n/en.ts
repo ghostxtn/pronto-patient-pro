@@ -1,4 +1,4 @@
-export const en = {
+export const en: Record<string, string> = {
   // Common
   signIn: "Sign In",
   signUp: "Sign up",
