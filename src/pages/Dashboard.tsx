@@ -31,10 +31,16 @@ export default function Dashboard() {
     queryKey: ["dashboard-appointments", user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("appointments")
-        .select(`*, doctors (specializations (name, icon), profiles!doctors_user_id_fkey (full_name))`)
-        .eq("patient_id", user!.id)
-        .order("appointment_date", { ascending: true });
+  .from("appointments")
+  .select(`
+    *,
+    doctors (
+      specializations (name, icon),
+      profiles!doctors_user_id_profiles_fkey (full_name)
+    )
+  `)
+  .eq("patient_id", user!.id)
+  .order("appointment_date", { ascending: true });
       if (error) throw error;
       return data;
     },
