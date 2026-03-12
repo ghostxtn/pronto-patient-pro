@@ -1,6 +1,8 @@
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
+import { useLanguage } from "@/contexts/LanguageContext";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 import {
   Stethoscope, HeartPulse, Brain, Eye, Baby, Bone, ScanFace, Smile,
   CalendarCheck, Clock, Shield, Star, ArrowRight, CheckCircle2
@@ -11,30 +13,6 @@ const iconMap: Record<string, React.ElementType> = {
   eye: Eye, baby: Baby, bone: Bone, "scan-face": ScanFace, smile: Smile,
 };
 
-const specializations = [
-  { name: "General Medicine", icon: "stethoscope", color: "from-primary to-info" },
-  { name: "Cardiology", icon: "heart-pulse", color: "from-destructive to-warning" },
-  { name: "Dermatology", icon: "scan-face", color: "from-secondary to-success" },
-  { name: "Orthopedics", icon: "bone", color: "from-warning to-destructive" },
-  { name: "Pediatrics", icon: "baby", color: "from-info to-primary" },
-  { name: "Neurology", icon: "brain", color: "from-accent-foreground to-primary" },
-  { name: "Ophthalmology", icon: "eye", color: "from-secondary to-info" },
-  { name: "Dentistry", icon: "smile", color: "from-success to-secondary" },
-];
-
-const steps = [
-  { icon: ScanFace, title: "Choose a Specialist", desc: "Browse our expert doctors by specialty and find your perfect match." },
-  { icon: CalendarCheck, title: "Book Your Slot", desc: "Pick a convenient date and time from real-time availability." },
-  { icon: CheckCircle2, title: "Get Treated", desc: "Visit the clinic and receive world-class medical care." },
-];
-
-const stats = [
-  { value: "15+", label: "Expert Doctors" },
-  { value: "10k+", label: "Happy Patients" },
-  { value: "8", label: "Specializations" },
-  { value: "98%", label: "Satisfaction Rate" },
-];
-
 const fadeUp = {
   hidden: { opacity: 0, y: 30 },
   visible: (i: number) => ({
@@ -44,6 +22,38 @@ const fadeUp = {
 };
 
 export default function Landing() {
+  const { t } = useLanguage();
+
+  const specializations = [
+    { name: t.generalMedicine, icon: "stethoscope", color: "from-primary to-info" },
+    { name: t.cardiology, icon: "heart-pulse", color: "from-destructive to-warning" },
+    { name: t.dermatology, icon: "scan-face", color: "from-secondary to-success" },
+    { name: t.orthopedics, icon: "bone", color: "from-warning to-destructive" },
+    { name: t.pediatrics, icon: "baby", color: "from-info to-primary" },
+    { name: t.neurology, icon: "brain", color: "from-accent-foreground to-primary" },
+    { name: t.ophthalmology, icon: "eye", color: "from-secondary to-info" },
+    { name: t.dentistry, icon: "smile", color: "from-success to-secondary" },
+  ];
+
+  const steps = [
+    { icon: ScanFace, title: t.step1Title, desc: t.step1Desc },
+    { icon: CalendarCheck, title: t.step2Title, desc: t.step2Desc },
+    { icon: CheckCircle2, title: t.step3Title, desc: t.step3Desc },
+  ];
+
+  const stats = [
+    { value: "15+", label: t.expertDoctors },
+    { value: "10k+", label: t.happyPatients },
+    { value: "8", label: t.specializations },
+    { value: "98%", label: t.satisfactionRate },
+  ];
+
+  const testimonials = [
+    { name: "Sarah M.", text: t.testimonial1, rating: 5 },
+    { name: "James R.", text: t.testimonial2, rating: 5 },
+    { name: "Emily K.", text: t.testimonial3, rating: 5 },
+  ];
+
   return (
     <div className="min-h-screen bg-background overflow-hidden">
       {/* Nav */}
@@ -56,16 +66,17 @@ export default function Landing() {
             <span className="font-display text-xl font-bold tracking-tight">MediBook</span>
           </Link>
           <div className="hidden md:flex items-center gap-8">
-            <a href="#specializations" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">Specializations</a>
-            <a href="#how-it-works" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">How It Works</a>
-            <a href="#testimonials" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">Testimonials</a>
+            <a href="#specializations" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">{t.navSpecializations}</a>
+            <a href="#how-it-works" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">{t.navHowItWorks}</a>
+            <a href="#testimonials" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">{t.navTestimonials}</a>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <LanguageSwitcher />
             <Button variant="ghost" asChild>
-              <Link to="/auth">Sign In</Link>
+              <Link to="/auth">{t.signIn}</Link>
             </Button>
             <Button asChild className="rounded-full px-6 shadow-soft">
-              <Link to="/auth?tab=signup">Get Started</Link>
+              <Link to="/auth?tab=signup">{t.getStarted}</Link>
             </Button>
           </div>
         </div>
@@ -81,45 +92,38 @@ export default function Landing() {
           <div className="max-w-3xl mx-auto text-center">
             <motion.div initial="hidden" animate="visible" custom={0} variants={fadeUp}>
               <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-accent text-accent-foreground text-sm font-medium mb-6">
-                <Shield className="h-3.5 w-3.5" /> Trusted by 10,000+ Patients
+                <Shield className="h-3.5 w-3.5" /> {t.trustedBy}
               </span>
             </motion.div>
             <motion.h1
               className="text-4xl md:text-6xl lg:text-7xl font-display font-bold tracking-tight leading-[1.1] mb-6"
               initial="hidden" animate="visible" custom={1} variants={fadeUp}
             >
-              Your Health,{" "}
-              <span className="gradient-text">Our Priority</span>
+              {t.heroTitle1}{" "}
+              <span className="gradient-text">{t.heroTitle2}</span>
             </motion.h1>
             <motion.p
               className="text-lg md:text-xl text-muted-foreground max-w-xl mx-auto mb-10"
               initial="hidden" animate="visible" custom={2} variants={fadeUp}
             >
-              Book appointments with top specialists in seconds. Experience healthcare that's modern, seamless, and designed around you.
+              {t.heroDesc}
             </motion.p>
             <motion.div className="flex flex-col sm:flex-row gap-4 justify-center" initial="hidden" animate="visible" custom={3} variants={fadeUp}>
               <Button size="lg" asChild className="rounded-full px-8 text-base h-12 shadow-elevated">
                 <Link to="/auth?tab=signup">
-                  Book an Appointment <ArrowRight className="ml-2 h-4 w-4" />
+                  {t.bookAppointment} <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
               </Button>
               <Button size="lg" variant="outline" asChild className="rounded-full px-8 text-base h-12">
-                <a href="#specializations">Explore Specializations</a>
+                <a href="#specializations">{t.exploreSpecializations}</a>
               </Button>
             </motion.div>
           </div>
 
           {/* Stats */}
-          <motion.div
-            className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-20 max-w-3xl mx-auto"
-            initial="hidden" animate="visible"
-          >
+          <motion.div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-20 max-w-3xl mx-auto" initial="hidden" animate="visible">
             {stats.map((stat, i) => (
-              <motion.div
-                key={stat.label}
-                className="glass rounded-2xl p-5 text-center shadow-card"
-                custom={i + 4} variants={fadeUp}
-              >
+              <motion.div key={stat.label} className="glass rounded-2xl p-5 text-center shadow-card" custom={i + 4} variants={fadeUp}>
                 <div className="text-2xl md:text-3xl font-display font-bold gradient-text">{stat.value}</div>
                 <div className="text-sm text-muted-foreground mt-1">{stat.label}</div>
               </motion.div>
@@ -133,21 +137,17 @@ export default function Landing() {
         <div className="container">
           <motion.div className="text-center mb-14" initial="hidden" whileInView="visible" viewport={{ once: true }}>
             <motion.h2 className="text-3xl md:text-4xl font-display font-bold mb-4" custom={0} variants={fadeUp}>
-              Our <span className="gradient-text">Specializations</span>
+              {t.ourSpecializations} <span className="gradient-text">{t.specializationsWord}</span>
             </motion.h2>
             <motion.p className="text-muted-foreground max-w-lg mx-auto" custom={1} variants={fadeUp}>
-              Expert care across multiple medical disciplines, all under one roof.
+              {t.specDesc}
             </motion.p>
           </motion.div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
             {specializations.map((spec, i) => {
               const Icon = iconMap[spec.icon] || Stethoscope;
               return (
-                <motion.div
-                  key={spec.name}
-                  className="group glass rounded-2xl p-6 text-center shadow-card hover:shadow-elevated transition-all duration-300 cursor-pointer hover:-translate-y-1"
-                  initial="hidden" whileInView="visible" viewport={{ once: true }} custom={i} variants={fadeUp}
-                >
+                <motion.div key={spec.name} className="group glass rounded-2xl p-6 text-center shadow-card hover:shadow-elevated transition-all duration-300 cursor-pointer hover:-translate-y-1" initial="hidden" whileInView="visible" viewport={{ once: true }} custom={i} variants={fadeUp}>
                   <div className={`mx-auto w-14 h-14 rounded-2xl bg-gradient-to-br ${spec.color} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
                     <Icon className="h-7 w-7 text-primary-foreground" />
                   </div>
@@ -164,19 +164,15 @@ export default function Landing() {
         <div className="container">
           <motion.div className="text-center mb-14" initial="hidden" whileInView="visible" viewport={{ once: true }}>
             <motion.h2 className="text-3xl md:text-4xl font-display font-bold mb-4" custom={0} variants={fadeUp}>
-              How It <span className="gradient-text">Works</span>
+              {t.howItWorks} <span className="gradient-text">{t.worksWord}</span>
             </motion.h2>
             <motion.p className="text-muted-foreground max-w-lg mx-auto" custom={1} variants={fadeUp}>
-              Three simple steps to better health.
+              {t.howItWorksDesc}
             </motion.p>
           </motion.div>
           <div className="grid md:grid-cols-3 gap-8 max-w-4xl mx-auto">
             {steps.map((step, i) => (
-              <motion.div
-                key={step.title}
-                className="relative glass rounded-3xl p-8 shadow-card text-center"
-                initial="hidden" whileInView="visible" viewport={{ once: true }} custom={i} variants={fadeUp}
-              >
+              <motion.div key={step.title} className="relative glass rounded-3xl p-8 shadow-card text-center" initial="hidden" whileInView="visible" viewport={{ once: true }} custom={i} variants={fadeUp}>
                 <div className="absolute -top-4 -left-2 w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-display font-bold text-lg shadow-soft">
                   {i + 1}
                 </div>
@@ -196,31 +192,23 @@ export default function Landing() {
         <div className="container">
           <motion.div className="text-center mb-14" initial="hidden" whileInView="visible" viewport={{ once: true }}>
             <motion.h2 className="text-3xl md:text-4xl font-display font-bold mb-4" custom={0} variants={fadeUp}>
-              What Our <span className="gradient-text">Patients Say</span>
+              {t.whatPatientsSay} <span className="gradient-text">{t.patientsSayWord}</span>
             </motion.h2>
           </motion.div>
           <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-            {[
-              { name: "Sarah M.", text: "Booking was incredibly easy. I found a cardiologist and had an appointment within 24 hours!", rating: 5 },
-              { name: "James R.", text: "The doctors are top-notch. The whole experience from booking to consultation was seamless.", rating: 5 },
-              { name: "Emily K.", text: "I love being able to upload my medical documents beforehand. It saves so much time at the clinic.", rating: 5 },
-            ].map((t, i) => (
-              <motion.div
-                key={t.name}
-                className="glass rounded-2xl p-6 shadow-card"
-                initial="hidden" whileInView="visible" viewport={{ once: true }} custom={i} variants={fadeUp}
-              >
+            {testimonials.map((tt, i) => (
+              <motion.div key={tt.name} className="glass rounded-2xl p-6 shadow-card" initial="hidden" whileInView="visible" viewport={{ once: true }} custom={i} variants={fadeUp}>
                 <div className="flex gap-1 mb-4">
-                  {Array.from({ length: t.rating }).map((_, j) => (
+                  {Array.from({ length: tt.rating }).map((_, j) => (
                     <Star key={j} className="h-4 w-4 fill-warning text-warning" />
                   ))}
                 </div>
-                <p className="text-muted-foreground text-sm mb-4">"{t.text}"</p>
+                <p className="text-muted-foreground text-sm mb-4">"{tt.text}"</p>
                 <div className="flex items-center gap-3">
                   <div className="h-9 w-9 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-primary-foreground font-display font-bold text-sm">
-                    {t.name[0]}
+                    {tt.name[0]}
                   </div>
-                  <span className="font-medium text-sm">{t.name}</span>
+                  <span className="font-medium text-sm">{tt.name}</span>
                 </div>
               </motion.div>
             ))}
@@ -231,22 +219,18 @@ export default function Landing() {
       {/* CTA */}
       <section className="py-20">
         <div className="container">
-          <motion.div
-            className="rounded-3xl p-10 md:p-16 text-center relative overflow-hidden"
-            style={{ background: "var(--gradient-primary)" }}
-            initial="hidden" whileInView="visible" viewport={{ once: true }} custom={0} variants={fadeUp}
-          >
+          <motion.div className="rounded-3xl p-10 md:p-16 text-center relative overflow-hidden" style={{ background: "var(--gradient-primary)" }} initial="hidden" whileInView="visible" viewport={{ once: true }} custom={0} variants={fadeUp}>
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_50%,rgba(255,255,255,0.15),transparent)]" />
             <div className="relative">
               <h2 className="text-3xl md:text-4xl font-display font-bold text-primary-foreground mb-4">
-                Ready to Take Control of Your Health?
+                {t.ctaTitle}
               </h2>
               <p className="text-primary-foreground/80 max-w-lg mx-auto mb-8">
-                Join thousands of patients who trust MediBook for their healthcare needs.
+                {t.ctaDesc}
               </p>
               <Button size="lg" variant="secondary" asChild className="rounded-full px-8 h-12 text-base">
                 <Link to="/auth?tab=signup">
-                  Create Your Account <ArrowRight className="ml-2 h-4 w-4" />
+                  {t.createAccount} <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
               </Button>
             </div>
@@ -263,11 +247,11 @@ export default function Landing() {
             </div>
             <span className="font-display font-bold">MediBook</span>
           </div>
-          <p className="text-sm text-muted-foreground">© 2026 MediBook. All rights reserved.</p>
+          <p className="text-sm text-muted-foreground">{t.copyright}</p>
           <div className="flex gap-6">
-            <a href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Privacy</a>
-            <a href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Terms</a>
-            <a href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Contact</a>
+            <a href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">{t.privacy}</a>
+            <a href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">{t.terms}</a>
+            <a href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">{t.contact}</a>
           </div>
         </div>
       </footer>

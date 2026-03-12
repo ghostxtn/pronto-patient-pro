@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import AppLayout from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -22,8 +23,6 @@ const iconMap: Record<string, React.ElementType> = {
   eye: Eye, baby: Baby, bone: Bone, "scan-face": ScanFace, smile: Smile,
 };
 
-const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-
 const fadeUp = {
   hidden: { opacity: 0, y: 20 },
   visible: (i: number) => ({
@@ -36,18 +35,18 @@ function generateTimeSlots(startTime: string, endTime: string, intervalMin = 30)
   const slots: string[] = [];
   let current = parse(startTime, "HH:mm:ss", new Date());
   const end = parse(endTime, "HH:mm:ss", new Date());
-  while (isBefore(current, end)) {
-    slots.push(format(current, "HH:mm"));
-    current = addMinutes(current, intervalMin);
-  }
+  while (isBefore(current, end)) { slots.push(format(current, "HH:mm")); current = addMinutes(current, intervalMin); }
   return slots;
 }
 
 export default function DoctorProfile() {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+
+  const dayNames = [t.sunday, t.monday, t.tuesday, t.wednesday, t.thursday, t.friday, t.saturday];
 
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
@@ -56,15 +55,7 @@ export default function DoctorProfile() {
   const { data: doctor, isLoading } = useQuery({
     queryKey: ["doctor", id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("doctors")
-        .select(`
-          *,
-          specializations (id, name, icon, description),
-          profiles!doctors_user_id_fkey (full_name, avatar_url, email)
-        `)
-        .eq("id", id!)
-        .single();
+      const { data, error } = await supabase.from("doctors").select(`*, specializations (id, name, icon, description), profiles!doctors_user_id_fkey (full_name, avatar_url, email)`).eq("id", id!).single();
       if (error) throw error;
       return data;
     },
@@ -74,11 +65,7 @@ export default function DoctorProfile() {
   const { data: availability } = useQuery({
     queryKey: ["doctor-availability", id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("doctor_availability")
-        .select("*")
-        .eq("doctor_id", id!)
-        .eq("is_active", true);
+      const { data, error } = await supabase.from("doctor_availability").select("*").eq("doctor_id", id!).eq("is_active", true);
       if (error) throw error;
       return data;
     },
@@ -89,12 +76,7 @@ export default function DoctorProfile() {
     queryKey: ["doctor-appointments", id, selectedDate],
     queryFn: async () => {
       if (!selectedDate) return [];
-      const { data, error } = await supabase
-        .from("appointments")
-        .select("start_time, end_time")
-        .eq("doctor_id", id!)
-        .eq("appointment_date", format(selectedDate, "yyyy-MM-dd"))
-        .in("status", ["pending", "confirmed"]);
+      const { data, error } = await supabase.from("appointments").select("start_time, end_time").eq("doctor_id", id!).eq("appointment_date", format(selectedDate, "yyyy-MM-dd")).in("status", ["pending", "confirmed"]);
       if (error) throw error;
       return data;
     },
@@ -107,65 +89,22 @@ export default function DoctorProfile() {
       const startTime = selectedSlot + ":00";
       const endParsed = addMinutes(parse(selectedSlot, "HH:mm", new Date()), 30);
       const endTime = format(endParsed, "HH:mm") + ":00";
-
-      const { error } = await supabase.from("appointments").insert({
-        patient_id: user.id,
-        doctor_id: id,
-        appointment_date: format(selectedDate, "yyyy-MM-dd"),
-        start_time: startTime,
-        end_time: endTime,
-        notes: notes || null,
-      });
+      const { error } = await supabase.from("appointments").insert({ patient_id: user.id, doctor_id: id, appointment_date: format(selectedDate, "yyyy-MM-dd"), start_time: startTime, end_time: endTime, notes: notes || null });
       if (error) throw error;
     },
-    onSuccess: () => {
-      toast.success("Appointment booked successfully!");
-      queryClient.invalidateQueries({ queryKey: ["doctor-appointments"] });
-      navigate("/appointments");
-    },
-    onError: (err: any) => {
-      toast.error(err.message || "Failed to book appointment");
-    },
+    onSuccess: () => { toast.success(t.bookingSuccess); queryClient.invalidateQueries({ queryKey: ["doctor-appointments"] }); navigate("/appointments"); },
+    onError: (err: any) => toast.error(err.message || t.bookingFailed),
   });
 
   const availableDays = availability?.map((a) => a.day_of_week) || [];
-
-  const isDateDisabled = (date: Date) => {
-    if (isBefore(date, new Date()) && !isToday(date)) return true;
-    return !availableDays.includes(date.getDay());
-  };
-
-  const selectedDayAvailability = selectedDate
-    ? availability?.filter((a) => a.day_of_week === selectedDate.getDay())
-    : [];
-
-  const allSlots = selectedDayAvailability?.flatMap((a) =>
-    generateTimeSlots(a.start_time, a.end_time)
-  ) || [];
-
+  const isDateDisabled = (date: Date) => { if (isBefore(date, new Date()) && !isToday(date)) return true; return !availableDays.includes(date.getDay()); };
+  const selectedDayAvailability = selectedDate ? availability?.filter((a) => a.day_of_week === selectedDate.getDay()) : [];
+  const allSlots = selectedDayAvailability?.flatMap((a) => generateTimeSlots(a.start_time, a.end_time)) || [];
   const bookedSlots = existingAppointments?.map((a) => a.start_time.slice(0, 5)) || [];
   const availableSlots = allSlots.filter((s) => !bookedSlots.includes(s));
 
-  if (isLoading) {
-    return (
-      <AppLayout>
-        <div className="flex items-center justify-center py-20">
-          <div className="h-8 w-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-        </div>
-      </AppLayout>
-    );
-  }
-
-  if (!doctor) {
-    return (
-      <AppLayout>
-        <div className="text-center py-20">
-          <h2 className="font-display font-bold text-xl mb-2">Doctor Not Found</h2>
-          <Button variant="outline" onClick={() => navigate("/doctors")}>Back to Doctors</Button>
-        </div>
-      </AppLayout>
-    );
-  }
+  if (isLoading) return <AppLayout><div className="flex items-center justify-center py-20"><div className="h-8 w-8 rounded-full border-2 border-primary border-t-transparent animate-spin" /></div></AppLayout>;
+  if (!doctor) return <AppLayout><div className="text-center py-20"><h2 className="font-display font-bold text-xl mb-2">{t.doctorNotFound}</h2><Button variant="outline" onClick={() => navigate("/doctors")}>{t.backToDoctors}</Button></div></AppLayout>;
 
   const profile = doctor.profiles as any;
   const spec = doctor.specializations as any;
@@ -175,83 +114,35 @@ export default function DoctorProfile() {
     <AppLayout>
       <motion.div initial="hidden" animate="visible">
         <motion.div custom={0} variants={fadeUp}>
-          <Button variant="ghost" size="sm" className="mb-4" onClick={() => navigate("/doctors")}>
-            <ArrowLeft className="h-4 w-4 mr-1" /> Back to Doctors
-          </Button>
+          <Button variant="ghost" size="sm" className="mb-4" onClick={() => navigate("/doctors")}><ArrowLeft className="h-4 w-4 mr-1" /> {t.backToDoctors}</Button>
         </motion.div>
 
         <div className="grid lg:grid-cols-3 gap-6">
-          {/* Doctor Info */}
           <motion.div className="lg:col-span-1 space-y-4" custom={1} variants={fadeUp}>
             <div className="glass rounded-2xl p-6 shadow-card">
               <div className="flex flex-col items-center text-center">
                 <div className="h-24 w-24 rounded-3xl bg-gradient-to-br from-primary to-info flex items-center justify-center mb-4">
-                  {profile?.avatar_url ? (
-                    <img src={profile.avatar_url} alt="" className="h-24 w-24 rounded-3xl object-cover" />
-                  ) : (
-                    <span className="text-primary-foreground font-display font-bold text-3xl">
-                      {profile?.full_name?.[0] || "D"}
-                    </span>
-                  )}
+                  {profile?.avatar_url ? <img src={profile.avatar_url} alt="" className="h-24 w-24 rounded-3xl object-cover" /> : <span className="text-primary-foreground font-display font-bold text-3xl">{profile?.full_name?.[0] || "D"}</span>}
                 </div>
                 <h1 className="text-xl font-display font-bold">Dr. {profile?.full_name || "Unknown"}</h1>
-                <Badge variant="secondary" className="mt-2 rounded-full">
-                  <Icon className="h-3.5 w-3.5 mr-1" />
-                  {spec?.name || "General"}
-                </Badge>
-
+                <Badge variant="secondary" className="mt-2 rounded-full"><Icon className="h-3.5 w-3.5 mr-1" />{spec?.name || "General"}</Badge>
                 <div className="grid grid-cols-3 gap-3 mt-6 w-full">
-                  <div className="text-center p-3 rounded-xl bg-muted">
-                    <GraduationCap className="h-4 w-4 mx-auto mb-1 text-muted-foreground" />
-                    <div className="text-sm font-bold">{doctor.experience_years}y</div>
-                    <div className="text-xs text-muted-foreground">Experience</div>
-                  </div>
-                  <div className="text-center p-3 rounded-xl bg-muted">
-                    <Star className="h-4 w-4 mx-auto mb-1 fill-warning text-warning" />
-                    <div className="text-sm font-bold">4.8</div>
-                    <div className="text-xs text-muted-foreground">Rating</div>
-                  </div>
-                  <div className="text-center p-3 rounded-xl bg-muted">
-                    <DollarSign className="h-4 w-4 mx-auto mb-1 text-muted-foreground" />
-                    <div className="text-sm font-bold">${doctor.consultation_fee}</div>
-                    <div className="text-xs text-muted-foreground">Fee</div>
-                  </div>
+                  <div className="text-center p-3 rounded-xl bg-muted"><GraduationCap className="h-4 w-4 mx-auto mb-1 text-muted-foreground" /><div className="text-sm font-bold">{doctor.experience_years}y</div><div className="text-xs text-muted-foreground">{t.experience}</div></div>
+                  <div className="text-center p-3 rounded-xl bg-muted"><Star className="h-4 w-4 mx-auto mb-1 fill-warning text-warning" /><div className="text-sm font-bold">4.8</div><div className="text-xs text-muted-foreground">{t.rating}</div></div>
+                  <div className="text-center p-3 rounded-xl bg-muted"><DollarSign className="h-4 w-4 mx-auto mb-1 text-muted-foreground" /><div className="text-sm font-bold">${doctor.consultation_fee}</div><div className="text-xs text-muted-foreground">{t.fee}</div></div>
                 </div>
               </div>
             </div>
-
-            {doctor.bio && (
-              <div className="glass rounded-2xl p-6 shadow-card">
-                <h3 className="font-display font-semibold mb-2 flex items-center gap-2">
-                  <FileText className="h-4 w-4" /> About
-                </h3>
-                <p className="text-sm text-muted-foreground">{doctor.bio}</p>
-              </div>
-            )}
-
-            {/* Weekly Schedule */}
+            {doctor.bio && (<div className="glass rounded-2xl p-6 shadow-card"><h3 className="font-display font-semibold mb-2 flex items-center gap-2"><FileText className="h-4 w-4" /> {t.about}</h3><p className="text-sm text-muted-foreground">{doctor.bio}</p></div>)}
             <div className="glass rounded-2xl p-6 shadow-card">
-              <h3 className="font-display font-semibold mb-3 flex items-center gap-2">
-                <Clock className="h-4 w-4" /> Weekly Schedule
-              </h3>
+              <h3 className="font-display font-semibold mb-3 flex items-center gap-2"><Clock className="h-4 w-4" /> {t.weeklySchedule}</h3>
               <div className="space-y-2">
                 {dayNames.map((day, idx) => {
                   const daySlots = availability?.filter((a) => a.day_of_week === idx);
                   return (
                     <div key={day} className="flex items-center justify-between text-sm">
-                      <span className={cn(
-                        "font-medium",
-                        daySlots && daySlots.length > 0 ? "text-foreground" : "text-muted-foreground"
-                      )}>
-                        {day}
-                      </span>
-                      {daySlots && daySlots.length > 0 ? (
-                        <span className="text-muted-foreground">
-                          {daySlots.map((s) => `${s.start_time.slice(0, 5)} - ${s.end_time.slice(0, 5)}`).join(", ")}
-                        </span>
-                      ) : (
-                        <span className="text-muted-foreground/50 text-xs">Unavailable</span>
-                      )}
+                      <span className={cn("font-medium", daySlots && daySlots.length > 0 ? "text-foreground" : "text-muted-foreground")}>{day}</span>
+                      {daySlots && daySlots.length > 0 ? <span className="text-muted-foreground">{daySlots.map((s) => `${s.start_time.slice(0, 5)} - ${s.end_time.slice(0, 5)}`).join(", ")}</span> : <span className="text-muted-foreground/50 text-xs">{t.unavailable}</span>}
                     </div>
                   );
                 })}
@@ -259,110 +150,38 @@ export default function DoctorProfile() {
             </div>
           </motion.div>
 
-          {/* Booking Section */}
           <motion.div className="lg:col-span-2 space-y-4" custom={2} variants={fadeUp}>
             <div className="glass rounded-2xl p-6 shadow-card">
-              <h2 className="text-xl font-display font-bold mb-1 flex items-center gap-2">
-                <CalendarCheck className="h-5 w-5" /> Book an Appointment
-              </h2>
-              <p className="text-sm text-muted-foreground mb-6">Select a date and time that works for you.</p>
-
+              <h2 className="text-xl font-display font-bold mb-1 flex items-center gap-2"><CalendarCheck className="h-5 w-5" /> {t.bookAnAppointment}</h2>
+              <p className="text-sm text-muted-foreground mb-6">{t.selectDateAndTime}</p>
               <div className="grid md:grid-cols-2 gap-6">
-                {/* Calendar */}
                 <div>
-                  <h3 className="text-sm font-semibold mb-3">Select Date</h3>
-                  <Calendar
-                    mode="single"
-                    selected={selectedDate}
-                    onSelect={(date) => {
-                      setSelectedDate(date);
-                      setSelectedSlot(null);
-                    }}
-                    disabled={isDateDisabled}
-                    className={cn("p-3 pointer-events-auto rounded-xl border")}
-                    fromDate={new Date()}
-                  />
+                  <h3 className="text-sm font-semibold mb-3">{t.selectDate}</h3>
+                  <Calendar mode="single" selected={selectedDate} onSelect={(date) => { setSelectedDate(date); setSelectedSlot(null); }} disabled={isDateDisabled} className={cn("p-3 pointer-events-auto rounded-xl border")} fromDate={new Date()} />
                 </div>
-
-                {/* Time Slots */}
                 <div>
-                  <h3 className="text-sm font-semibold mb-3">
-                    {selectedDate
-                      ? `Available Slots — ${format(selectedDate, "EEE, MMM d")}`
-                      : "Select a date first"}
-                  </h3>
-                  {selectedDate ? (
-                    availableSlots.length > 0 ? (
-                      <div className="grid grid-cols-3 gap-2">
-                        {availableSlots.map((slot) => (
-                          <Button
-                            key={slot}
-                            variant={selectedSlot === slot ? "default" : "outline"}
-                            size="sm"
-                            className="rounded-xl text-sm"
-                            onClick={() => setSelectedSlot(slot)}
-                          >
-                            {slot}
-                          </Button>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-center py-8 text-muted-foreground text-sm">
-                        No available slots for this date.
-                      </div>
-                    )
-                  ) : (
-                    <div className="text-center py-8 text-muted-foreground text-sm">
-                      Pick a highlighted date from the calendar.
-                    </div>
-                  )}
+                  <h3 className="text-sm font-semibold mb-3">{selectedDate ? `${t.availableSlots} — ${format(selectedDate, "EEE, MMM d")}` : t.selectDateFirst}</h3>
+                  {selectedDate ? (availableSlots.length > 0 ? (<div className="grid grid-cols-3 gap-2">{availableSlots.map((slot) => (<Button key={slot} variant={selectedSlot === slot ? "default" : "outline"} size="sm" className="rounded-xl text-sm" onClick={() => setSelectedSlot(slot)}>{slot}</Button>))}</div>) : (<div className="text-center py-8 text-muted-foreground text-sm">{t.noSlotsAvailable}</div>)) : (<div className="text-center py-8 text-muted-foreground text-sm">{t.pickDate}</div>)}
                 </div>
               </div>
             </div>
 
-            {/* Notes & Confirm */}
             {selectedSlot && selectedDate && (
-              <motion.div
-                className="glass rounded-2xl p-6 shadow-card"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3 }}
-              >
-                <h3 className="font-display font-semibold mb-3">Additional Notes</h3>
-                <Textarea
-                  placeholder="Describe your symptoms or any information the doctor should know..."
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  className="rounded-xl mb-4"
-                  rows={3}
-                />
-
+              <motion.div className="glass rounded-2xl p-6 shadow-card" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
+                <h3 className="font-display font-semibold mb-3">{t.additionalNotes}</h3>
+                <Textarea placeholder={t.symptomsPlaceholder} value={notes} onChange={(e) => setNotes(e.target.value)} className="rounded-xl mb-4" rows={3} />
                 <div className="glass rounded-xl p-4 mb-4">
-                  <h4 className="text-sm font-semibold mb-2">Booking Summary</h4>
+                  <h4 className="text-sm font-semibold mb-2">{t.bookingSummary}</h4>
                   <div className="grid grid-cols-2 gap-2 text-sm">
-                    <span className="text-muted-foreground">Doctor</span>
-                    <span className="font-medium">Dr. {profile?.full_name}</span>
-                    <span className="text-muted-foreground">Specialty</span>
-                    <span className="font-medium">{spec?.name}</span>
-                    <span className="text-muted-foreground">Date</span>
-                    <span className="font-medium">{format(selectedDate, "EEEE, MMMM d, yyyy")}</span>
-                    <span className="text-muted-foreground">Time</span>
-                    <span className="font-medium">{selectedSlot} — {format(addMinutes(parse(selectedSlot, "HH:mm", new Date()), 30), "HH:mm")}</span>
-                    <span className="text-muted-foreground">Fee</span>
-                    <span className="font-medium">${doctor.consultation_fee}</span>
+                    <span className="text-muted-foreground">{t.doctor}</span><span className="font-medium">Dr. {profile?.full_name}</span>
+                    <span className="text-muted-foreground">{t.specialty}</span><span className="font-medium">{spec?.name}</span>
+                    <span className="text-muted-foreground">{t.date}</span><span className="font-medium">{format(selectedDate, "EEEE, MMMM d, yyyy")}</span>
+                    <span className="text-muted-foreground">{t.time}</span><span className="font-medium">{selectedSlot} — {format(addMinutes(parse(selectedSlot, "HH:mm", new Date()), 30), "HH:mm")}</span>
+                    <span className="text-muted-foreground">{t.fee}</span><span className="font-medium">${doctor.consultation_fee}</span>
                   </div>
                 </div>
-
-                <Button
-                  className="w-full rounded-xl h-11 shadow-soft"
-                  onClick={() => bookMutation.mutate()}
-                  disabled={bookMutation.isPending}
-                >
-                  {bookMutation.isPending ? (
-                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Booking...</>
-                  ) : (
-                    <><CalendarCheck className="mr-2 h-4 w-4" /> Confirm Booking</>
-                  )}
+                <Button className="w-full rounded-xl h-11 shadow-soft" onClick={() => bookMutation.mutate()} disabled={bookMutation.isPending}>
+                  {bookMutation.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> {t.booking}</> : <><CalendarCheck className="mr-2 h-4 w-4" /> {t.confirmBooking}</>}
                 </Button>
               </motion.div>
             )}

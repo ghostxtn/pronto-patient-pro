@@ -1,4 +1,5 @@
 import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { useNavigate, Link } from "react-router-dom";
 import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -19,6 +20,7 @@ const fadeUp = {
 
 export default function Dashboard() {
   const { user, loading, hasRole } = useAuth();
+  const { t } = useLanguage();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -30,13 +32,7 @@ export default function Dashboard() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("appointments")
-        .select(`
-          *,
-          doctors (
-            specializations (name, icon),
-            profiles!doctors_user_id_fkey (full_name)
-          )
-        `)
+        .select(`*, doctors (specializations (name, icon), profiles!doctors_user_id_fkey (full_name))`)
         .eq("patient_id", user!.id)
         .order("appointment_date", { ascending: true });
       if (error) throw error;
@@ -59,20 +55,20 @@ export default function Dashboard() {
   const total = appointments?.length || 0;
 
   const quickStats = [
-    { icon: CalendarCheck, label: "Upcoming", value: String(upcoming.length), color: "from-primary to-info" },
-    { icon: Clock, label: "Pending", value: String(pending.length), color: "from-warning to-destructive" },
-    { icon: Users, label: "Completed", value: String(completed.length), color: "from-secondary to-success" },
-    { icon: Activity, label: "Total", value: String(total), color: "from-accent-foreground to-primary" },
+    { icon: CalendarCheck, label: t.upcoming, value: String(upcoming.length), color: "from-primary to-info" },
+    { icon: Clock, label: t.pending, value: String(pending.length), color: "from-warning to-destructive" },
+    { icon: Users, label: t.completed, value: String(completed.length), color: "from-secondary to-success" },
+    { icon: Activity, label: t.total, value: String(total), color: "from-accent-foreground to-primary" },
   ];
 
   return (
     <AppLayout>
       <motion.div initial="hidden" animate="visible">
         <motion.h1 className="text-3xl font-display font-bold mb-2" custom={0} variants={fadeUp}>
-          Welcome back{user?.user_metadata?.full_name ? `, ${user.user_metadata.full_name}` : ""}! 👋
+          {t.welcomeBackUser}{user?.user_metadata?.full_name ? `, ${user.user_metadata.full_name}` : ""}! 👋
         </motion.h1>
         <motion.p className="text-muted-foreground mb-8" custom={1} variants={fadeUp}>
-          Here's your health dashboard overview.
+          {t.dashboardDesc}
         </motion.p>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
@@ -87,13 +83,12 @@ export default function Dashboard() {
           ))}
         </div>
 
-        {/* Upcoming appointments */}
         {upcoming.length > 0 ? (
           <motion.div className="glass rounded-2xl p-6 shadow-card" custom={6} variants={fadeUp}>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-display font-semibold text-lg">Upcoming Appointments</h3>
+              <h3 className="font-display font-semibold text-lg">{t.upcomingAppointments}</h3>
               <Button variant="ghost" size="sm" asChild>
-                <Link to="/appointments">View All <ArrowRight className="ml-1 h-3 w-3" /></Link>
+                <Link to="/appointments">{t.viewAll} <ArrowRight className="ml-1 h-3 w-3" /></Link>
               </Button>
             </div>
             <div className="space-y-3">
@@ -118,12 +113,10 @@ export default function Dashboard() {
         ) : (
           <motion.div className="glass rounded-2xl p-8 shadow-card text-center" custom={6} variants={fadeUp}>
             <CalendarCheck className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" />
-            <h3 className="font-display font-semibold text-lg mb-2">No Appointments Yet</h3>
-            <p className="text-muted-foreground text-sm mb-4">
-              Book your first appointment with one of our specialists.
-            </p>
+            <h3 className="font-display font-semibold text-lg mb-2">{t.noAppointmentsYet}</h3>
+            <p className="text-muted-foreground text-sm mb-4">{t.noAppointmentsDesc}</p>
             <Button className="rounded-full px-6 shadow-soft" asChild>
-              <Link to="/doctors">Find a Doctor</Link>
+              <Link to="/doctors">{t.findDoctor}</Link>
             </Button>
           </motion.div>
         )}
