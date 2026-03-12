@@ -60,7 +60,7 @@ export default function DoctorProfile() {
   .select(`
     *,
     specializations (id, name, icon, description),
-    profiles:user_id (full_name, avatar_url, email)
+    profiles!doctors_user_id_profiles_fkey (full_name, avatar_url, email)
   `)
   .eq("id", id!)
   .single();
