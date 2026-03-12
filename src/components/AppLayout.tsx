@@ -1,40 +1,44 @@
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { Button } from "@/components/ui/button";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 import {
   Stethoscope, LogOut, LayoutDashboard, Search, CalendarDays, User, Clock, ClipboardList,
   Users, Settings, ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const patientLinks = [
-  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/doctors", label: "Find Doctors", icon: Search },
-  { to: "/appointments", label: "My Appointments", icon: CalendarDays },
-  { to: "/profile", label: "Profile", icon: User },
-];
-
-const doctorLinks = [
-  { to: "/doctor/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/doctor/schedule", label: "My Schedule", icon: Clock },
-  { to: "/doctor/appointments", label: "Appointments", icon: ClipboardList },
-  { to: "/profile", label: "Profile", icon: User },
-];
-
-const adminLinks = [
-  { to: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/admin/doctors", label: "Doctors", icon: Stethoscope },
-  { to: "/admin/patients", label: "Patients", icon: Users },
-  { to: "/admin/appointments", label: "Appointments", icon: CalendarDays },
-  { to: "/admin/settings", label: "Settings", icon: Settings },
-];
-
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, signOut, hasRole } = useAuth();
+  const { t } = useLanguage();
   const location = useLocation();
   const isAdmin = hasRole("admin");
   const isDoctor = hasRole("doctor");
-  const roleLabel = isAdmin ? "Admin" : isDoctor ? "Doctor" : "Patient";
+  const roleLabel = isAdmin ? t.admin : isDoctor ? t.doctor : t.patient;
+
+  const patientLinks = [
+    { to: "/dashboard", label: t.dashboard, icon: LayoutDashboard },
+    { to: "/doctors", label: t.findDoctorsNav, icon: Search },
+    { to: "/appointments", label: t.myAppointments, icon: CalendarDays },
+    { to: "/profile", label: t.profile, icon: User },
+  ];
+
+  const doctorLinks = [
+    { to: "/doctor/dashboard", label: t.dashboard, icon: LayoutDashboard },
+    { to: "/doctor/schedule", label: t.myScheduleNav, icon: Clock },
+    { to: "/doctor/appointments", label: t.appointmentsNav, icon: ClipboardList },
+    { to: "/profile", label: t.profile, icon: User },
+  ];
+
+  const adminLinks = [
+    { to: "/admin/dashboard", label: t.dashboard, icon: LayoutDashboard },
+    { to: "/admin/doctors", label: t.doctorsNav, icon: Stethoscope },
+    { to: "/admin/patients", label: t.patientsNav, icon: Users },
+    { to: "/admin/appointments", label: t.appointmentsNav, icon: CalendarDays },
+    { to: "/admin/settings", label: t.settingsNav, icon: Settings },
+  ];
+
   const links = isAdmin ? adminLinks : isDoctor ? doctorLinks : patientLinks;
   const homePath = isAdmin ? "/admin/dashboard" : isDoctor ? "/doctor/dashboard" : "/dashboard";
 
@@ -72,7 +76,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             ))}
           </nav>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1">
+            <LanguageSwitcher />
             <span className="text-sm text-muted-foreground hidden lg:block">{user?.email}</span>
             <Button variant="ghost" size="icon" onClick={signOut}>
               <LogOut className="h-4 w-4" />
