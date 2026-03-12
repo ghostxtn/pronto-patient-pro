@@ -3,7 +3,7 @@ import { en } from "@/i18n/en";
 import { tr } from "@/i18n/tr";
 
 type Language = "en" | "tr";
-type Translations = typeof en;
+type Translations = Record<string, string>;
 
 interface LanguageContextType {
   lang: Language;

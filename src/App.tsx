@@ -4,6 +4,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { LanguageProvider } from "@/contexts/LanguageContext";
 import Landing from "./pages/Landing";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
@@ -29,27 +30,29 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <AuthProvider>
-          <Routes>
-            <Route path="/" element={<Landing />} />
-            <Route path="/auth" element={<Auth />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/doctors" element={<FindDoctors />} />
-            <Route path="/doctors/:id" element={<DoctorProfile />} />
-            <Route path="/appointments" element={<MyAppointments />} />
-            <Route path="/doctor/dashboard" element={<DoctorDashboard />} />
-            <Route path="/doctor/schedule" element={<DoctorSchedule />} />
-            <Route path="/doctor/appointments" element={<DoctorAppointments />} />
-            <Route path="/admin/dashboard" element={<AdminDashboard />} />
-            <Route path="/admin/doctors" element={<ManageDoctors />} />
-            <Route path="/admin/patients" element={<ManagePatients />} />
-            <Route path="/admin/appointments" element={<ManageAppointments />} />
-            <Route path="/admin/settings" element={<ClinicSettings />} />
-            <Route path="/profile" element={<Profile />} />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </AuthProvider>
+        <LanguageProvider>
+          <AuthProvider>
+            <Routes>
+              <Route path="/" element={<Landing />} />
+              <Route path="/auth" element={<Auth />} />
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/doctors" element={<FindDoctors />} />
+              <Route path="/doctors/:id" element={<DoctorProfile />} />
+              <Route path="/appointments" element={<MyAppointments />} />
+              <Route path="/doctor/dashboard" element={<DoctorDashboard />} />
+              <Route path="/doctor/schedule" element={<DoctorSchedule />} />
+              <Route path="/doctor/appointments" element={<DoctorAppointments />} />
+              <Route path="/admin/dashboard" element={<AdminDashboard />} />
+              <Route path="/admin/doctors" element={<ManageDoctors />} />
+              <Route path="/admin/patients" element={<ManagePatients />} />
+              <Route path="/admin/appointments" element={<ManageAppointments />} />
+              <Route path="/admin/settings" element={<ClinicSettings />} />
+              <Route path="/profile" element={<Profile />} />
+              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </AuthProvider>
+        </LanguageProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
