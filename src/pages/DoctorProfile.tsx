@@ -55,7 +55,15 @@ export default function DoctorProfile() {
   const { data: doctor, isLoading } = useQuery({
     queryKey: ["doctor", id],
     queryFn: async () => {
-      const { data, error } = await supabase.from("doctors").select(`*, specializations (id, name, icon, description), profiles!doctors_user_id_fkey (full_name, avatar_url, email)`).eq("id", id!).single();
+      const { data, error } = await supabase
+  .from("doctors")
+  .select(`
+    *,
+    specializations (id, name, icon, description),
+    profiles:user_id (full_name, avatar_url, email)
+  `)
+  .eq("id", id!)
+  .single();
       if (error) throw error;
       return data;
     },
