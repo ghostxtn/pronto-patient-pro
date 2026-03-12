@@ -45,7 +45,24 @@ export default function MyAppointments() {
   const { data: appointments, isLoading } = useQuery({
     queryKey: ["my-appointments", user?.id],
     queryFn: async () => {
-      const { data, error } = await supabase.from("appointments").select(`*, doctors (id, consultation_fee, experience_years, specializations (name, icon), profiles!doctors_user_id_fkey (full_name, avatar_url))`).eq("patient_id", user!.id).order("appointment_date", { ascending: false });
+      const { data, error } = await supabase
+  .from("appointments")
+  .select(`
+    *,
+    doctors (
+      id,
+      consultation_fee,
+      experience_years,
+      specializations (name, icon),
+      profiles!doctors_user_id_profiles_fkey (
+        full_name,
+        avatar_url,
+        email
+      )
+    )
+  `)
+  .eq("patient_id", user!.id)
+  .order("appointment_date", { ascending: false });
       if (error) throw error;
       return data;
     },
