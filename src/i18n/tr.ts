@@ -1,6 +1,4 @@
-import type { en } from "./en";
-
-export const tr: typeof en = {
+export const tr: Record<string, string> = {
   // Common
   signIn: "Giriş Yap",
   signUp: "Kayıt ol",
