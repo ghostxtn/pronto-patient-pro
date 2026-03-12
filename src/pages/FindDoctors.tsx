@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { useLanguage } from "@/contexts/LanguageContext";
 import AppLayout from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,14 +29,12 @@ const fadeUp = {
 export default function FindDoctors() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedSpec, setSelectedSpec] = useState<string | null>(null);
+  const { t } = useLanguage();
 
   const { data: specializations } = useQuery({
     queryKey: ["specializations"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("specializations")
-        .select("*")
-        .order("name");
+      const { data, error } = await supabase.from("specializations").select("*").order("name");
       if (error) throw error;
       return data;
     },
@@ -44,19 +43,8 @@ export default function FindDoctors() {
   const { data: doctors, isLoading } = useQuery({
     queryKey: ["doctors", selectedSpec],
     queryFn: async () => {
-      let query = supabase
-        .from("doctors")
-        .select(`
-          *,
-          specializations (id, name, icon),
-          profiles!doctors_user_id_fkey (full_name, avatar_url, email)
-        `)
-        .eq("is_active", true);
-
-      if (selectedSpec) {
-        query = query.eq("specialization_id", selectedSpec);
-      }
-
+      let query = supabase.from("doctors").select(`*, specializations (id, name, icon), profiles!doctors_user_id_fkey (full_name, avatar_url, email)`).eq("is_active", true);
+      if (selectedSpec) query = query.eq("specialization_id", selectedSpec);
       const { data, error } = await query;
       if (error) throw error;
       return data;
@@ -75,64 +63,35 @@ export default function FindDoctors() {
     <AppLayout>
       <motion.div initial="hidden" animate="visible">
         <motion.div className="mb-8" custom={0} variants={fadeUp}>
-          <h1 className="text-3xl font-display font-bold mb-2">Find a Doctor</h1>
-          <p className="text-muted-foreground">Browse our specialists and book your appointment.</p>
+          <h1 className="text-3xl font-display font-bold mb-2">{t.findDoctorTitle}</h1>
+          <p className="text-muted-foreground">{t.findDoctorDesc}</p>
         </motion.div>
 
-        {/* Search */}
         <motion.div className="mb-6" custom={1} variants={fadeUp}>
           <div className="relative max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search by name or specialty..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 h-11 rounded-xl"
-            />
+            <Input placeholder={t.searchByNameOrSpecialty} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10 h-11 rounded-xl" />
           </div>
         </motion.div>
 
-        {/* Specialization filters */}
         <motion.div className="flex flex-wrap gap-2 mb-8" custom={2} variants={fadeUp}>
-          <Button
-            variant={selectedSpec === null ? "default" : "outline"}
-            size="sm"
-            className="rounded-full"
-            onClick={() => setSelectedSpec(null)}
-          >
-            All
-          </Button>
+          <Button variant={selectedSpec === null ? "default" : "outline"} size="sm" className="rounded-full" onClick={() => setSelectedSpec(null)}>{t.all}</Button>
           {specializations?.map((spec) => {
             const Icon = iconMap[spec.icon || ""] || Stethoscope;
             return (
-              <Button
-                key={spec.id}
-                variant={selectedSpec === spec.id ? "default" : "outline"}
-                size="sm"
-                className="rounded-full"
-                onClick={() => setSelectedSpec(spec.id)}
-              >
-                <Icon className="h-3.5 w-3.5 mr-1" />
-                {spec.name}
+              <Button key={spec.id} variant={selectedSpec === spec.id ? "default" : "outline"} size="sm" className="rounded-full" onClick={() => setSelectedSpec(spec.id)}>
+                <Icon className="h-3.5 w-3.5 mr-1" /> {spec.name}
               </Button>
             );
           })}
         </motion.div>
 
-        {/* Doctor Cards */}
         {isLoading ? (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
             {[1, 2, 3].map((i) => (
               <div key={i} className="glass rounded-2xl p-6 shadow-card animate-pulse">
-                <div className="flex items-center gap-4 mb-4">
-                  <div className="h-14 w-14 rounded-2xl bg-muted" />
-                  <div className="space-y-2 flex-1">
-                    <div className="h-4 bg-muted rounded w-2/3" />
-                    <div className="h-3 bg-muted rounded w-1/2" />
-                  </div>
-                </div>
-                <div className="h-3 bg-muted rounded w-full mb-2" />
-                <div className="h-3 bg-muted rounded w-3/4" />
+                <div className="flex items-center gap-4 mb-4"><div className="h-14 w-14 rounded-2xl bg-muted" /><div className="space-y-2 flex-1"><div className="h-4 bg-muted rounded w-2/3" /><div className="h-3 bg-muted rounded w-1/2" /></div></div>
+                <div className="h-3 bg-muted rounded w-full mb-2" /><div className="h-3 bg-muted rounded w-3/4" />
               </div>
             ))}
           </div>
@@ -143,55 +102,24 @@ export default function FindDoctors() {
               const spec = doctor.specializations as any;
               const Icon = iconMap[spec?.icon || ""] || Stethoscope;
               return (
-                <motion.div
-                  key={doctor.id}
-                  className="glass rounded-2xl p-6 shadow-card hover:shadow-elevated transition-all duration-300 hover:-translate-y-1"
-                  custom={i + 3} variants={fadeUp}
-                >
+                <motion.div key={doctor.id} className="glass rounded-2xl p-6 shadow-card hover:shadow-elevated transition-all duration-300 hover:-translate-y-1" custom={i + 3} variants={fadeUp}>
                   <div className="flex items-start gap-4 mb-4">
                     <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-primary to-info flex items-center justify-center flex-shrink-0">
-                      {profile?.avatar_url ? (
-                        <img src={profile.avatar_url} alt="" className="h-14 w-14 rounded-2xl object-cover" />
-                      ) : (
-                        <span className="text-primary-foreground font-display font-bold text-lg">
-                          {profile?.full_name?.[0] || "D"}
-                        </span>
-                      )}
+                      {profile?.avatar_url ? <img src={profile.avatar_url} alt="" className="h-14 w-14 rounded-2xl object-cover" /> : <span className="text-primary-foreground font-display font-bold text-lg">{profile?.full_name?.[0] || "D"}</span>}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <h3 className="font-display font-semibold truncate">
-                        Dr. {profile?.full_name || "Unknown"}
-                      </h3>
-                      <Badge variant="secondary" className="mt-1 text-xs rounded-full">
-                        <Icon className="h-3 w-3 mr-1" />
-                        {spec?.name || "General"}
-                      </Badge>
+                      <h3 className="font-display font-semibold truncate">Dr. {profile?.full_name || "Unknown"}</h3>
+                      <Badge variant="secondary" className="mt-1 text-xs rounded-full"><Icon className="h-3 w-3 mr-1" />{spec?.name || "General"}</Badge>
                     </div>
                   </div>
-
-                  {doctor.bio && (
-                    <p className="text-sm text-muted-foreground mb-4 line-clamp-2">{doctor.bio}</p>
-                  )}
-
+                  {doctor.bio && <p className="text-sm text-muted-foreground mb-4 line-clamp-2">{doctor.bio}</p>}
                   <div className="flex items-center gap-4 text-sm text-muted-foreground mb-4">
-                    <span className="flex items-center gap-1">
-                      <Clock className="h-3.5 w-3.5" />
-                      {doctor.experience_years}y exp
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <DollarSign className="h-3.5 w-3.5" />
-                      ${doctor.consultation_fee}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Star className="h-3.5 w-3.5 fill-warning text-warning" />
-                      4.8
-                    </span>
+                    <span className="flex items-center gap-1"><Clock className="h-3.5 w-3.5" />{doctor.experience_years}{t.yrsExp}</span>
+                    <span className="flex items-center gap-1"><DollarSign className="h-3.5 w-3.5" />${doctor.consultation_fee}</span>
+                    <span className="flex items-center gap-1"><Star className="h-3.5 w-3.5 fill-warning text-warning" />4.8</span>
                   </div>
-
                   <Button asChild className="w-full rounded-xl shadow-soft">
-                    <Link to={`/doctors/${doctor.id}`}>
-                      Book Appointment <ArrowRight className="ml-2 h-4 w-4" />
-                    </Link>
+                    <Link to={`/doctors/${doctor.id}`}>{t.bookAppointment} <ArrowRight className="ml-2 h-4 w-4" /></Link>
                   </Button>
                 </motion.div>
               );
@@ -200,12 +128,8 @@ export default function FindDoctors() {
         ) : (
           <motion.div className="glass rounded-2xl p-12 shadow-card text-center" custom={3} variants={fadeUp}>
             <Search className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" />
-            <h3 className="font-display font-semibold text-lg mb-2">No Doctors Found</h3>
-            <p className="text-muted-foreground text-sm">
-              {searchQuery
-                ? "Try adjusting your search or filters."
-                : "No doctors are available for this specialization yet."}
-            </p>
+            <h3 className="font-display font-semibold text-lg mb-2">{t.noDoctorsFound}</h3>
+            <p className="text-muted-foreground text-sm">{searchQuery ? t.noSearchResults : t.noSpecDoctors}</p>
           </motion.div>
         )}
       </motion.div>
