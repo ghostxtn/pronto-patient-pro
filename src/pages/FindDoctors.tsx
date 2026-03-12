@@ -48,7 +48,7 @@ export default function FindDoctors() {
   .select(`
     *,
     specializations (id, name, icon),
-    profiles:user_id (full_name, avatar_url, email)
+    profiles!doctors_user_id_profiles_fkey (full_name, avatar_url, email)
   `)
   .eq("is_active", true);
       if (selectedSpec) query = query.eq("specialization_id", selectedSpec);
