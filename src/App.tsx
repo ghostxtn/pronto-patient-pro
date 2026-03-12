@@ -18,6 +18,7 @@ import ManageDoctors from "./pages/admin/ManageDoctors";
 import ManagePatients from "./pages/admin/ManagePatients";
 import ManageAppointments from "./pages/admin/ManageAppointments";
 import ClinicSettings from "./pages/admin/ClinicSettings";
+import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -44,6 +45,7 @@ const App = () => (
             <Route path="/admin/patients" element={<ManagePatients />} />
             <Route path="/admin/appointments" element={<ManageAppointments />} />
             <Route path="/admin/settings" element={<ClinicSettings />} />
+            <Route path="/profile" element={<Profile />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
