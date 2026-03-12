@@ -43,7 +43,14 @@ export default function FindDoctors() {
   const { data: doctors, isLoading } = useQuery({
     queryKey: ["doctors", selectedSpec],
     queryFn: async () => {
-      let query = supabase.from("doctors").select(`*, specializations (id, name, icon), profiles!doctors_user_id_fkey (full_name, avatar_url, email)`).eq("is_active", true);
+      let query = supabase
+  .from("doctors")
+  .select(`
+    *,
+    specializations (id, name, icon),
+    profiles:user_id (full_name, avatar_url, email)
+  `)
+  .eq("is_active", true);
       if (selectedSpec) query = query.eq("specialization_id", selectedSpec);
       const { data, error } = await query;
       if (error) throw error;
