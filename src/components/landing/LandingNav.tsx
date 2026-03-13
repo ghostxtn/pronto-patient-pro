@@ -8,29 +8,34 @@ import LanguageSwitcher from "@/components/LanguageSwitcher";
 export default function LandingNav() {
   const { t } = useLanguage();
   const { scrollY } = useScroll();
-  const navBg = useTransform(scrollY, [0, 100], [0, 1]);
-  const navBlur = useTransform(scrollY, [0, 100], [0, 20]);
+  const navBg = useTransform(scrollY, [0, 80], [0, 1]);
 
   return (
     <motion.nav
-      className="fixed top-0 inset-x-0 z-50 border-b"
+      className="fixed top-0 inset-x-0 z-50"
       style={{
-        backgroundColor: useTransform(navBg, (v) => `hsl(var(--card) / ${0.6 + v * 0.3})`),
-        backdropFilter: useTransform(navBlur, (v) => `blur(${v}px)`),
-        borderColor: useTransform(navBg, (v) => `hsl(var(--border) / ${v * 0.6})`),
+        backgroundColor: useTransform(navBg, (v) =>
+          `hsl(222 47% 11% / ${0.4 + v * 0.5})`
+        ),
+        backdropFilter: useTransform(navBg, (v) => `blur(${v * 24}px)`),
+        borderBottom: useTransform(navBg, (v) =>
+          `1px solid hsl(220 20% 100% / ${v * 0.06})`
+        ),
       }}
     >
       <div className="container flex h-16 items-center justify-between">
         <Link to="/" className="flex items-center gap-2.5">
           <motion.div
-            className="h-9 w-9 rounded-xl flex items-center justify-center"
+            className="h-9 w-9 rounded-lg flex items-center justify-center"
             style={{ background: "var(--gradient-primary)" }}
-            whileHover={{ rotate: 15, scale: 1.1 }}
-            transition={{ type: "spring", stiffness: 300 }}
+            whileHover={{ scale: 1.08 }}
+            transition={{ type: "spring", stiffness: 400 }}
           >
-            <Stethoscope className="h-5 w-5 text-primary-foreground" />
+            <Stethoscope className="h-5 w-5 text-white" />
           </motion.div>
-          <span className="font-display text-xl font-bold tracking-tight">MediBook</span>
+          <span className="font-display text-lg font-bold tracking-tight text-white">
+            MediBook
+          </span>
         </Link>
 
         <div className="hidden md:flex items-center gap-8">
@@ -42,20 +47,20 @@ export default function LandingNav() {
             <a
               key={link.href}
               href={link.href}
-              className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors relative group"
+              className="text-sm font-medium text-white/60 hover:text-white transition-colors duration-300 relative group"
             >
               {link.label}
-              <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-primary group-hover:w-full transition-all duration-300" />
+              <span className="absolute -bottom-1 left-0 w-0 h-px bg-white/50 group-hover:w-full transition-all duration-300" />
             </a>
           ))}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <LanguageSwitcher />
-          <Button variant="ghost" asChild className="text-sm">
+          <Button variant="ghost" asChild className="text-sm text-white/70 hover:text-white hover:bg-white/10">
             <Link to="/auth">{t.signIn}</Link>
           </Button>
-          <Button asChild className="rounded-full px-6 shadow-soft text-sm">
+          <Button asChild className="rounded-lg px-5 text-sm bg-white text-slate-900 hover:bg-white/90 font-semibold shadow-lg shadow-white/10">
             <Link to="/auth?tab=signup">{t.getStarted}</Link>
           </Button>
         </div>
