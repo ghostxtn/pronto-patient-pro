@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import api from "@/services/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import AppLayout from "@/components/AppLayout";
@@ -34,12 +34,31 @@ export default function DoctorSchedule() {
   const dayNames = [t.sunday, t.monday, t.tuesday, t.wednesday, t.thursday, t.friday, t.saturday];
   const dayShort = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-  const { data: doctorRecord } = useQuery({ queryKey: ["my-doctor-record", user?.id], queryFn: async () => { const { data, error } = await supabase.from("doctors").select("id").eq("user_id", user!.id).single(); if (error) throw error; return data; }, enabled: !!user });
-  const { data: availability, isLoading } = useQuery({ queryKey: ["my-availability", doctorRecord?.id], queryFn: async () => { const { data, error } = await supabase.from("doctor_availability").select("*").eq("doctor_id", doctorRecord!.id).order("day_of_week").order("start_time"); if (error) throw error; return data; }, enabled: !!doctorRecord });
+  const { data: doctorRecord } = useQuery({
+    queryKey: ["my-doctor-record", user?.id],
+    queryFn: async () => {
+      const doctors = await api.doctors.list();
+      const doctor = doctors.find((item: any) => item.user_id === user!.id);
+      if (!doctor) throw new Error("Doctor record not found");
+      return doctor;
+    },
+    enabled: !!user,
+  });
+  const { data: availability, isLoading } = useQuery({
+    queryKey: ["my-availability", doctorRecord?.id],
+    queryFn: async () => {
+      const data = await api.availability.listByDoctor(doctorRecord!.id);
+      return data.sort((a: any, b: any) => {
+        if (a.day_of_week !== b.day_of_week) return a.day_of_week - b.day_of_week;
+        return a.start_time.localeCompare(b.start_time);
+      });
+    },
+    enabled: !!doctorRecord,
+  });
 
-  const addSlot = useMutation({ mutationFn: async () => { if (!doctorRecord) throw new Error("No doctor record"); const { error } = await supabase.from("doctor_availability").insert({ doctor_id: doctorRecord.id, day_of_week: parseInt(newDay), start_time: newStart + ":00", end_time: newEnd + ":00", is_active: true }); if (error) throw error; }, onSuccess: () => { toast.success(t.slotAdded); queryClient.invalidateQueries({ queryKey: ["my-availability"] }); setAddDialogOpen(false); }, onError: (err: any) => toast.error(err.message) });
-  const toggleSlot = useMutation({ mutationFn: async ({ id, is_active }: { id: string; is_active: boolean }) => { const { error } = await supabase.from("doctor_availability").update({ is_active }).eq("id", id); if (error) throw error; }, onSuccess: () => queryClient.invalidateQueries({ queryKey: ["my-availability"] }), onError: (err: any) => toast.error(err.message) });
-  const deleteSlot = useMutation({ mutationFn: async (id: string) => { const { error } = await supabase.from("doctor_availability").delete().eq("id", id); if (error) throw error; }, onSuccess: () => { toast.success(t.slotRemoved); queryClient.invalidateQueries({ queryKey: ["my-availability"] }); }, onError: (err: any) => toast.error(err.message) });
+  const addSlot = useMutation({ mutationFn: async () => { if (!doctorRecord) throw new Error("No doctor record"); return api.availability.create({ doctor_id: doctorRecord.id, day_of_week: parseInt(newDay, 10), start_time: newStart + ":00", end_time: newEnd + ":00", is_active: true }); }, onSuccess: () => { toast.success(t.slotAdded); queryClient.invalidateQueries({ queryKey: ["my-availability"] }); setAddDialogOpen(false); }, onError: (err: any) => toast.error(err.message) });
+  const toggleSlot = useMutation({ mutationFn: async ({ id, is_active }: { id: string; is_active: boolean }) => api.availability.update(id, { is_active }), onSuccess: () => queryClient.invalidateQueries({ queryKey: ["my-availability"] }), onError: (err: any) => toast.error(err.message) });
+  const deleteSlot = useMutation({ mutationFn: async (id: string) => api.availability.delete(id), onSuccess: () => { toast.success(t.slotRemoved); queryClient.invalidateQueries({ queryKey: ["my-availability"] }); }, onError: (err: any) => toast.error(err.message) });
 
   const groupedByDay = dayNames.map((name, idx) => ({ name, short: dayShort[idx], idx, slots: availability?.filter((a) => a.day_of_week === idx) || [] }));
 

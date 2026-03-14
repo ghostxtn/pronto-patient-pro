@@ -3,7 +3,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { useNavigate, Link } from "react-router-dom";
 import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import api from "@/services/api";
 import AppLayout from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { CalendarCheck, Clock, Users, Activity, ArrowRight } from "lucide-react";
@@ -30,13 +30,7 @@ export default function Dashboard() {
   const { data: appointments } = useQuery({
     queryKey: ["dashboard-appointments", user?.id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("appointments")
-        .select(`*, doctors (specializations (name, icon), profiles!doctors_user_id_fkey (full_name))`)
-        .eq("patient_id", user!.id)
-        .order("appointment_date", { ascending: true });
-      if (error) throw error;
-      return data;
+      return api.appointments.list({ patient_id: user!.id });
     },
     enabled: !!user,
   });

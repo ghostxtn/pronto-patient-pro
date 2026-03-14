@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import api from "@/services/api";
 import { useLanguage } from "@/contexts/LanguageContext";
 import AppLayout from "@/components/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
@@ -24,6 +24,21 @@ const statusConfig: Record<string, { color: string; icon: React.ElementType }> =
   cancelled: { color: "bg-destructive/15 text-destructive border-destructive/30", icon: XCircle },
 };
 
+const getPatientName = (appointment: any) =>
+  [appointment?.patient?.firstName, appointment?.patient?.lastName]
+    .filter(Boolean)
+    .join(" ")
+    .trim() || "Patient";
+
+const getDoctorName = (appointment: any) =>
+  [appointment?.doctor?.firstName, appointment?.doctor?.lastName]
+    .filter(Boolean)
+    .join(" ")
+    .trim() || "Doctor";
+
+const getDoctorTitle = (appointment: any) =>
+  appointment?.doctor?.title || "Dr.";
+
 export default function ManageAppointments() {
   const { t } = useLanguage();
   const qc = useQueryClient();
@@ -32,10 +47,17 @@ export default function ManageAppointments() {
   const [selected, setSelected] = useState<any>(null);
   const [newStatus, setNewStatus] = useState("");
 
-  const { data: appointments } = useQuery({ queryKey: ["admin-all-appointments"], queryFn: async () => { const { data } = await supabase.from("appointments").select("*, doctors(id, user_id, profiles:user_id(full_name)), profiles!appointments_patient_profile_fkey(full_name)").order("appointment_date", { ascending: false }); return data ?? []; } });
-  const updateStatus = useMutation({ mutationFn: async ({ id, status }: { id: string; status: string }) => { const { error } = await supabase.from("appointments").update({ status: status as any }).eq("id", id); if (error) throw error; }, onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-all-appointments"] }); qc.invalidateQueries({ queryKey: ["admin-stats"] }); setSelected(null); toast.success(t.appointmentStatusUpdated); } });
+  const { data: appointments } = useQuery({
+    queryKey: ["admin-all-appointments"],
+    queryFn: async () => {
+      const data = await api.appointments.list();
+      return data
+        .sort((a: any, b: any) => new Date(b.appointment_date).getTime() - new Date(a.appointment_date).getTime());
+    },
+  });
+  const updateStatus = useMutation({ mutationFn: async ({ id, status }: { id: string; status: string }) => api.appointments.updateStatus(id, status), onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-all-appointments"] }); qc.invalidateQueries({ queryKey: ["admin-stats"] }); setSelected(null); toast.success(t.appointmentStatusUpdated); } });
 
-  const filtered = appointments?.filter((a: any) => { const q = search.toLowerCase(); const matchesSearch = !q || a.profiles?.full_name?.toLowerCase().includes(q) || a.doctors?.profiles?.full_name?.toLowerCase().includes(q); return matchesSearch && (tab === "all" || a.status === tab); }) ?? [];
+  const filtered = appointments?.filter((a: any) => { const q = search.toLowerCase(); const matchesSearch = !q || getPatientName(a).toLowerCase().includes(q) || getDoctorName(a).toLowerCase().includes(q); return matchesSearch && (tab === "all" || a.status === tab); }) ?? [];
   const counts: Record<string, number> = { all: appointments?.length ?? 0 }; appointments?.forEach((a: any) => { counts[a.status] = (counts[a.status] ?? 0) + 1; });
 
   return (
@@ -46,13 +68,13 @@ export default function ManageAppointments() {
         <motion.div custom={2} variants={fadeUp}><Tabs value={tab} onValueChange={setTab}><TabsList><TabsTrigger value="all">{t.all} ({counts.all})</TabsTrigger><TabsTrigger value="pending">{t.pending} ({counts.pending ?? 0})</TabsTrigger><TabsTrigger value="confirmed">{t.confirmed} ({counts.confirmed ?? 0})</TabsTrigger><TabsTrigger value="completed">{t.completed} ({counts.completed ?? 0})</TabsTrigger><TabsTrigger value="cancelled">{t.cancelled} ({counts.cancelled ?? 0})</TabsTrigger></TabsList></Tabs></motion.div>
         <motion.div custom={3} variants={fadeUp}>
           <Card className="shadow-card"><CardContent className="p-0"><div className="overflow-x-auto"><table className="w-full"><thead><tr className="border-b text-left"><th className="p-4 text-sm font-medium text-muted-foreground">{t.patient}</th><th className="p-4 text-sm font-medium text-muted-foreground">{t.doctor}</th><th className="p-4 text-sm font-medium text-muted-foreground hidden md:table-cell">{t.date}</th><th className="p-4 text-sm font-medium text-muted-foreground hidden lg:table-cell">{t.time}</th><th className="p-4 text-sm font-medium text-muted-foreground">{t.status}</th><th className="p-4 text-sm font-medium text-muted-foreground text-right">{t.actions}</th></tr></thead>
-          <tbody>{filtered.map((apt: any) => { const cfg = statusConfig[apt.status] ?? statusConfig.pending; return (<tr key={apt.id} className="border-b last:border-0 hover:bg-muted/40 transition-colors"><td className="p-4 text-sm font-medium">{apt.profiles?.full_name ?? t.patient}</td><td className="p-4 text-sm">Dr. {apt.doctors?.profiles?.full_name ?? t.doctor}</td><td className="p-4 hidden md:table-cell text-sm text-muted-foreground">{format(new Date(apt.appointment_date), "MMM d, yyyy")}</td><td className="p-4 hidden lg:table-cell text-sm text-muted-foreground">{apt.start_time?.slice(0, 5)}</td><td className="p-4"><Badge variant="outline" className={cfg.color}>{apt.status}</Badge></td><td className="p-4 text-right"><Button variant="ghost" size="sm" onClick={() => { setSelected(apt); setNewStatus(apt.status); }}>{t.manage}</Button></td></tr>); })}{!filtered.length && <tr><td colSpan={6} className="p-8 text-center text-muted-foreground">—</td></tr>}</tbody></table></div></CardContent></Card>
+          <tbody>{filtered.map((apt: any) => { const cfg = statusConfig[apt.status] ?? statusConfig.pending; return (<tr key={apt.id} className="border-b last:border-0 hover:bg-muted/40 transition-colors"><td className="p-4 text-sm font-medium">{getPatientName(apt)}</td><td className="p-4 text-sm">{getDoctorTitle(apt)} {getDoctorName(apt)}</td><td className="p-4 hidden md:table-cell text-sm text-muted-foreground">{format(new Date(apt.appointment_date), "MMM d, yyyy")}</td><td className="p-4 hidden lg:table-cell text-sm text-muted-foreground">{apt.start_time?.slice(0, 5)}</td><td className="p-4"><Badge variant="outline" className={cfg.color}>{apt.status}</Badge></td><td className="p-4 text-right"><Button variant="ghost" size="sm" onClick={() => { setSelected(apt); setNewStatus(apt.status); }}>{t.manage}</Button></td></tr>); })}{!filtered.length && <tr><td colSpan={6} className="p-8 text-center text-muted-foreground">—</td></tr>}</tbody></table></div></CardContent></Card>
         </motion.div>
       </motion.div>
 
       <Dialog open={!!selected} onOpenChange={() => setSelected(null)}>
         <DialogContent><DialogHeader><DialogTitle>{t.manageAppointment}</DialogTitle></DialogHeader>
-          {selected && (<div className="space-y-4"><div className="grid grid-cols-2 gap-4 text-sm"><div><span className="text-muted-foreground">{t.patient}:</span><p className="font-medium">{selected.profiles?.full_name}</p></div><div><span className="text-muted-foreground">{t.doctor}:</span><p className="font-medium">Dr. {selected.doctors?.profiles?.full_name}</p></div><div><span className="text-muted-foreground">{t.date}:</span><p className="font-medium">{format(new Date(selected.appointment_date), "MMM d, yyyy")}</p></div><div><span className="text-muted-foreground">{t.time}:</span><p className="font-medium">{selected.start_time?.slice(0, 5)} – {selected.end_time?.slice(0, 5)}</p></div></div>{selected.notes && <div className="text-sm"><span className="text-muted-foreground">{t.notes}:</span><p className="mt-1 p-3 rounded-lg bg-muted/50">{selected.notes}</p></div>}<div><span className="text-sm text-muted-foreground">{t.updateStatus}</span><Select value={newStatus} onValueChange={setNewStatus}><SelectTrigger className="mt-1"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="pending">{t.pending}</SelectItem><SelectItem value="confirmed">{t.confirmed}</SelectItem><SelectItem value="completed">{t.completed}</SelectItem><SelectItem value="cancelled">{t.cancelled}</SelectItem></SelectContent></Select></div></div>)}
+          {selected && (<div className="space-y-4"><div className="grid grid-cols-2 gap-4 text-sm"><div><span className="text-muted-foreground">{t.patient}:</span><p className="font-medium">{getPatientName(selected)}</p></div><div><span className="text-muted-foreground">{t.doctor}:</span><p className="font-medium">{getDoctorTitle(selected)} {getDoctorName(selected)}</p></div><div><span className="text-muted-foreground">{t.date}:</span><p className="font-medium">{format(new Date(selected.appointment_date), "MMM d, yyyy")}</p></div><div><span className="text-muted-foreground">{t.time}:</span><p className="font-medium">{selected.start_time?.slice(0, 5)} – {selected.end_time?.slice(0, 5)}</p></div></div>{selected.notes && <div className="text-sm"><span className="text-muted-foreground">{t.notes}:</span><p className="mt-1 p-3 rounded-lg bg-muted/50">{selected.notes}</p></div>}<div><span className="text-sm text-muted-foreground">{t.updateStatus}</span><Select value={newStatus} onValueChange={setNewStatus}><SelectTrigger className="mt-1"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="pending">{t.pending}</SelectItem><SelectItem value="confirmed">{t.confirmed}</SelectItem><SelectItem value="completed">{t.completed}</SelectItem><SelectItem value="cancelled">{t.cancelled}</SelectItem></SelectContent></Select></div></div>)}
           <DialogFooter><Button variant="outline" onClick={() => setSelected(null)}>{t.close}</Button><Button onClick={() => updateStatus.mutate({ id: selected.id, status: newStatus })} disabled={updateStatus.isPending || newStatus === selected?.status}>{t.updateStatus}</Button></DialogFooter>
         </DialogContent>
       </Dialog>

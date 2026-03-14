@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import api from "@/services/api";
 import { useLanguage } from "@/contexts/LanguageContext";
 import AppLayout from "@/components/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -21,11 +21,10 @@ export default function ClinicSettings() {
   const [showAddSpec, setShowAddSpec] = useState(false);
   const [specName, setSpecName] = useState("");
   const [specDesc, setSpecDesc] = useState("");
-  const [specIcon, setSpecIcon] = useState("");
 
-  const { data: specializations } = useQuery({ queryKey: ["specializations"], queryFn: async () => { const { data } = await supabase.from("specializations").select("*").order("name"); return data ?? []; } });
-  const addSpec = useMutation({ mutationFn: async () => { const { error } = await supabase.from("specializations").insert({ name: specName, description: specDesc || null, icon: specIcon || null }); if (error) throw error; }, onSuccess: () => { qc.invalidateQueries({ queryKey: ["specializations"] }); setShowAddSpec(false); setSpecName(""); setSpecDesc(""); setSpecIcon(""); toast.success(t.specAdded); }, onError: () => toast.error(t.specAddFailed) });
-  const deleteSpec = useMutation({ mutationFn: async (id: string) => { const { error } = await supabase.from("specializations").delete().eq("id", id); if (error) throw error; }, onSuccess: () => { qc.invalidateQueries({ queryKey: ["specializations"] }); toast.success(t.specDeleted); }, onError: () => toast.error(t.specDeleteFailed) });
+  const { data: specializations } = useQuery({ queryKey: ["specializations"], queryFn: async () => api.specializations.list() });
+  const addSpec = useMutation({ mutationFn: async () => api.specializations.create({ name: specName, description: specDesc || undefined }), onSuccess: () => { qc.invalidateQueries({ queryKey: ["specializations"] }); setShowAddSpec(false); setSpecName(""); setSpecDesc(""); toast.success(t.specAdded); }, onError: () => toast.error(t.specAddFailed) });
+  const deleteSpec = useMutation({ mutationFn: async (id: string) => api.specializations.delete(id), onSuccess: () => { qc.invalidateQueries({ queryKey: ["specializations"] }); toast.success(t.specDeleted); }, onError: () => toast.error(t.specDeleteFailed) });
 
   return (
     <AppLayout>
@@ -35,7 +34,7 @@ export default function ClinicSettings() {
         <motion.div custom={1} variants={fadeUp}>
           <Card className="shadow-card">
             <CardHeader className="flex flex-row items-center justify-between"><div><CardTitle className="flex items-center gap-2 text-lg"><Stethoscope className="h-5 w-5 text-primary" />{t.specializations}</CardTitle><CardDescription>{t.specManageDesc}</CardDescription></div><Button size="sm" onClick={() => setShowAddSpec(true)}><Plus className="h-4 w-4 mr-1" /> {t.add}</Button></CardHeader>
-            <CardContent>{!specializations?.length ? <p className="text-muted-foreground text-sm text-center py-4">—</p> : (<div className="space-y-2">{specializations.map((s) => (<div key={s.id} className="flex items-center justify-between p-3 rounded-xl bg-muted/40 hover:bg-muted/60 transition-colors"><div><p className="font-medium text-sm">{s.name}</p>{s.description && <p className="text-xs text-muted-foreground">{s.description}</p>}</div><div className="flex items-center gap-2">{s.icon && <Badge variant="outline" className="text-xs">{s.icon}</Badge>}<Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteSpec.mutate(s.id)}><Trash2 className="h-4 w-4" /></Button></div></div>))}</div>)}</CardContent>
+            <CardContent>{!specializations?.length ? <p className="text-muted-foreground text-sm text-center py-4">—</p> : (<div className="space-y-2">{specializations.map((s) => (<div key={s.id} className="flex items-center justify-between p-3 rounded-xl bg-muted/40 hover:bg-muted/60 transition-colors"><div><p className="font-medium text-sm">{s.name}</p>{s.description && <p className="text-xs text-muted-foreground">{s.description}</p>}</div><div className="flex items-center gap-2"><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteSpec.mutate(s.id)}><Trash2 className="h-4 w-4" /></Button></div></div>))}</div>)}</CardContent>
           </Card>
         </motion.div>
 
@@ -45,7 +44,7 @@ export default function ClinicSettings() {
       </motion.div>
 
       <Dialog open={showAddSpec} onOpenChange={setShowAddSpec}>
-        <DialogContent><DialogHeader><DialogTitle>{t.addSpecialization}</DialogTitle></DialogHeader><div className="space-y-4"><div><Label>{t.name} *</Label><Input value={specName} onChange={(e) => setSpecName(e.target.value)} /></div><div><Label>{t.description}</Label><Input value={specDesc} onChange={(e) => setSpecDesc(e.target.value)} /></div><div><Label>{t.iconKey}</Label><Input value={specIcon} onChange={(e) => setSpecIcon(e.target.value)} /></div></div><DialogFooter><Button variant="outline" onClick={() => setShowAddSpec(false)}>{t.cancel}</Button><Button onClick={() => addSpec.mutate()} disabled={!specName.trim() || addSpec.isPending}>{t.addSpecialization}</Button></DialogFooter></DialogContent>
+        <DialogContent><DialogHeader><DialogTitle>{t.addSpecialization}</DialogTitle></DialogHeader><div className="space-y-4"><div><Label>{t.name} *</Label><Input value={specName} onChange={(e) => setSpecName(e.target.value)} /></div><div><Label>{t.description}</Label><Input value={specDesc} onChange={(e) => setSpecDesc(e.target.value)} /></div></div><DialogFooter><Button variant="outline" onClick={() => setShowAddSpec(false)}>{t.cancel}</Button><Button onClick={() => addSpec.mutate()} disabled={!specName.trim() || addSpec.isPending}>{t.addSpecialization}</Button></DialogFooter></DialogContent>
       </Dialog>
     </AppLayout>
   );

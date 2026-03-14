@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import api from "@/services/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import AppLayout from "@/components/AppLayout";
@@ -55,9 +55,12 @@ export default function DoctorProfile() {
   const { data: doctor, isLoading } = useQuery({
     queryKey: ["doctor", id],
     queryFn: async () => {
-      const { data, error } = await supabase.from("doctors").select(`*, specializations (id, name, icon, description), profiles!doctors_user_id_fkey (full_name, avatar_url, email)`).eq("id", id!).single();
-      if (error) throw error;
-      return data;
+      const data = await api.doctors.get(id!);
+      return {
+        ...data,
+        profiles: data.profiles ?? data.profile ?? data.user ?? null,
+        specializations: data.specializations ?? data.specialization ?? null,
+      };
     },
     enabled: !!id,
   });
@@ -65,9 +68,8 @@ export default function DoctorProfile() {
   const { data: availability } = useQuery({
     queryKey: ["doctor-availability", id],
     queryFn: async () => {
-      const { data, error } = await supabase.from("doctor_availability").select("*").eq("doctor_id", id!).eq("is_active", true);
-      if (error) throw error;
-      return data;
+      const data = await api.availability.listByDoctor(id!);
+      return data.filter((slot: any) => slot.is_active !== false);
     },
     enabled: !!id,
   });
@@ -76,9 +78,21 @@ export default function DoctorProfile() {
     queryKey: ["doctor-appointments", id, selectedDate],
     queryFn: async () => {
       if (!selectedDate) return [];
-      const { data, error } = await supabase.from("appointments").select("start_time, end_time").eq("doctor_id", id!).eq("appointment_date", format(selectedDate, "yyyy-MM-dd")).in("status", ["pending", "confirmed"]);
-      if (error) throw error;
-      return data;
+      const dateStr = format(selectedDate, "yyyy-MM-dd");
+      const data = await api.appointments.list({
+        doctor_id: id!,
+        date_from: dateStr,
+        date_to: dateStr,
+      });
+      return data
+        .filter((appointment: any) =>
+          appointment.appointment_date === dateStr &&
+          (appointment.status === "pending" || appointment.status === "confirmed"),
+        )
+        .map((appointment: any) => ({
+          start_time: appointment.start_time,
+          end_time: appointment.end_time,
+        }));
     },
     enabled: !!id && !!selectedDate,
   });
@@ -86,11 +100,17 @@ export default function DoctorProfile() {
   const bookMutation = useMutation({
     mutationFn: async () => {
       if (!user || !selectedDate || !selectedSlot || !id) throw new Error("Missing data");
-      const startTime = selectedSlot + ":00";
+      const startTime = selectedSlot;
       const endParsed = addMinutes(parse(selectedSlot, "HH:mm", new Date()), 30);
-      const endTime = format(endParsed, "HH:mm") + ":00";
-      const { error } = await supabase.from("appointments").insert({ patient_id: user.id, doctor_id: id, appointment_date: format(selectedDate, "yyyy-MM-dd"), start_time: startTime, end_time: endTime, notes: notes || null });
-      if (error) throw error;
+      const endTime = format(endParsed, "HH:mm");
+      return api.appointments.create({
+        patientId: user.id,
+        doctorId: id,
+        appointmentDate: format(selectedDate, "yyyy-MM-dd"),
+        startTime: startTime,
+        endTime: endTime,
+        notes: notes || null,
+      });
     },
     onSuccess: () => { toast.success(t.bookingSuccess); queryClient.invalidateQueries({ queryKey: ["doctor-appointments"] }); navigate("/appointments"); },
     onError: (err: any) => toast.error(err.message || t.bookingFailed),

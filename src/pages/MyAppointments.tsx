@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import api from "@/services/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import AppLayout from "@/components/AppLayout";
@@ -45,17 +45,31 @@ export default function MyAppointments() {
   const { data: appointments, isLoading } = useQuery({
     queryKey: ["my-appointments", user?.id],
     queryFn: async () => {
-      const { data, error } = await supabase.from("appointments").select(`*, doctors (id, consultation_fee, experience_years, specializations (name, icon), profiles!doctors_user_id_fkey (full_name, avatar_url))`).eq("patient_id", user!.id).order("appointment_date", { ascending: false });
-      if (error) throw error;
-      return data;
+      const data = await api.appointments.list({ patient_id: user!.id });
+      return data.map((appointment: any) => ({
+        ...appointment,
+        doctors: appointment.doctors
+          ? {
+              ...appointment.doctors,
+              profiles:
+                appointment.doctors.profiles ??
+                appointment.doctors.profile ??
+                appointment.doctors.user ??
+                null,
+              specializations:
+                appointment.doctors.specializations ??
+                appointment.doctors.specialization ??
+                null,
+            }
+          : null,
+      }));
     },
     enabled: !!user,
   });
 
   const cancelMutation = useMutation({
     mutationFn: async (appointmentId: string) => {
-      const { error } = await supabase.from("appointments").update({ status: "cancelled" as const }).eq("id", appointmentId);
-      if (error) throw error;
+      return api.appointments.updateStatus(appointmentId, "cancelled");
     },
     onSuccess: () => { toast.success(t.appointmentCancelled); queryClient.invalidateQueries({ queryKey: ["my-appointments"] }); setDetailId(null); },
     onError: (err: any) => toast.error(err.message),

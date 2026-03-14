@@ -1,77 +1,146 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
-import { User, Session } from "@supabase/supabase-js";
-import { supabase } from "@/integrations/supabase/client";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import type { ReactNode } from "react";
+import api, { clearTokens, getAccessToken, setTokens } from "@/services/api";
+import type { AppRole } from "@/lib/auth-routing";
 
-type AppRole = "patient" | "doctor" | "admin";
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  role: AppRole;
+  clinic_id: string | null;
+}
 
 interface AuthContextType {
   user: User | null;
-  session: Session | null;
   loading: boolean;
-  roles: AppRole[];
-  signOut: () => Promise<void>;
-  hasRole: (role: AppRole) => boolean;
+  error: string | null;
+  login: (email: string, pass: string) => Promise<void>;
+  register: (data: { email: string; password: string; firstName: string; lastName: string }) => Promise<void>;
+  googleLogin: (idToken: string) => Promise<void>;
+  logout: () => Promise<void>;
+  clearError: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+function normalizeUser(input: any): User {
+  const validRoles: AppRole[] = ["owner", "admin", "staff", "doctor", "patient"];
+  const role = validRoles.includes(input.role) ? input.role : "patient";
+
+  return {
+    id: input.id,
+    email: input.email,
+    name:
+      input.name ||
+      input.full_name ||
+      [input.firstName, input.lastName].filter(Boolean).join(" ") ||
+      [input.first_name, input.last_name].filter(Boolean).join(" "),
+    role,
+    clinic_id: input.clinic_id ?? input.clinicId ?? null,
+  };
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  const [roles, setRoles] = useState<AppRole[]>([]);
-
-  const fetchRoles = async (userId: string) => {
-    const { data } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", userId);
-    if (data) {
-      setRoles(data.map((r) => r.role));
-    }
-  };
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        if (session?.user) {
-          setTimeout(() => fetchRoles(session.user.id), 0);
-        } else {
-          setRoles([]);
-        }
+    const bootstrap = async () => {
+      const token = getAccessToken();
+
+      if (!token) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const me = await api.auth.me();
+        setUser(normalizeUser(me.user ?? me));
+      } catch (err) {
+        clearTokens();
+        setError(err instanceof Error ? err.message : "Authentication failed");
+      } finally {
         setLoading(false);
       }
-    );
+    };
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchRoles(session.user.id);
-      }
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
+    void bootstrap();
   }, []);
 
-  const signOut = async () => {
-    await supabase.auth.signOut();
-  };
-
-  const hasRole = (role: AppRole) => roles.includes(role);
-
-  return (
-    <AuthContext.Provider value={{ user, session, loading, roles, signOut, hasRole }}>
-      {children}
-    </AuthContext.Provider>
+  const value = useMemo<AuthContextType>(
+    () => ({
+      user,
+      loading,
+      error,
+      login: async (email: string, pass: string) => {
+        setLoading(true);
+        setError(null);
+        try {
+          const result = await api.auth.login(email, pass);
+          setTokens(result.accessToken ?? null, result.refreshToken ?? null);
+          setUser(normalizeUser(result.user));
+        } catch (err) {
+          setError(err instanceof Error ? err.message : "Login failed");
+          throw err;
+        } finally {
+          setLoading(false);
+        }
+      },
+      register: async (data: { email: string; password: string; firstName: string; lastName: string }) => {
+        setLoading(true);
+        setError(null);
+        try {
+          const result = await api.auth.register(data);
+          setTokens(result.accessToken ?? null, result.refreshToken ?? null);
+          setUser(normalizeUser(result.user));
+        } catch (err) {
+          setError(err instanceof Error ? err.message : "Registration failed");
+          throw err;
+        } finally {
+          setLoading(false);
+        }
+      },
+      googleLogin: async (idToken: string) => {
+        setLoading(true);
+        setError(null);
+        try {
+          const result = await api.auth.googleLogin(idToken);
+          setTokens(result.accessToken ?? null, result.refreshToken ?? null);
+          setUser(normalizeUser(result.user));
+        } catch (err) {
+          setError(err instanceof Error ? err.message : "Google login failed");
+          throw err;
+        } finally {
+          setLoading(false);
+        }
+      },
+      logout: async () => {
+        setLoading(true);
+        setError(null);
+        try {
+          await api.auth.logout();
+        } finally {
+          clearTokens();
+          setUser(null);
+          setLoading(false);
+        }
+      },
+      clearError: () => setError(null),
+    }),
+    [error, loading, user],
   );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {
   const context = useContext(AuthContext);
-  if (!context) throw new Error("useAuth must be used within AuthProvider");
+
+  if (!context) {
+    throw new Error("useAuth must be used within AuthProvider");
+  }
+
   return context;
 }

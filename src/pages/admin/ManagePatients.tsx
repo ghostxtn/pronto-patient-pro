@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import api from "@/services/api";
 import { useLanguage } from "@/contexts/LanguageContext";
 import AppLayout from "@/components/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
@@ -15,13 +15,18 @@ export default function ManagePatients() {
   const [search, setSearch] = useState("");
   const { t } = useLanguage();
 
-  const { data: patients } = useQuery({ queryKey: ["admin-patients"], queryFn: async () => { const { data } = await supabase.from("profiles").select("*").order("created_at", { ascending: false }); return data ?? []; } });
+  const { data: patientsResult } = useQuery({
+    queryKey: ["admin-patients"],
+    queryFn: async () => api.patients.list(),
+  });
+  const patients = patientsResult?.data ?? [];
+  const totalPatients = patientsResult?.total ?? patients.length;
   const filtered = patients?.filter((p) => { const q = search.toLowerCase(); return (p.full_name?.toLowerCase().includes(q) || p.email?.toLowerCase().includes(q)); }) ?? [];
 
   return (
     <AppLayout>
       <motion.div initial="hidden" animate="visible" className="space-y-6">
-        <motion.div custom={0} variants={fadeUp}><h1 className="text-3xl font-display font-bold">{t.managePatients}</h1><p className="text-muted-foreground mt-1">{patients?.length ?? 0} {t.registeredPatients}</p></motion.div>
+        <motion.div custom={0} variants={fadeUp}><h1 className="text-3xl font-display font-bold">{t.managePatients}</h1><p className="text-muted-foreground mt-1">{totalPatients} {t.registeredPatients}</p></motion.div>
         <motion.div custom={1} variants={fadeUp} className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" /><Input placeholder={t.searchByNameOrEmail} value={search} onChange={(e) => setSearch(e.target.value)} className="pl-10" /></motion.div>
         <motion.div custom={2} variants={fadeUp}>
           <Card className="shadow-card"><CardContent className="p-0"><div className="overflow-x-auto"><table className="w-full"><thead><tr className="border-b text-left"><th className="p-4 text-sm font-medium text-muted-foreground">{t.patient}</th><th className="p-4 text-sm font-medium text-muted-foreground hidden md:table-cell">{t.email}</th><th className="p-4 text-sm font-medium text-muted-foreground hidden lg:table-cell">{t.phone}</th><th className="p-4 text-sm font-medium text-muted-foreground hidden lg:table-cell">{t.joined}</th></tr></thead>

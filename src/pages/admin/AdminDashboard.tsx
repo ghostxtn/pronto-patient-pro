@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import api from "@/services/api";
 import { useLanguage } from "@/contexts/LanguageContext";
 import AppLayout from "@/components/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,8 +16,53 @@ const fadeUp = {
 export default function AdminDashboard() {
   const { t } = useLanguage();
 
-  const { data: stats } = useQuery({ queryKey: ["admin-stats"], queryFn: async () => { const [patients, doctors, appointments, pending] = await Promise.all([supabase.from("profiles").select("id", { count: "exact", head: true }), supabase.from("doctors").select("id", { count: "exact", head: true }), supabase.from("appointments").select("id", { count: "exact", head: true }), supabase.from("appointments").select("id", { count: "exact", head: true }).eq("status", "pending")]); return { patients: patients.count ?? 0, doctors: doctors.count ?? 0, appointments: appointments.count ?? 0, pending: pending.count ?? 0 }; } });
-  const { data: recentAppointments } = useQuery({ queryKey: ["admin-recent-appointments"], queryFn: async () => { const { data } = await supabase.from("appointments").select("*, doctors(id, user_id, profiles:user_id(full_name)), profiles!appointments_patient_profile_fkey(full_name)").order("created_at", { ascending: false }).limit(8); return data ?? []; } });
+  const { data: stats } = useQuery({
+    queryKey: ["admin-stats"],
+    queryFn: async () => {
+      const [patients, doctors, appointments] = await Promise.all([
+        api.patients.list({ limit: 0 }),
+        api.doctors.list(),
+        api.appointments.list(),
+      ]);
+      return {
+        patients: patients.total ?? patients.data?.length ?? 0,
+        doctors: doctors.length ?? 0,
+        appointments: appointments.length ?? 0,
+        pending: appointments.filter((appointment: any) => appointment.status === "pending").length,
+      };
+    },
+  });
+  const { data: recentAppointments } = useQuery({
+    queryKey: ["admin-recent-appointments"],
+    queryFn: async () => {
+      const data = await api.appointments.list();
+      return data
+        .map((appointment: any) => ({
+          ...appointment,
+          doctors: appointment.doctors
+            ? {
+                ...appointment.doctors,
+                profiles:
+                  appointment.doctors.profiles ??
+                  appointment.doctors.profile ??
+                  appointment.doctors.user ??
+                  null,
+              }
+            : null,
+          profiles:
+            appointment.profiles ??
+            appointment.profile ??
+            appointment.patient ??
+            null,
+        }))
+        .sort((a: any, b: any) => {
+          const aDate = new Date(a.created_at ?? a.appointment_date).getTime();
+          const bDate = new Date(b.created_at ?? b.appointment_date).getTime();
+          return bDate - aDate;
+        })
+        .slice(0, 8);
+    },
+  });
 
   const statCards = [
     { label: t.totalPatients, value: stats?.patients ?? 0, icon: Users, color: "from-primary to-info" },
