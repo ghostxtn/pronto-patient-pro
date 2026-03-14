@@ -1,0 +1,41 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1773350781397,
+      "tag": "0000_needy_matthew_murdock",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1773352436265,
+      "tag": "0001_mature_kulan_gath",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1773354242535,
+      "tag": "0002_overrated_fenris",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1773356013961,
+      "tag": "0003_ancient_mikhail_rasputin",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1774000000000,
+      "tag": "0004_tenant_domain_and_scoped_user_email",
+      "breakpoints": true
+    }
+  ]
+}

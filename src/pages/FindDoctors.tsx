@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import api from "@/services/api";
 import { useLanguage } from "@/contexts/LanguageContext";
 import AppLayout from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
@@ -33,15 +33,11 @@ export default function FindDoctors() {
 
   const { data: specializations } = useQuery({
     queryKey: ["specializations"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("specializations").select("*").order("name");
-      if (error) throw error;
-      return data;
-    },
+    queryFn: async () => api.specializations.list(),
   });
 
   const { data: doctors, isLoading } = useQuery({
-    queryKey: ["doctors", selectedSpec],
+    queryKey: ["doctors", selectedSpec, searchQuery],
     queryFn: async () => {
       let query = supabase
   .from("doctors")
@@ -58,13 +54,7 @@ export default function FindDoctors() {
     },
   });
 
-  const filteredDoctors = doctors?.filter((doc) => {
-    if (!searchQuery) return true;
-    const name = (doc.profiles as any)?.full_name?.toLowerCase() || "";
-    const specName = (doc.specializations as any)?.name?.toLowerCase() || "";
-    const q = searchQuery.toLowerCase();
-    return name.includes(q) || specName.includes(q);
-  });
+  const filteredDoctors = doctors;
 
   return (
     <AppLayout>
@@ -105,17 +95,22 @@ export default function FindDoctors() {
         ) : filteredDoctors && filteredDoctors.length > 0 ? (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredDoctors.map((doctor, i) => {
-              const profile = doctor.profiles as any;
-              const spec = doctor.specializations as any;
+              const doctorName =
+                [doctor.firstName, doctor.lastName].filter(Boolean).join(" ").trim() ||
+                (doctor as any).full_name ||
+                (doctor as any).name ||
+                "Unknown";
+              const doctorInitial = doctorName[0] || "D";
+              const spec = (doctor as any).specializations as any;
               const Icon = iconMap[spec?.icon || ""] || Stethoscope;
               return (
                 <motion.div key={doctor.id} className="glass rounded-2xl p-6 shadow-card hover:shadow-elevated transition-all duration-300 hover:-translate-y-1" custom={i + 3} variants={fadeUp}>
                   <div className="flex items-start gap-4 mb-4">
                     <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-primary to-info flex items-center justify-center flex-shrink-0">
-                      {profile?.avatar_url ? <img src={profile.avatar_url} alt="" className="h-14 w-14 rounded-2xl object-cover" /> : <span className="text-primary-foreground font-display font-bold text-lg">{profile?.full_name?.[0] || "D"}</span>}
+                      <span className="text-primary-foreground font-display font-bold text-lg">{doctorInitial}</span>
                     </div>
                     <div className="min-w-0 flex-1">
-                      <h3 className="font-display font-semibold truncate">Dr. {profile?.full_name || "Unknown"}</h3>
+                      <h3 className="font-display font-semibold truncate">Dr. {doctorName}</h3>
                       <Badge variant="secondary" className="mt-1 text-xs rounded-full"><Icon className="h-3 w-3 mr-1" />{spec?.name || "General"}</Badge>
                     </div>
                   </div>

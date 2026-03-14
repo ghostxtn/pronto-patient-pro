@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import api from "@/services/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import AppLayout from "@/components/AppLayout";
@@ -71,8 +71,7 @@ export default function MyAppointments() {
 
   const cancelMutation = useMutation({
     mutationFn: async (appointmentId: string) => {
-      const { error } = await supabase.from("appointments").update({ status: "cancelled" as const }).eq("id", appointmentId);
-      if (error) throw error;
+      return api.appointments.updateStatus(appointmentId, "cancelled");
     },
     onSuccess: () => { toast.success(t.appointmentCancelled); queryClient.invalidateQueries({ queryKey: ["my-appointments"] }); setDetailId(null); },
     onError: (err: any) => toast.error(err.message),

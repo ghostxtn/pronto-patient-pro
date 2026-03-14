@@ -1,7 +1,6 @@
-import { useEffect } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import api from "@/services/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import AppLayout from "@/components/AppLayout";
@@ -25,19 +24,34 @@ const statusColors: Record<string, string> = {
 };
 
 export default function DoctorDashboard() {
-  const { user, loading, hasRole } = useAuth();
+  const { user } = useAuth();
   const { t } = useLanguage();
-  const navigate = useNavigate();
 
-  useEffect(() => {
-    if (!loading && !user) navigate("/auth");
-    if (!loading && user && !hasRole("doctor")) navigate("/dashboard");
-  }, [user, loading, hasRole, navigate]);
-
-  const { data: doctorRecord } = useQuery({ queryKey: ["my-doctor-record", user?.id], queryFn: async () => { const { data, error } = await supabase.from("doctors").select("id").eq("user_id", user!.id).single(); if (error) throw error; return data; }, enabled: !!user });
-  const { data: appointments } = useQuery({ queryKey: ["doctor-all-appointments", doctorRecord?.id], queryFn: async () => { const { data, error } = await supabase.from("appointments").select(`*, profiles!appointments_patient_profile_fkey (full_name, avatar_url, email)`).eq("doctor_id", doctorRecord!.id).order("appointment_date", { ascending: true }); if (error) throw error; return data; }, enabled: !!doctorRecord });
-
-  if (loading) return <div className="min-h-screen flex items-center justify-center bg-background"><div className="h-8 w-8 rounded-full border-2 border-primary border-t-transparent animate-spin" /></div>;
+  const { data: doctorRecord } = useQuery({
+    queryKey: ["my-doctor-record", user?.id],
+    queryFn: async () => {
+      const doctors = await api.doctors.list();
+      const doctor = doctors.find((item: any) => item.user_id === user!.id);
+      if (!doctor) throw new Error("Doctor record not found");
+      return doctor;
+    },
+    enabled: !!user,
+  });
+  const { data: appointments } = useQuery({
+    queryKey: ["doctor-all-appointments", doctorRecord?.id],
+    queryFn: async () => {
+      const data = await api.appointments.list({ doctor_id: doctorRecord!.id });
+      return data.map((appointment: any) => ({
+        ...appointment,
+        profiles:
+          appointment.profiles ??
+          appointment.profile ??
+          appointment.patient ??
+          null,
+      }));
+    },
+    enabled: !!doctorRecord,
+  });
 
   const todayAppts = appointments?.filter((a) => isToday(parseISO(a.appointment_date)) && a.status !== "cancelled") || [];
   const pending = appointments?.filter((a) => a.status === "pending") || [];

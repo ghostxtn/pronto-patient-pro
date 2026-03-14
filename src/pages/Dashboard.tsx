@@ -3,7 +3,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { useNavigate, Link } from "react-router-dom";
 import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import api from "@/services/api";
 import AppLayout from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { CalendarCheck, Clock, Users, Activity, ArrowRight } from "lucide-react";

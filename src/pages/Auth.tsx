@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
+import { getDefaultRouteByRole } from "@/lib/auth-routing";
 import { Stethoscope, Mail, Lock, User, ArrowLeft, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -16,14 +17,15 @@ export default function Auth() {
   const [isSignUp, setIsSignUp] = useState(searchParams.get("tab") === "signup");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [fullName, setFullName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, login, register, googleLogin } = useAuth();
   const { t } = useLanguage();
 
   useEffect(() => {
-    if (user) navigate("/dashboard");
+    if (user) navigate(getDefaultRouteByRole(user.role), { replace: true });
   }, [user, navigate]);
 
   const handleEmailAuth = async (e: React.FormEvent) => {
@@ -31,20 +33,9 @@ export default function Auth() {
     setLoading(true);
     try {
       if (isSignUp) {
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: { full_name: fullName },
-            emailRedirectTo: window.location.origin,
-          },
-        });
-        if (error) throw error;
-        toast.success(t.checkEmail);
+        await register({ email, password, firstName, lastName });
       } else {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
-        navigate("/dashboard");
+        await login(email, password);
       }
     } catch (err: any) {
       toast.error(err.message);
@@ -64,12 +55,8 @@ export default function Auth() {
   if (error) toast.error(error.message);
 };
 
-  const handleSocialLogin = async (provider: "azure" | "facebook") => {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider,
-      options: { redirectTo: `${window.location.origin}/dashboard` },
-    });
-    if (error) toast.error(error.message);
+  const handleSocialLogin = async (_provider: "azure" | "facebook") => {
+    toast.info("Coming soon");
   };
 
   return (
@@ -151,15 +138,28 @@ export default function Auth() {
 
             <form onSubmit={handleEmailAuth} className="space-y-4">
               {isSignUp && (
-                <div className="space-y-2">
-                  <Label htmlFor="name">{t.fullName}</Label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="name" placeholder="Dr. John Smith"
-                      value={fullName} onChange={(e) => setFullName(e.target.value)}
-                      className="pl-10 h-11 rounded-xl" required
-                    />
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="firstName">{t.firstName || "Ad"}</Label>
+                    <div className="relative">
+                      <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="firstName" placeholder="John"
+                        value={firstName} onChange={(e) => setFirstName(e.target.value)}
+                        className="pl-10 h-11 rounded-xl" required
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="lastName">{t.lastName || "Soyad"}</Label>
+                    <div className="relative">
+                      <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="lastName" placeholder="Smith"
+                        value={lastName} onChange={(e) => setLastName(e.target.value)}
+                        className="pl-10 h-11 rounded-xl" required
+                      />
+                    </div>
                   </div>
                 </div>
               )}

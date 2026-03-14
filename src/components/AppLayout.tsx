@@ -3,19 +3,22 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Button } from "@/components/ui/button";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
+import { getDefaultRouteByRole } from "@/lib/auth-routing";
 import {
   Stethoscope, LogOut, LayoutDashboard, Search, CalendarDays, User, Clock, ClipboardList,
-  Users, Settings, ShieldCheck,
+  Users, Settings,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const { user, signOut, hasRole } = useAuth();
+  const { user, logout } = useAuth();
   const { t } = useLanguage();
   const location = useLocation();
-  const isAdmin = hasRole("admin");
-  const isDoctor = hasRole("doctor");
-  const roleLabel = isAdmin ? t.admin : isDoctor ? t.doctor : t.patient;
+  const isOwner = user?.role === "owner";
+  const isAdmin = user?.role === "admin";
+  const isStaff = user?.role === "staff";
+  const isDoctor = user?.role === "doctor";
+  const isPatient = user?.role === "patient";
 
   const patientLinks = [
     { to: "/dashboard", label: t.dashboard, icon: LayoutDashboard },
@@ -39,8 +42,32 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     { to: "/admin/settings", label: t.settingsNav, icon: Settings },
   ];
 
-  const links = isAdmin ? adminLinks : isDoctor ? doctorLinks : patientLinks;
-  const homePath = isAdmin ? "/admin/dashboard" : isDoctor ? "/doctor/dashboard" : "/dashboard";
+  const staffLinks = [
+    { to: "/admin/patients", label: t.patientsNav, icon: Users },
+    { to: "/admin/appointments", label: t.appointmentsNav, icon: CalendarDays },
+    { to: "/profile", label: t.profile, icon: User },
+  ];
+
+  const links =
+    isOwner || isAdmin ? adminLinks
+    : isStaff ? staffLinks
+    : isDoctor ? doctorLinks
+    : patientLinks;
+
+  const roleLabel =
+    isOwner ? "Owner"
+    : isAdmin ? t.admin
+    : isStaff ? "Staff"
+    : isDoctor ? t.doctor
+    : isPatient ? t.patient
+    : t.patient;
+
+  const defaultRoute = getDefaultRouteByRole(user?.role);
+  const homePath =
+    isOwner || isAdmin ? "/admin/dashboard"
+    : isStaff ? "/admin/patients"
+    : isDoctor ? "/doctor/dashboard"
+    : defaultRoute === "/dashboard" ? "/dashboard" : "/dashboard";
 
   return (
     <div className="min-h-screen bg-background">
@@ -79,7 +106,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <div className="flex items-center gap-1">
             <LanguageSwitcher />
             <span className="text-sm text-muted-foreground hidden lg:block">{user?.email}</span>
-            <Button variant="ghost" size="icon" onClick={signOut}>
+            <Button variant="ghost" size="icon" onClick={logout}>
               <LogOut className="h-4 w-4" />
             </Button>
           </div>

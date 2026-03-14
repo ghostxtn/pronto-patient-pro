@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { supabase } from "@/integrations/supabase/client";
+import api from "@/services/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -22,13 +22,14 @@ const fadeUp = {
 };
 
 export default function Profile() {
-  const { user, loading: authLoading, roles } = useAuth();
+  const { user, loading: authLoading } = useAuth();
+  const roles = user?.role ? [user.role] : [];
   const { t } = useLanguage();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  const [fullName, setFullName] = useState("");
-  const [phone, setPhone] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -39,27 +40,22 @@ export default function Profile() {
 
   const { data: profile, isLoading } = useQuery({
     queryKey: ["profile", user?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("profiles").select("*").eq("user_id", user!.id).single();
-      if (error) throw error;
-      return data;
-    },
+    queryFn: async () => api.profiles.me(),
     enabled: !!user,
   });
 
   useEffect(() => {
     if (profile) {
-      setFullName(profile.full_name || "");
-      setPhone(profile.phone || "");
+      setFirstName(profile.first_name || "");
+      setLastName(profile.last_name || "");
     }
   }, [profile]);
 
   const updateMutation = useMutation({
-    mutationFn: async ({ name, phone, avatarUrl }: { name: string; phone: string; avatarUrl?: string }) => {
-      const updates: Record<string, string> = { full_name: name, phone };
-      if (avatarUrl) updates.avatar_url = avatarUrl;
-      const { error } = await supabase.from("profiles").update(updates).eq("user_id", user!.id);
-      if (error) throw error;
+    mutationFn: async ({ firstName, lastName, avatarUrl }: { firstName: string; lastName: string; avatarUrl?: string }) => {
+      const updates: Record<string, string> = { firstName, lastName };
+      if (avatarUrl) updates.avatarUrl = avatarUrl;
+      return api.profiles.update("me", updates);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["profile", user?.id] });
@@ -81,18 +77,20 @@ export default function Profile() {
     let avatarUrl: string | undefined;
     if (avatarFile && user) {
       setUploading(true);
-      const ext = avatarFile.name.split(".").pop();
-      const path = `${user.id}/avatar.${ext}`;
-      const { error } = await supabase.storage.from("appointment-files").upload(path, avatarFile, { upsert: true });
-      if (error) { toast.error(t.avatarUploadFailed); setUploading(false); return; }
-      const { data: urlData } = supabase.storage.from("appointment-files").getPublicUrl(path);
-      avatarUrl = urlData.publicUrl;
+      try {
+        const response = await api.storage.uploadAvatar(avatarFile);
+        avatarUrl = response.url;
+      } catch (err: any) {
+        toast.error(err.message || t.avatarUploadFailed);
+        setUploading(false);
+        return;
+      }
       setUploading(false);
     }
-    updateMutation.mutate({ name: fullName, phone, avatarUrl });
+    updateMutation.mutate({ firstName, lastName, avatarUrl });
   };
 
-  const initials = (fullName || user?.email || "U").split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2);
+  const initials = [firstName, lastName].filter(Boolean).map((w) => w[0]).join("").toUpperCase() || "U";
   const displayAvatar = avatarPreview || profile?.avatar_url || "";
 
   if (authLoading || isLoading) {
@@ -127,7 +125,7 @@ export default function Profile() {
                     <input id="avatar-upload" type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
                   </div>
                   <div>
-                    <p className="font-medium">{fullName || t.yourName}</p>
+                    <p className="font-medium">{[firstName, lastName].filter(Boolean).join(" ") || t.yourName}</p>
                     <p className="text-sm text-muted-foreground">{user?.email}</p>
                     <div className="flex gap-1 mt-1">
                       {roles.map((role) => (
@@ -141,12 +139,12 @@ export default function Profile() {
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="fullName" className="flex items-center gap-2"><User className="h-3.5 w-3.5 text-muted-foreground" /> {t.fullName}</Label>
-                    <Input id="fullName" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder={t.yourName} className="rounded-xl" />
+                    <Label htmlFor="firstName" className="flex items-center gap-2"><User className="h-3.5 w-3.5 text-muted-foreground" /> {t.firstName || "Ad"}</Label>
+                    <Input id="firstName" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="Ad" className="rounded-xl" />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="phone" className="flex items-center gap-2"><Phone className="h-3.5 w-3.5 text-muted-foreground" /> {t.phone}</Label>
-                    <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+1 (555) 000-0000" className="rounded-xl" />
+                    <Label htmlFor="lastName" className="flex items-center gap-2"><Phone className="h-3.5 w-3.5 text-muted-foreground" /> {t.lastName || "Soyad"}</Label>
+                    <Input id="lastName" value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Soyad" className="rounded-xl" />
                   </div>
                 </div>
 

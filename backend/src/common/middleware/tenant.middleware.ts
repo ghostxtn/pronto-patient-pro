@@ -1,0 +1,42 @@
+import {
+  Injectable,
+  NestMiddleware,
+  NotFoundException,
+} from '@nestjs/common';
+import { NextFunction, Response } from 'express';
+import { TenantRequest } from '../interfaces/tenant-request.interface';
+import { TenantResolverService } from '../services/tenant-resolver.service';
+
+@Injectable()
+export class TenantMiddleware implements NestMiddleware {
+  constructor(
+    private readonly tenantResolverService: TenantResolverService,
+  ) {}
+
+  async use(
+    request: TenantRequest,
+    _response: Response,
+    next: NextFunction,
+  ) {
+    const forwardedHost = request.headers['x-forwarded-host'];
+    const rawHost = Array.isArray(forwardedHost)
+      ? forwardedHost[0]
+      : forwardedHost || request.headers.host;
+    const host = rawHost?.toLowerCase().split(':')[0];
+
+    const clinic = host
+      ? await this.tenantResolverService.findClinicByDomain(host)
+      : null;
+
+    if (!clinic) {
+      throw new NotFoundException('Clinic not found for this domain');
+    }
+
+    request.tenant = {
+      clinicId: clinic.id,
+      clinic,
+    };
+
+    next();
+  }
+}
