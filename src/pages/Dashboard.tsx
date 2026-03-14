@@ -30,7 +30,19 @@ export default function Dashboard() {
   const { data: appointments } = useQuery({
     queryKey: ["dashboard-appointments", user?.id],
     queryFn: async () => {
-      return api.appointments.list({ patient_id: user!.id });
+      const { data, error } = await supabase
+  .from("appointments")
+  .select(`
+    *,
+    doctors (
+      specializations (name, icon),
+      profiles!doctors_user_id_profiles_fkey (full_name)
+    )
+  `)
+  .eq("patient_id", user!.id)
+  .order("appointment_date", { ascending: true });
+      if (error) throw error;
+      return data;
     },
     enabled: !!user,
   });

@@ -45,24 +45,26 @@ export default function MyAppointments() {
   const { data: appointments, isLoading } = useQuery({
     queryKey: ["my-appointments", user?.id],
     queryFn: async () => {
-      const data = await api.appointments.list({ patient_id: user!.id });
-      return data.map((appointment: any) => ({
-        ...appointment,
-        doctors: appointment.doctors
-          ? {
-              ...appointment.doctors,
-              profiles:
-                appointment.doctors.profiles ??
-                appointment.doctors.profile ??
-                appointment.doctors.user ??
-                null,
-              specializations:
-                appointment.doctors.specializations ??
-                appointment.doctors.specialization ??
-                null,
-            }
-          : null,
-      }));
+      const { data, error } = await supabase
+  .from("appointments")
+  .select(`
+    *,
+    doctors (
+      id,
+      consultation_fee,
+      experience_years,
+      specializations (name, icon),
+      profiles!doctors_user_id_profiles_fkey (
+        full_name,
+        avatar_url,
+        email
+      )
+    )
+  `)
+  .eq("patient_id", user!.id)
+  .order("appointment_date", { ascending: false });
+      if (error) throw error;
+      return data;
     },
     enabled: !!user,
   });

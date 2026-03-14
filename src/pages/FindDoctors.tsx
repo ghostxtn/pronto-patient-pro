@@ -39,10 +39,18 @@ export default function FindDoctors() {
   const { data: doctors, isLoading } = useQuery({
     queryKey: ["doctors", selectedSpec, searchQuery],
     queryFn: async () => {
-      return api.doctors.list({
-        specialization_id: selectedSpec ?? undefined,
-        search: searchQuery || undefined,
-      } as any);
+      let query = supabase
+  .from("doctors")
+  .select(`
+    *,
+    specializations (id, name, icon),
+    profiles!doctors_user_id_profiles_fkey (full_name, avatar_url, email)
+  `)
+  .eq("is_active", true);
+      if (selectedSpec) query = query.eq("specialization_id", selectedSpec);
+      const { data, error } = await query;
+      if (error) throw error;
+      return data;
     },
   });
 

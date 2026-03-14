@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { motion } from "framer-motion";
+import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Button } from "@/components/ui/button";
@@ -44,11 +45,15 @@ export default function Auth() {
   };
 
   const handleGoogleLogin = async () => {
-    void googleLogin;
-    // If the app switches to Google Identity Services later, replace this redirect
-    // with a GSI flow and pass the returned ID token into `googleLogin`.
-    window.location.href = `${import.meta.env.VITE_API_URL || "/api"}/auth/google`;
-  };
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo: `${window.location.origin}/dashboard`,
+    },
+  });
+
+  if (error) toast.error(error.message);
+};
 
   const handleSocialLogin = async (_provider: "azure" | "facebook") => {
     toast.info("Coming soon");
