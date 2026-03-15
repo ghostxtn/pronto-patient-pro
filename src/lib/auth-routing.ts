@@ -3,7 +3,7 @@ export type AppRole = "owner" | "admin" | "staff" | "doctor" | "patient";
 export function getDefaultRouteByRole(role?: string) {
   switch (role) {
     case "owner":
-      return "/owner/dashboard";
+      return "/admin/dashboard";
     case "admin":
       return "/admin/dashboard";
     case "staff":

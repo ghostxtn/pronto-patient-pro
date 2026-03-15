@@ -22,7 +22,7 @@ export default function ManageDoctors() {
   const { t } = useLanguage();
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("active");
+  const [statusFilter, setStatusFilter] = useState<"active" | "inactive" | "all">("active");
   const [editDoctor, setEditDoctor] = useState<any>(null);
   const [addOpen, setAddOpen] = useState(false);
   const emptyNewDoctor = {
@@ -39,9 +39,9 @@ export default function ManageDoctors() {
 
   const { data: specializations } = useQuery({ queryKey: ["specializations"], queryFn: async () => api.specializations.list() });
   const { data: doctors } = useQuery({
-    queryKey: ["admin-doctors"],
+    queryKey: ["admin-doctors", statusFilter],
     queryFn: async () => {
-      const data = await api.doctors.list();
+      const data = await api.doctors.list({ status: statusFilter });
       return data
         .map((doctor: any) => ({
           ...doctor,
@@ -104,9 +104,12 @@ export default function ManageDoctors() {
   };
 
   const visibleDoctors = (doctors ?? []).filter((doc: any) => {
-    if (statusFilter === "active") return doc.is_active === true;
-    if (statusFilter === "inactive") return doc.is_active === false;
-    return true;
+    const q = search.trim().toLowerCase();
+    if (!q) return true;
+
+    const name = `${doc.firstName ?? ""} ${doc.lastName ?? ""}`.trim().toLowerCase();
+    const email = (doc.email ?? doc.profiles?.email ?? "").toLowerCase();
+    return name.includes(q) || email.includes(q);
   });
 
   return (
@@ -163,7 +166,15 @@ Add Doctor
                       </div>
                     </div>
                   </td>
-
+                  <td className="p-4 hidden md:table-cell text-sm text-muted-foreground">
+                    {doc.specialization?.name ?? doc.specializations?.name ?? "—"}
+                  </td>
+                  <td className="p-4 hidden lg:table-cell text-sm text-muted-foreground">
+                    {doc.experience_years ?? doc.experienceYears ?? "—"}
+                  </td>
+                  <td className="p-4 hidden lg:table-cell text-sm text-muted-foreground">
+                    {doc.consultation_fee ?? doc.consultationFee ?? "—"}
+                  </td>
                   <td className="p-4">
                     <Badge
                       variant="outline"
@@ -192,13 +203,15 @@ Add Doctor
                         <Edit className="h-4 w-4" />
                       </Button>
 
-                      <Button variant="ghost" size="icon" onClick={() => toggleActive.mutate({ id: doc.id, isActive: true })}>
-                        <UserCheck className="h-4 w-4 text-success" />
-                      </Button>
-
-                      <Button variant="ghost" size="icon" onClick={() => toggleActive.mutate({ id: doc.id, isActive: false })}>
-                        <UserX className="h-4 w-4 text-destructive" />
-                      </Button>
+                      {doc.is_active ? (
+                        <Button variant="ghost" size="icon" onClick={() => toggleActive.mutate({ id: doc.id, isActive: false })}>
+                          <UserX className="h-4 w-4 text-destructive" />
+                        </Button>
+                      ) : (
+                        <Button variant="ghost" size="icon" onClick={() => toggleActive.mutate({ id: doc.id, isActive: true })}>
+                          <UserCheck className="h-4 w-4 text-success" />
+                        </Button>
+                      )}
 
                     </div>
                   </td>
@@ -207,7 +220,7 @@ Add Doctor
             })}
 
             {!visibleDoctors.length && (
-              <tr><td colSpan={3} className="p-8 text-center text-muted-foreground">{t.noDoctorsFound}</td></tr>
+              <tr><td colSpan={6} className="p-8 text-center text-muted-foreground">{t.noDoctorsFound}</td></tr>
             )}
           </tbody></table></div></CardContent></Card>
         </motion.div>
