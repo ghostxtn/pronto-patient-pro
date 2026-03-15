@@ -1,0 +1,3 @@
+Repo icinde homepage ile iliskili bir Figma linki bulunmadi.
+
+Bu dosya, daha sonra eklenecek gercek Figma dosya/link bilgisinin yeri olarak bir placeholder'dir.
