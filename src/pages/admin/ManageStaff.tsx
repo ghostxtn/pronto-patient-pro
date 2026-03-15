@@ -195,22 +195,23 @@ export default function ManageStaff() {
                               >
                                 <Edit className="h-4 w-4" />
                               </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => setStaffStatus.mutate({ id: member.id, isActive: true })}
-                                disabled={Boolean(member.isActive)}
-                              >
-                                <UserCheck className="h-4 w-4 text-success" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => setStaffStatus.mutate({ id: member.id, isActive: false })}
-                                disabled={!member.isActive}
-                              >
-                                <UserX className="h-4 w-4 text-destructive" />
-                              </Button>
+                              {member.isActive ? (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => setStaffStatus.mutate({ id: member.id, isActive: false })}
+                                >
+                                  <UserX className="h-4 w-4 text-destructive" />
+                                </Button>
+                              ) : (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => setStaffStatus.mutate({ id: member.id, isActive: true })}
+                                >
+                                  <UserCheck className="h-4 w-4 text-success" />
+                                </Button>
+                              )}
                               <Button
                                 variant="ghost"
                                 size="icon"
