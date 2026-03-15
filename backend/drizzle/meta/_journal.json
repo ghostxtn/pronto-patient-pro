@@ -36,6 +36,13 @@
       "when": 1774000000000,
       "tag": "0004_tenant_domain_and_scoped_user_email",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1774100000000,
+      "tag": "0005_staff_phone_on_users",
+      "breakpoints": true
     }
   ]
 }

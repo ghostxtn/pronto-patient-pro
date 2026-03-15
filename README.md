@@ -59,6 +59,37 @@ Useful commands
 
 If a teammate pulls new backend schema changes later, they should run `npm run db:migrate` again.
 
+Existing database repair flow
+
+Use this only if your local PostgreSQL already has the clinic tables but `npm run db:migrate` fails with errors like `relation "users" already exists`.
+
+This means the database schema exists, but Drizzle migration history is missing or incomplete.
+
+Repair steps
+
+1. Make sure PostgreSQL is running:
+   - `npm run db:up`
+2. Apply the baseline repair script:
+   - `Get-Content .\backend\drizzle\baseline_existing_db.sql -Raw | docker compose exec -T postgres psql -U clinic_user -d clinic_db`
+3. Restart the backend:
+   - `npm run backend:dev`
+4. After this, future schema changes can use the normal flow again:
+   - `npm run db:migrate`
+
+What the repair script does
+
+- Creates `drizzle.__drizzle_migrations` if it does not exist.
+- Marks migrations `0000` through `0005` as already applied, only if they are missing.
+- Adds `users.phone` if it is missing.
+
+Important
+
+- Use the repair script only for an existing local database that already contains the clinic tables.
+- Do not use it as the default setup for a brand new empty database.
+- For a fresh database, keep using:
+  - `npm run db:migrate`
+  - `npm run db:seed`
+
 Local seed accounts
 
 - `test-klinik.localhost`

@@ -26,6 +26,8 @@ export const en: Record<string, string> = {
   email: "Email",
   phone: "Phone",
   name: "Name",
+  firstName: "First Name",
+  lastName: "Last Name",
   returnHome: "Return to Home",
 
   // Landing
@@ -232,6 +234,18 @@ export const en: Record<string, string> = {
   registeredPatients: "registered patients",
   joined: "Joined",
 
+  // Admin - Manage Staff
+  manageStaff: "Manage Staff",
+  registeredStaff: "registered staff",
+  addStaff: "Add Staff",
+  editStaff: "Edit Staff",
+  noStaffFound: "No staff found",
+  staffCreated: "Staff member created.",
+  staffUpdated: "Staff member updated",
+  staffDeleted: "Staff member deleted",
+  staffStatusUpdated: "Staff status updated",
+  temporaryPasswordLabel: "Temporary password",
+
   // Admin - Manage Appointments
   manageAppointments: "Manage Appointments",
   totalAppointments: "total appointments",
@@ -279,6 +293,7 @@ export const en: Record<string, string> = {
   myScheduleNav: "My Schedule",
   appointmentsNav: "Appointments",
   doctorsNav: "Doctors",
+  staffNav: "Staff",
   patientsNav: "Patients",
   settingsNav: "Settings",
 };

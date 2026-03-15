@@ -26,6 +26,8 @@ export const tr: Record<string, string> = {
   email: "E-posta",
   phone: "Telefon",
   name: "İsim",
+  firstName: "Ad",
+  lastName: "Soyad",
   returnHome: "Ana Sayfaya Dön",
 
   // Landing
@@ -232,6 +234,18 @@ export const tr: Record<string, string> = {
   registeredPatients: "kayıtlı hasta",
   joined: "Katılım",
 
+  // Admin - Manage Staff
+  manageStaff: "Personeli Yönet",
+  registeredStaff: "kayıtlı personel",
+  addStaff: "Personel Ekle",
+  editStaff: "Personeli Düzenle",
+  noStaffFound: "Personel bulunamadı",
+  staffCreated: "Personel hesabı oluşturuldu.",
+  staffUpdated: "Personel güncellendi",
+  staffDeleted: "Personel silindi",
+  staffStatusUpdated: "Personel durumu güncellendi",
+  temporaryPasswordLabel: "Geçici şifre",
+
   // Admin - Manage Appointments
   manageAppointments: "Randevuları Yönet",
   totalAppointments: "toplam randevu",
@@ -279,6 +293,7 @@ export const tr: Record<string, string> = {
   myScheduleNav: "Programım",
   appointmentsNav: "Randevular",
   doctorsNav: "Doktorlar",
+  staffNav: "Personel",
   patientsNav: "Hastalar",
   settingsNav: "Ayarlar",
 };

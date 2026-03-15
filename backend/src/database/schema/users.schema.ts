@@ -17,6 +17,7 @@ export const users = pgTable(
     password_hash: varchar('password_hash', { length: 255 }),
     first_name: varchar('first_name', { length: 100 }).notNull(),
     last_name: varchar('last_name', { length: 100 }).notNull(),
+    phone: varchar('phone', { length: 20 }),
     role: varchar('role', { length: 20 }).notNull().default('staff'),
     clinic_id: uuid('clinic_id')
       .notNull()
