@@ -54,19 +54,7 @@ export default function DoctorProfile() {
 
   const { data: doctor, isLoading } = useQuery({
     queryKey: ["doctor", id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-  .from("doctors")
-  .select(`
-    *,
-    specializations (id, name, icon, description),
-    profiles!doctors_user_id_profiles_fkey (full_name, avatar_url, email)
-  `)
-  .eq("id", id!)
-  .single();
-      if (error) throw error;
-      return data;
-    },
+    queryFn: async () => api.doctors.get(id!),
     enabled: !!id,
   });
 
@@ -131,8 +119,11 @@ export default function DoctorProfile() {
   if (isLoading) return <AppLayout><div className="flex items-center justify-center py-20"><div className="h-8 w-8 rounded-full border-2 border-primary border-t-transparent animate-spin" /></div></AppLayout>;
   if (!doctor) return <AppLayout><div className="text-center py-20"><h2 className="font-display font-bold text-xl mb-2">{t.doctorNotFound}</h2><Button variant="outline" onClick={() => navigate("/doctors")}>{t.backToDoctors}</Button></div></AppLayout>;
 
-  const profile = doctor.profiles as any;
-  const spec = doctor.specializations as any;
+  const profile = {
+    full_name: [doctor.firstName, doctor.lastName].filter(Boolean).join(" "),
+    email: doctor.email,
+  };
+  const spec = doctor.specialization as any;
   const Icon = iconMap[spec?.icon || ""] || Stethoscope;
 
   return (
@@ -147,14 +138,14 @@ export default function DoctorProfile() {
             <div className="glass rounded-2xl p-6 shadow-card">
               <div className="flex flex-col items-center text-center">
                 <div className="h-24 w-24 rounded-3xl bg-gradient-to-br from-primary to-info flex items-center justify-center mb-4">
-                  {profile?.avatar_url ? <img src={profile.avatar_url} alt="" className="h-24 w-24 rounded-3xl object-cover" /> : <span className="text-primary-foreground font-display font-bold text-3xl">{profile?.full_name?.[0] || "D"}</span>}
+                  <span className="text-primary-foreground font-display font-bold text-3xl">{profile?.full_name?.[0] || "D"}</span>
                 </div>
                 <h1 className="text-xl font-display font-bold">Dr. {profile?.full_name || "Unknown"}</h1>
                 <Badge variant="secondary" className="mt-2 rounded-full"><Icon className="h-3.5 w-3.5 mr-1" />{spec?.name || "General"}</Badge>
                 <div className="grid grid-cols-3 gap-3 mt-6 w-full">
-                  <div className="text-center p-3 rounded-xl bg-muted"><GraduationCap className="h-4 w-4 mx-auto mb-1 text-muted-foreground" /><div className="text-sm font-bold">{doctor.experience_years}y</div><div className="text-xs text-muted-foreground">{t.experience}</div></div>
+                  <div className="text-center p-3 rounded-xl bg-muted"><GraduationCap className="h-4 w-4 mx-auto mb-1 text-muted-foreground" /><div className="text-sm font-bold">{doctor.title || "-"}</div><div className="text-xs text-muted-foreground">{t.experience}</div></div>
                   <div className="text-center p-3 rounded-xl bg-muted"><Star className="h-4 w-4 mx-auto mb-1 fill-warning text-warning" /><div className="text-sm font-bold">4.8</div><div className="text-xs text-muted-foreground">{t.rating}</div></div>
-                  <div className="text-center p-3 rounded-xl bg-muted"><DollarSign className="h-4 w-4 mx-auto mb-1 text-muted-foreground" /><div className="text-sm font-bold">${doctor.consultation_fee}</div><div className="text-xs text-muted-foreground">{t.fee}</div></div>
+                  <div className="text-center p-3 rounded-xl bg-muted"><DollarSign className="h-4 w-4 mx-auto mb-1 text-muted-foreground" /><div className="text-sm font-bold">{doctor.phone || "-"}</div><div className="text-xs text-muted-foreground">{t.fee}</div></div>
                 </div>
               </div>
             </div>
@@ -202,7 +193,7 @@ export default function DoctorProfile() {
                     <span className="text-muted-foreground">{t.specialty}</span><span className="font-medium">{spec?.name}</span>
                     <span className="text-muted-foreground">{t.date}</span><span className="font-medium">{format(selectedDate, "EEEE, MMMM d, yyyy")}</span>
                     <span className="text-muted-foreground">{t.time}</span><span className="font-medium">{selectedSlot} — {format(addMinutes(parse(selectedSlot, "HH:mm", new Date()), 30), "HH:mm")}</span>
-                    <span className="text-muted-foreground">{t.fee}</span><span className="font-medium">${doctor.consultation_fee}</span>
+                    <span className="text-muted-foreground">{t.fee}</span><span className="font-medium">{doctor.phone || "-"}</span>
                   </div>
                 </div>
                 <Button className="w-full rounded-xl h-11 shadow-soft" onClick={() => bookMutation.mutate()} disabled={bookMutation.isPending}>

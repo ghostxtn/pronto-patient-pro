@@ -1,5 +1,5 @@
 import { ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, gte, lte } from 'drizzle-orm';
 import { appointmentNotes, appointments, doctors, patients, users } from '../database/schema';
 import { CreateAppointmentNoteDto } from './dto/create-appointment-note.dto';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
@@ -49,10 +49,30 @@ export class AppointmentsService {
       doctorId?: string;
       patientId?: string;
       date?: string;
+      dateFrom?: string;
+      dateTo?: string;
       status?: string;
+    },
+    currentUser?: {
+      userId: string;
+      role: string;
     },
   ) {
     const conditions = [eq(appointments.clinic_id, clinicId)];
+
+    if (currentUser?.role === 'patient') {
+      const [patient] = await this.db
+        .select()
+        .from(patients)
+        .where(and(eq(patients.user_id, currentUser.userId), eq(patients.clinic_id, clinicId)))
+        .limit(1);
+
+      if (!patient) {
+        throw new ForbiddenException('Patient record not found');
+      }
+
+      conditions.push(eq(appointments.patient_id, patient.id));
+    }
 
     if (filters?.doctorId) {
       conditions.push(eq(appointments.doctor_id, filters.doctorId));
@@ -64,6 +84,14 @@ export class AppointmentsService {
 
     if (filters?.date) {
       conditions.push(eq(appointments.appointment_date, filters.date));
+    }
+
+    if (filters?.dateFrom) {
+      conditions.push(gte(appointments.appointment_date, filters.dateFrom));
+    }
+
+    if (filters?.dateTo) {
+      conditions.push(lte(appointments.appointment_date, filters.dateTo));
     }
 
     if (filters?.status) {
@@ -96,6 +124,7 @@ export class AppointmentsService {
           lastName: users.last_name,
           email: users.email,
           title: doctors.title,
+          phone: doctors.phone,
         },
       })
       .from(appointments)

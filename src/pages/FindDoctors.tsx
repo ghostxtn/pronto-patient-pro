@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { motion } from "framer-motion";
 import {
   Stethoscope, HeartPulse, Brain, Eye, Baby, Bone, ScanFace, Smile,
-  Search, Star, Clock, DollarSign, ArrowRight,
+  Search, Star, ArrowRight,
 } from "lucide-react";
 
 const iconMap: Record<string, React.ElementType> = {
@@ -38,23 +38,20 @@ export default function FindDoctors() {
 
   const { data: doctors, isLoading } = useQuery({
     queryKey: ["doctors", selectedSpec, searchQuery],
-    queryFn: async () => {
-      let query = supabase
-  .from("doctors")
-  .select(`
-    *,
-    specializations (id, name, icon),
-    profiles!doctors_user_id_profiles_fkey (full_name, avatar_url, email)
-  `)
-  .eq("is_active", true);
-      if (selectedSpec) query = query.eq("specialization_id", selectedSpec);
-      const { data, error } = await query;
-      if (error) throw error;
-      return data;
-    },
+    queryFn: async () => api.doctors.list(selectedSpec ? { specialization_id: selectedSpec } : undefined),
   });
 
-  const filteredDoctors = doctors;
+  const filteredDoctors = (doctors ?? []).filter((doctor: any) => {
+    const doctorName = [doctor.firstName, doctor.lastName].filter(Boolean).join(" ").trim().toLowerCase();
+    const specializationName = doctor.specialization?.name?.toLowerCase() ?? "";
+    const query = searchQuery.trim().toLowerCase();
+
+    if (!query) {
+      return true;
+    }
+
+    return doctorName.includes(query) || specializationName.includes(query);
+  });
 
   return (
     <AppLayout>
@@ -74,7 +71,7 @@ export default function FindDoctors() {
         <motion.div className="flex flex-wrap gap-2 mb-8" custom={2} variants={fadeUp}>
           <Button variant={selectedSpec === null ? "default" : "outline"} size="sm" className="rounded-full" onClick={() => setSelectedSpec(null)}>{t.all}</Button>
           {specializations?.map((spec) => {
-            const Icon = iconMap[spec.icon || ""] || Stethoscope;
+            const Icon = iconMap[(spec as any).icon || ""] || Stethoscope;
             return (
               <Button key={spec.id} variant={selectedSpec === spec.id ? "default" : "outline"} size="sm" className="rounded-full" onClick={() => setSelectedSpec(spec.id)}>
                 <Icon className="h-3.5 w-3.5 mr-1" /> {spec.name}
@@ -97,11 +94,9 @@ export default function FindDoctors() {
             {filteredDoctors.map((doctor, i) => {
               const doctorName =
                 [doctor.firstName, doctor.lastName].filter(Boolean).join(" ").trim() ||
-                (doctor as any).full_name ||
-                (doctor as any).name ||
                 "Unknown";
               const doctorInitial = doctorName[0] || "D";
-              const spec = (doctor as any).specializations as any;
+              const spec = (doctor as any).specialization as any;
               const Icon = iconMap[spec?.icon || ""] || Stethoscope;
               return (
                 <motion.div key={doctor.id} className="glass rounded-2xl p-6 shadow-card hover:shadow-elevated transition-all duration-300 hover:-translate-y-1" custom={i + 3} variants={fadeUp}>
@@ -116,8 +111,7 @@ export default function FindDoctors() {
                   </div>
                   {doctor.bio && <p className="text-sm text-muted-foreground mb-4 line-clamp-2">{doctor.bio}</p>}
                   <div className="flex items-center gap-4 text-sm text-muted-foreground mb-4">
-                    <span className="flex items-center gap-1"><Clock className="h-3.5 w-3.5" />{doctor.experience_years}{t.yrsExp}</span>
-                    <span className="flex items-center gap-1"><DollarSign className="h-3.5 w-3.5" />${doctor.consultation_fee}</span>
+                    {doctor.phone ? <span>{doctor.phone}</span> : null}
                     <span className="flex items-center gap-1"><Star className="h-3.5 w-3.5 fill-warning text-warning" />4.8</span>
                   </div>
                   <Button asChild className="w-full rounded-xl shadow-soft">

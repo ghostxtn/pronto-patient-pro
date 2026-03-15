@@ -44,28 +44,7 @@ export default function MyAppointments() {
 
   const { data: appointments, isLoading } = useQuery({
     queryKey: ["my-appointments", user?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-  .from("appointments")
-  .select(`
-    *,
-    doctors (
-      id,
-      consultation_fee,
-      experience_years,
-      specializations (name, icon),
-      profiles!doctors_user_id_profiles_fkey (
-        full_name,
-        avatar_url,
-        email
-      )
-    )
-  `)
-  .eq("patient_id", user!.id)
-  .order("appointment_date", { ascending: false });
-      if (error) throw error;
-      return data;
-    },
+    queryFn: async () => api.appointments.list(),
     enabled: !!user,
   });
 
@@ -98,17 +77,16 @@ export default function MyAppointments() {
                 <motion.h2 className="font-display font-semibold text-lg mb-4" custom={1} variants={fadeUp}>{t.upcoming} ({upcoming.length})</motion.h2>
                 <div className="space-y-3">
                   {upcoming.map((apt, i) => {
-                    const doc = apt.doctors as any; const profile = doc?.profiles; const spec = doc?.specializations;
-                    const status = statusConfig[apt.status]; const StatusIcon = status.icon; const SpecIcon = iconMap[spec?.icon || ""] || Stethoscope;
+                    const doc = apt.doctor as any;
+                    const status = statusConfig[apt.status]; const StatusIcon = status.icon;
                     return (
                       <motion.div key={apt.id} className="glass rounded-2xl p-5 shadow-card hover:shadow-elevated transition-all cursor-pointer" custom={i + 2} variants={fadeUp} onClick={() => setDetailId(apt.id)}>
                         <div className="flex items-center justify-between gap-4">
                           <div className="flex items-center gap-4 min-w-0">
-                            <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-primary to-info flex items-center justify-center flex-shrink-0"><span className="text-primary-foreground font-display font-bold">{profile?.full_name?.[0] || "D"}</span></div>
+                            <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-primary to-info flex items-center justify-center flex-shrink-0"><span className="text-primary-foreground font-display font-bold">{doc?.firstName?.[0] || "D"}</span></div>
                             <div className="min-w-0">
-                              <div className="font-display font-semibold truncate">Dr. {profile?.full_name}</div>
+                              <div className="font-display font-semibold truncate">Dr. {[doc?.firstName, doc?.lastName].filter(Boolean).join(" ")}</div>
                               <div className="flex items-center gap-3 text-sm text-muted-foreground mt-0.5">
-                                <span className="flex items-center gap-1"><SpecIcon className="h-3 w-3" /> {spec?.name}</span>
                                 <span className="flex items-center gap-1"><CalendarDays className="h-3 w-3" />{format(parseISO(apt.appointment_date), "MMM d")}</span>
                                 <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{apt.start_time.slice(0, 5)}</span>
                               </div>
@@ -127,17 +105,16 @@ export default function MyAppointments() {
                 <motion.h2 className="font-display font-semibold text-lg mb-4" custom={upcoming.length + 2} variants={fadeUp}>{t.past} ({past.length})</motion.h2>
                 <div className="space-y-3">
                   {past.map((apt, i) => {
-                    const doc = apt.doctors as any; const profile = doc?.profiles; const spec = doc?.specializations;
-                    const status = statusConfig[apt.status]; const StatusIcon = status.icon; const SpecIcon = iconMap[spec?.icon || ""] || Stethoscope;
+                    const doc = apt.doctor as any;
+                    const status = statusConfig[apt.status]; const StatusIcon = status.icon;
                     return (
                       <motion.div key={apt.id} className="glass rounded-2xl p-5 shadow-card hover:shadow-elevated transition-all cursor-pointer" custom={i + upcoming.length + 3} variants={fadeUp} onClick={() => setDetailId(apt.id)}>
                         <div className="flex items-center justify-between gap-4">
                           <div className="flex items-center gap-4 min-w-0">
-                            <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-primary to-info flex items-center justify-center flex-shrink-0"><span className="text-primary-foreground font-display font-bold">{profile?.full_name?.[0] || "D"}</span></div>
+                            <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-primary to-info flex items-center justify-center flex-shrink-0"><span className="text-primary-foreground font-display font-bold">{doc?.firstName?.[0] || "D"}</span></div>
                             <div className="min-w-0">
-                              <div className="font-display font-semibold truncate">Dr. {profile?.full_name}</div>
+                              <div className="font-display font-semibold truncate">Dr. {[doc?.firstName, doc?.lastName].filter(Boolean).join(" ")}</div>
                               <div className="flex items-center gap-3 text-sm text-muted-foreground mt-0.5">
-                                <span className="flex items-center gap-1"><SpecIcon className="h-3 w-3" /> {spec?.name}</span>
                                 <span className="flex items-center gap-1"><CalendarDays className="h-3 w-3" />{format(parseISO(apt.appointment_date), "MMM d")}</span>
                               </div>
                             </div>
@@ -164,8 +141,8 @@ export default function MyAppointments() {
       <Dialog open={!!detailId} onOpenChange={() => setDetailId(null)}>
         <DialogContent className="sm:max-w-lg rounded-2xl">
           {selectedAppointment && (() => {
-            const doc = selectedAppointment.doctors as any; const profile = doc?.profiles; const spec = doc?.specializations;
-            const status = statusConfig[selectedAppointment.status]; const StatusIcon = status.icon; const SpecIcon = iconMap[spec?.icon || ""] || Stethoscope;
+            const doc = selectedAppointment.doctor as any;
+            const status = statusConfig[selectedAppointment.status]; const StatusIcon = status.icon;
             return (
               <>
                 <DialogHeader>
@@ -174,13 +151,13 @@ export default function MyAppointments() {
                 </DialogHeader>
                 <div className="space-y-4">
                   <div className="flex items-center gap-3">
-                    <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-primary to-info flex items-center justify-center"><span className="text-primary-foreground font-display font-bold">{profile?.full_name?.[0] || "D"}</span></div>
-                    <div><div className="font-semibold">Dr. {profile?.full_name}</div><div className="text-sm text-muted-foreground flex items-center gap-1"><SpecIcon className="h-3 w-3" /> {spec?.name}</div></div>
+                    <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-primary to-info flex items-center justify-center"><span className="text-primary-foreground font-display font-bold">{doc?.firstName?.[0] || "D"}</span></div>
+                    <div><div className="font-semibold">Dr. {[doc?.firstName, doc?.lastName].filter(Boolean).join(" ")}</div><div className="text-sm text-muted-foreground">{doc?.email}</div></div>
                   </div>
                   <div className="grid grid-cols-2 gap-3 text-sm">
                     <div className="p-3 rounded-xl bg-muted"><div className="text-muted-foreground mb-1">{t.date}</div><div className="font-medium">{format(parseISO(selectedAppointment.appointment_date), "EEE, MMM d, yyyy")}</div></div>
                     <div className="p-3 rounded-xl bg-muted"><div className="text-muted-foreground mb-1">{t.time}</div><div className="font-medium">{selectedAppointment.start_time.slice(0, 5)} — {selectedAppointment.end_time.slice(0, 5)}</div></div>
-                    <div className="p-3 rounded-xl bg-muted"><div className="text-muted-foreground mb-1">{t.fee}</div><div className="font-medium">${doc?.consultation_fee}</div></div>
+                    <div className="p-3 rounded-xl bg-muted"><div className="text-muted-foreground mb-1">{t.fee}</div><div className="font-medium">{doc?.phone || "-"}</div></div>
                     <div className="p-3 rounded-xl bg-muted"><div className="text-muted-foreground mb-1">{t.status}</div><div className="font-medium capitalize">{selectedAppointment.status}</div></div>
                   </div>
                   {selectedAppointment.notes && (<div className="p-3 rounded-xl bg-muted"><div className="text-muted-foreground text-sm mb-1 flex items-center gap-1"><FileText className="h-3 w-3" /> {t.notes}</div><p className="text-sm">{selectedAppointment.notes}</p></div>)}

@@ -31,16 +31,34 @@ export class AppointmentsController {
 
   @Get()
   findAll(
-    @CurrentUser() user: { clinicId: string },
+    @CurrentUser() user: { clinicId: string; userId: string; role: string },
     @Query()
     filters: {
       doctorId?: string;
       patientId?: string;
+      doctor_id?: string;
+      patient_id?: string;
       date?: string;
+      date_from?: string;
+      date_to?: string;
       status?: string;
     },
   ) {
-    return this.appointmentsService.findAllByClinic(user.clinicId, filters);
+    return this.appointmentsService.findAllByClinic(
+      user.clinicId,
+      {
+        doctorId: filters.doctorId ?? filters.doctor_id,
+        patientId: filters.patientId ?? filters.patient_id,
+        date: filters.date,
+        dateFrom: filters.date_from,
+        dateTo: filters.date_to,
+        status: filters.status,
+      },
+      {
+        userId: user.userId,
+        role: user.role,
+      },
+    );
   }
 
   @Get(':id')

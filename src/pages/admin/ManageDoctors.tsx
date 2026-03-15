@@ -223,7 +223,7 @@ Add Doctor
       {addOpen && (
         <div className="fixed inset-0 flex items-center justify-center bg-black/40 z-50">
 
-          <div className="w-[420px] rounded-xl bg-white p-6 space-y-4 shadow-xl" autoComplete="off">
+          <div className="w-[420px] rounded-xl bg-white p-6 space-y-4 shadow-xl">
 
             <h2 className="text-lg font-semibold">
               Add Doctor

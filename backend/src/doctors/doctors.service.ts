@@ -5,9 +5,9 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import * as bcrypt from 'bcrypt';
-import { doctors, users } from '../database/schema';
+import { doctors, specializations, users } from '../database/schema';
 import { AdminSetDoctorStatusDto } from './dto/admin-set-doctor-status.dto';
 import { AdminUpdateDoctorDto } from './dto/admin-update-doctor.dto';
 import { CreateDoctorDto } from './dto/create-doctor.dto';
@@ -75,7 +75,16 @@ export class DoctorsService {
     return doctor;
   }
 
-  async findAllByClinic(clinicId: string) {
+  async findAllByClinic(clinicId: string, specializationId?: string) {
+    const conditions = [
+      eq(doctors.clinic_id, clinicId),
+      eq(doctors.is_active, true),
+    ];
+
+    if (specializationId) {
+      conditions.push(eq(doctors.specialization_id, specializationId));
+    }
+
     return this.db
       .select({
         id: doctors.id,
@@ -89,16 +98,40 @@ export class DoctorsService {
         firstName: users.first_name,
         lastName: users.last_name,
         email: users.email,
+        specialization: {
+          id: specializations.id,
+          name: specializations.name,
+        },
       })
       .from(doctors)
       .innerJoin(users, eq(doctors.user_id, users.id))
-      .where(eq(doctors.clinic_id, clinicId));
+      .leftJoin(specializations, eq(doctors.specialization_id, specializations.id))
+      .where(and(...conditions));
   }
 
   async findById(id: string, clinicId: string) {
     const [doctor] = await this.db
-      .select()
+      .select({
+        id: doctors.id,
+        user_id: doctors.user_id,
+        specialization_id: doctors.specialization_id,
+        clinic_id: doctors.clinic_id,
+        title: doctors.title,
+        bio: doctors.bio,
+        phone: doctors.phone,
+        is_active: doctors.is_active,
+        firstName: users.first_name,
+        lastName: users.last_name,
+        email: users.email,
+        specialization: {
+          id: specializations.id,
+          name: specializations.name,
+          description: specializations.description,
+        },
+      })
       .from(doctors)
+      .innerJoin(users, eq(doctors.user_id, users.id))
+      .leftJoin(specializations, eq(doctors.specialization_id, specializations.id))
       .where(eq(doctors.id, id))
       .limit(1);
 
