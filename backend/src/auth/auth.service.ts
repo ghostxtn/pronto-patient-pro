@@ -76,6 +76,7 @@ export class AuthService {
         lastName: user.last_name,
         role: user.role,
         clinicId: user.clinic_id,
+        avatar_url: user.avatar_url,
       },
     };
   }
@@ -117,6 +118,7 @@ export class AuthService {
         lastName: user.last_name,
         role: user.role,
         clinicId: user.clinic_id,
+        avatar_url: user.avatar_url,
       },
     };
   }
@@ -182,6 +184,7 @@ export class AuthService {
       lastName: user.last_name,
       role: user.role,
       clinicId: user.clinic_id,
+      avatar_url: user.avatar_url,
     };
   }
 
@@ -192,6 +195,12 @@ export class AuthService {
     lastName: string;
     avatar: string;
   }, clinicId: string) {
+    console.log('[auth][googleLogin] start', {
+      clinicId,
+      email: googleUser.email,
+      googleId: googleUser.googleId,
+    });
+
     const [googleUserRecord] = await this.db
       .select()
       .from(users)
@@ -204,23 +213,35 @@ export class AuthService {
       .limit(1);
 
     if (googleUserRecord) {
+      console.log('[auth][googleLogin] found existing google user', {
+        userId: googleUserRecord.id,
+        email: googleUserRecord.email,
+        role: googleUserRecord.role,
+      });
+      const normalizedGoogleUser = await this.ensureGooglePatientUser(
+        googleUserRecord,
+        clinicId,
+        googleUser.avatar,
+      );
+
       const { accessToken, refreshToken } = await this.generateTokens(
-        googleUserRecord.id,
-        googleUserRecord.email,
-        googleUserRecord.role,
-        googleUserRecord.clinic_id,
+        normalizedGoogleUser.id,
+        normalizedGoogleUser.email,
+        normalizedGoogleUser.role,
+        normalizedGoogleUser.clinic_id,
       );
 
       return {
         accessToken,
         refreshToken,
         user: {
-          id: googleUserRecord.id,
-          email: googleUserRecord.email,
-          firstName: googleUserRecord.first_name,
-          lastName: googleUserRecord.last_name,
-          role: googleUserRecord.role,
-          clinicId: googleUserRecord.clinic_id,
+          id: normalizedGoogleUser.id,
+          email: normalizedGoogleUser.email,
+          firstName: normalizedGoogleUser.first_name,
+          lastName: normalizedGoogleUser.last_name,
+          role: normalizedGoogleUser.role,
+          clinicId: normalizedGoogleUser.clinic_id,
+          avatar_url: normalizedGoogleUser.avatar_url,
         },
       };
     }
@@ -232,15 +253,32 @@ export class AuthService {
       .limit(1);
 
     if (emailUser) {
+      console.log('[auth][googleLogin] found existing user by email', {
+        userId: emailUser.id,
+        email: emailUser.email,
+        role: emailUser.role,
+        hasPassword: Boolean(emailUser.password_hash),
+      });
       const [updatedUser] = await this.db
         .update(users)
         .set({
+          role: emailUser.password_hash ? emailUser.role : 'patient',
           google_id: googleUser.googleId,
-          avatar_url: googleUser.avatar,
+          avatar_url: this.shouldUseGoogleAvatar(emailUser.avatar_url, googleUser.avatar)
+            ? googleUser.avatar
+            : emailUser.avatar_url,
           updated_at: new Date(),
         })
         .where(eq(users.id, emailUser.id))
         .returning();
+
+      if (updatedUser.role === 'patient') {
+        console.log('[auth][googleLogin] ensuring patient profile for email-matched user', {
+          userId: updatedUser.id,
+          role: updatedUser.role,
+        });
+        await this.ensurePatientProfile(updatedUser, clinicId);
+      }
 
       const { accessToken, refreshToken } = await this.generateTokens(
         updatedUser.id,
@@ -259,6 +297,7 @@ export class AuthService {
           lastName: updatedUser.last_name,
           role: updatedUser.role,
           clinicId: updatedUser.clinic_id,
+          avatar_url: updatedUser.avatar_url,
         },
       };
     }
@@ -271,11 +310,18 @@ export class AuthService {
         first_name: googleUser.firstName,
         last_name: googleUser.lastName,
         clinic_id: clinicId,
-        role: 'staff',
+        role: 'patient',
         google_id: googleUser.googleId,
         avatar_url: googleUser.avatar,
       })
       .returning();
+
+    console.log('[auth][googleLogin] created new google user', {
+      userId: newUser.id,
+      email: newUser.email,
+      role: newUser.role,
+    });
+    await this.ensurePatientProfile(newUser, clinicId);
 
     const { accessToken, refreshToken } = await this.generateTokens(
       newUser.id,
@@ -294,6 +340,7 @@ export class AuthService {
         lastName: newUser.last_name,
         role: newUser.role,
         clinicId: newUser.clinic_id,
+        avatar_url: newUser.avatar_url,
       },
     };
   }
@@ -322,5 +369,117 @@ export class AuthService {
     await this.redisService.setRefreshToken(userId, refreshToken, 604800);
 
     return { accessToken, refreshToken };
+  }
+
+  private async ensureGooglePatientUser(
+    user: typeof users.$inferSelect,
+    clinicId: string,
+    googleAvatar?: string,
+  ) {
+    let nextUser = user;
+
+    if (user.role === 'staff' && !user.password_hash) {
+      console.log('[auth][googleLogin] converting social-only staff user to patient', {
+        userId: user.id,
+        email: user.email,
+      });
+      const [updatedUser] = await this.db
+        .update(users)
+        .set({
+          role: 'patient',
+          updated_at: new Date(),
+        })
+        .where(eq(users.id, user.id))
+        .returning();
+
+      nextUser = updatedUser;
+    }
+
+    if (this.shouldUseGoogleAvatar(nextUser.avatar_url, googleAvatar)) {
+      const [updatedAvatarUser] = await this.db
+        .update(users)
+        .set({
+          avatar_url: googleAvatar,
+          updated_at: new Date(),
+        })
+        .where(eq(users.id, nextUser.id))
+        .returning();
+
+      nextUser = updatedAvatarUser;
+    }
+
+    if (nextUser.role === 'patient') {
+      console.log('[auth][googleLogin] ensuring patient profile for google user', {
+        userId: nextUser.id,
+        email: nextUser.email,
+      });
+      await this.ensurePatientProfile(nextUser, clinicId);
+    }
+
+    return nextUser;
+  }
+
+  private shouldUseGoogleAvatar(currentAvatar?: string | null, googleAvatar?: string | null) {
+    if (!googleAvatar) {
+      return false;
+    }
+
+    if (!currentAvatar) {
+      return true;
+    }
+
+    return currentAvatar.includes('googleusercontent.com');
+  }
+
+  private async ensurePatientProfile(
+    user: typeof users.$inferSelect,
+    clinicId: string,
+  ) {
+    console.log('[auth][googleLogin] ensurePatientProfile start', {
+      userId: user.id,
+      email: user.email,
+      clinicId,
+    });
+
+    const [existingPatient] = await this.db
+      .select()
+      .from(patients)
+      .where(and(eq(patients.user_id, user.id), eq(patients.clinic_id, clinicId)))
+      .limit(1);
+
+    if (existingPatient) {
+      console.log('[auth][googleLogin] patient profile already exists', {
+        patientId: existingPatient.id,
+        userId: user.id,
+      });
+      return existingPatient;
+    }
+
+    try {
+      const [patient] = await this.db
+        .insert(patients)
+        .values({
+          clinic_id: clinicId,
+          user_id: user.id,
+          first_name: user.first_name,
+          last_name: user.last_name,
+          email: user.email,
+        })
+        .returning();
+
+      console.log('[auth][googleLogin] patient profile created', {
+        patientId: patient.id,
+        userId: user.id,
+      });
+      return patient;
+    } catch (error) {
+      console.error('[auth][googleLogin] ensurePatientProfile failed', {
+        userId: user.id,
+        email: user.email,
+        clinicId,
+        error,
+      });
+      throw error;
+    }
   }
 }

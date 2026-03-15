@@ -13,8 +13,8 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
     private readonly authService: AuthService,
   ) {
     super({
-      clientID: configService.get<string>('GOOGLE_CLIENT_ID', 'placeholder'),
-      clientSecret: configService.get<string>('GOOGLE_CLIENT_SECRET', 'placeholder'),
+      clientID: configService.get<string>('GOOGLE_CLIENT_ID', '443771828527-25b30fovsvcrqg9717g4r3le1119f4kb.apps.googleusercontent.com'),
+      clientSecret: configService.get<string>('GOOGLE_CLIENT_SECRET', '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'),
       callbackURL: configService.get<string>(
         'GOOGLE_CALLBACK_URL',
         'http://localhost/api/auth/google/callback',
@@ -31,8 +31,15 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
     profile: Profile,
     done: VerifyCallback,
   ) {
+    console.log('[auth][googleStrategy] validate start', {
+      clinicId: req.tenant?.clinicId,
+      googleId: profile.id,
+      email: profile.emails?.[0]?.value ?? '',
+    });
+
     const clinicId = req.tenant?.clinicId;
     if (!clinicId) {
+      console.error('[auth][googleStrategy] tenant context missing');
       return done(new Error('Tenant context missing'), false);
     }
 
@@ -42,14 +49,23 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
     const lastName = profile.name?.familyName ?? '';
     const avatar = profile.photos?.[0]?.value ?? '';
 
-    const result = await this.authService.googleLogin({
-      googleId,
-      email,
-      firstName,
-      lastName,
-      avatar,
-    }, clinicId);
+    try {
+      const result = await this.authService.googleLogin({
+        googleId,
+        email,
+        firstName,
+        lastName,
+        avatar,
+      }, clinicId);
 
-    done(null, result);
+      console.log('[auth][googleStrategy] validate success', {
+        email,
+        role: result.user?.role,
+      });
+      done(null, result);
+    } catch (error) {
+      console.error('[auth][googleStrategy] validate failed', error);
+      done(error as Error, false);
+    }
   }
 }

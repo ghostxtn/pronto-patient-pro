@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import api, { clearTokens, getAccessToken, setTokens } from "@/services/api";
+import api, { ApiError, clearTokens, getAccessToken, setTokens } from "@/services/api";
 import type { AppRole } from "@/lib/auth-routing";
 
 export interface User {
@@ -9,6 +9,7 @@ export interface User {
   name: string;
   role: AppRole;
   clinic_id: string | null;
+  avatar_url: string | null;
 }
 
 interface AuthContextType {
@@ -38,6 +39,7 @@ function normalizeUser(input: any): User {
       [input.first_name, input.last_name].filter(Boolean).join(" "),
     role,
     clinic_id: input.clinic_id ?? input.clinicId ?? null,
+    avatar_url: input.avatar_url ?? input.avatarUrl ?? null,
   };
 }
 
@@ -49,19 +51,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const bootstrap = async () => {
       const token = getAccessToken();
+      console.debug("[auth][context] bootstrap start", {
+        hasAccessToken: Boolean(token),
+      });
 
       if (!token) {
+        console.debug("[auth][context] bootstrap skipped, no access token");
         setLoading(false);
         return;
       }
 
       try {
         const me = await api.auth.me();
-        setUser(normalizeUser(me.user ?? me));
+        const normalizedUser = normalizeUser(me.user ?? me);
+        console.debug("[auth][context] bootstrap /auth/me success", {
+          userId: normalizedUser.id,
+          role: normalizedUser.role,
+        });
+        setUser(normalizedUser);
       } catch (err) {
-        clearTokens();
+        console.debug("[auth][context] bootstrap failed", err);
+        if (err instanceof ApiError && err.status === 401) {
+          console.debug("[auth][context] bootstrap received 401, clearing tokens");
+          clearTokens();
+        }
         setError(err instanceof Error ? err.message : "Authentication failed");
       } finally {
+        console.debug("[auth][context] bootstrap complete");
         setLoading(false);
       }
     };
@@ -77,11 +93,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login: async (email: string, pass: string) => {
         setLoading(true);
         setError(null);
+        console.debug("[auth][context] login start", { email });
         try {
           const result = await api.auth.login(email, pass);
           setTokens(result.accessToken ?? null, result.refreshToken ?? null);
-          setUser(normalizeUser(result.user));
+          const normalizedUser = normalizeUser(result.user);
+          console.debug("[auth][context] login success", {
+            userId: normalizedUser.id,
+            role: normalizedUser.role,
+          });
+          setUser(normalizedUser);
         } catch (err) {
+          console.debug("[auth][context] login failed", err);
           setError(err instanceof Error ? err.message : "Login failed");
           throw err;
         } finally {
@@ -91,11 +114,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       register: async (data: { email: string; password: string; firstName: string; lastName: string }) => {
         setLoading(true);
         setError(null);
+        console.debug("[auth][context] register start", { email: data.email });
         try {
           const result = await api.auth.register(data);
           setTokens(result.accessToken ?? null, result.refreshToken ?? null);
-          setUser(normalizeUser(result.user));
+          const normalizedUser = normalizeUser(result.user);
+          console.debug("[auth][context] register success", {
+            userId: normalizedUser.id,
+            role: normalizedUser.role,
+          });
+          setUser(normalizedUser);
         } catch (err) {
+          console.debug("[auth][context] register failed", err);
           setError(err instanceof Error ? err.message : "Registration failed");
           throw err;
         } finally {
@@ -105,11 +135,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       googleLogin: async (idToken: string) => {
         setLoading(true);
         setError(null);
+        console.debug("[auth][context] googleLogin start");
         try {
           const result = await api.auth.googleLogin(idToken);
           setTokens(result.accessToken ?? null, result.refreshToken ?? null);
-          setUser(normalizeUser(result.user));
+          const normalizedUser = normalizeUser(result.user);
+          console.debug("[auth][context] googleLogin success", {
+            userId: normalizedUser.id,
+            role: normalizedUser.role,
+          });
+          setUser(normalizedUser);
         } catch (err) {
+          console.debug("[auth][context] googleLogin failed", err);
           setError(err instanceof Error ? err.message : "Google login failed");
           throw err;
         } finally {
@@ -119,9 +156,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       logout: async () => {
         setLoading(true);
         setError(null);
+        console.debug("[auth][context] logout start");
         try {
           await api.auth.logout();
         } finally {
+          console.debug("[auth][context] logout clearing local session");
           clearTokens();
           setUser(null);
           setLoading(false);

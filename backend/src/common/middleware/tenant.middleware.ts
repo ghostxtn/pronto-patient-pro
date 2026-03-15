@@ -3,6 +3,7 @@ import {
   NestMiddleware,
   NotFoundException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { NextFunction, Response } from 'express';
 import { TenantRequest } from '../interfaces/tenant-request.interface';
 import { TenantResolverService } from '../services/tenant-resolver.service';
@@ -11,6 +12,7 @@ import { TenantResolverService } from '../services/tenant-resolver.service';
 export class TenantMiddleware implements NestMiddleware {
   constructor(
     private readonly tenantResolverService: TenantResolverService,
+    private readonly configService: ConfigService,
   ) {}
 
   async use(
@@ -22,7 +24,14 @@ export class TenantMiddleware implements NestMiddleware {
     const rawHost = Array.isArray(forwardedHost)
       ? forwardedHost[0]
       : forwardedHost || request.headers.host;
-    const host = rawHost?.toLowerCase().split(':')[0];
+
+    let host = rawHost?.toLowerCase().split(':')[0];
+
+    const isDev = this.configService.get<string>('NODE_ENV') !== 'production';
+
+    if (isDev && host === 'localhost') {
+      host = 'test-klinik.localhost';
+    }
 
     const clinic = host
       ? await this.tenantResolverService.findClinicByDomain(host)
