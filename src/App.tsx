@@ -18,6 +18,7 @@ import DoctorSchedule from "./pages/doctor/DoctorSchedule";
 import DoctorAppointments from "./pages/doctor/DoctorAppointments";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import ManageDoctors from "./pages/admin/ManageDoctors";
+import ManageStaff from "./pages/admin/ManageStaff";
 import ManagePatients from "./pages/admin/ManagePatients";
 import ManageAppointments from "./pages/admin/ManageAppointments";
 import ClinicSettings from "./pages/admin/ClinicSettings";
@@ -58,6 +59,7 @@ const App = () => (
                 <Route element={<RequireRole allowedRoles={["owner", "admin"]} />}>
                   <Route path="/admin/dashboard" element={<AdminDashboard />} />
                   <Route path="/admin/doctors" element={<ManageDoctors />} />
+                  <Route path="/admin/staff" element={<ManageStaff />} />
                 </Route>
 
                 <Route element={<RequireRole allowedRoles={["owner", "admin", "staff"]} />}>

@@ -37,6 +37,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const adminLinks = [
     { to: "/admin/dashboard", label: t.dashboard, icon: LayoutDashboard },
     { to: "/admin/doctors", label: t.doctorsNav, icon: Stethoscope },
+    { to: "/admin/staff", label: t.staffNav, icon: Users },
     { to: "/admin/patients", label: t.patientsNav, icon: Users },
     { to: "/admin/appointments", label: t.appointmentsNav, icon: CalendarDays },
     { to: "/admin/settings", label: t.settingsNav, icon: Settings },

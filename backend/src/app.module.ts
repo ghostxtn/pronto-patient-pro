@@ -21,6 +21,7 @@ import { HealthModule } from './health/health.module';
 import { PatientsModule } from './patients/patients.module';
 import { ProfilesModule } from './profiles/profiles.module';
 import { RedisModule } from './redis/redis.module';
+import { StaffModule } from './staff/staff.module';
 import { SpecializationsModule } from './specializations/specializations.module';
 import { StorageModule } from './storage/storage.module';
 
@@ -37,6 +38,7 @@ import { StorageModule } from './storage/storage.module';
     ClinicsModule,
     ProfilesModule,
     SpecializationsModule,
+    StaffModule,
     DoctorsModule,
     AvailabilityModule,
     PatientsModule,

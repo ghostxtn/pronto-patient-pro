@@ -297,6 +297,34 @@ const api = {
         method: "DELETE",
       }),
   },
+  staff: {
+    list: (params?: { search?: string; status?: "active" | "inactive" | "all" }) => {
+      const search = new URLSearchParams();
+      search.set("role", "staff");
+      if (params?.search) search.set("search", params.search);
+      if (params?.status && params.status !== "all") search.set("status", params.status);
+      return request<any[]>(`/users?${search.toString()}`);
+    },
+    create: (data: unknown) =>
+      request<any>("/users/staff", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    update: (id: string, data: unknown) =>
+      request<any>(`/users/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
+    setStatus: (id: string, isActive: boolean) =>
+      request<any>(`/users/${id}/status`, {
+        method: "PATCH",
+        body: JSON.stringify({ isActive }),
+      }),
+    delete: (id: string) =>
+      request<any>(`/users/${id}`, {
+        method: "DELETE",
+      }),
+  },
   appointments: {
     list: (params?: {
       doctor_id?: string;
