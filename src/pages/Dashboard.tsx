@@ -19,7 +19,7 @@ const fadeUp = {
 };
 
 export default function Dashboard() {
-  const { user, loading, hasRole } = useAuth();
+  const { user, loading } = useAuth();
   const { t } = useLanguage();
   const navigate = useNavigate();
 
@@ -29,21 +29,7 @@ export default function Dashboard() {
 
   const { data: appointments } = useQuery({
     queryKey: ["dashboard-appointments", user?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-  .from("appointments")
-  .select(`
-    *,
-    doctors (
-      specializations (name, icon),
-      profiles!doctors_user_id_profiles_fkey (full_name)
-    )
-  `)
-  .eq("patient_id", user!.id)
-  .order("appointment_date", { ascending: true });
-      if (error) throw error;
-      return data;
-    },
+    queryFn: async () => api.appointments.list(),
     enabled: !!user,
   });
 
@@ -71,7 +57,7 @@ export default function Dashboard() {
     <AppLayout>
       <motion.div initial="hidden" animate="visible">
         <motion.h1 className="text-3xl font-display font-bold mb-2" custom={0} variants={fadeUp}>
-          {t.welcomeBackUser}{user?.user_metadata?.full_name ? `, ${user.user_metadata.full_name}` : ""}! 👋
+          {t.welcomeBackUser}{user?.name ? `, ${user.name}` : ""}! 👋
         </motion.h1>
         <motion.p className="text-muted-foreground mb-8" custom={1} variants={fadeUp}>
           {t.dashboardDesc}
@@ -99,13 +85,13 @@ export default function Dashboard() {
             </div>
             <div className="space-y-3">
               {upcoming.slice(0, 3).map((apt) => {
-                const doc = apt.doctors as any;
+                const doc = apt.doctor as any;
                 return (
                   <div key={apt.id} className="flex items-center justify-between p-3 rounded-xl bg-muted/50">
                     <div>
-                      <div className="font-medium text-sm">Dr. {doc?.profiles?.full_name}</div>
+                      <div className="font-medium text-sm">Dr. {[doc?.firstName, doc?.lastName].filter(Boolean).join(" ")}</div>
                       <div className="text-xs text-muted-foreground">
-                        {doc?.specializations?.name} • {format(parseISO(apt.appointment_date), "MMM d")} at {apt.start_time.slice(0, 5)}
+                        {format(parseISO(apt.appointment_date), "MMM d")} at {apt.start_time.slice(0, 5)}
                       </div>
                     </div>
                     <span className="text-xs font-medium px-2 py-1 rounded-full bg-primary/10 text-primary capitalize">

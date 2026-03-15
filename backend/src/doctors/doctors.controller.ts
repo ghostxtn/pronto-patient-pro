@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
 } from '@nestjs/common';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -39,8 +40,11 @@ export class DoctorsController {
   }
 
   @Get()
-  findAll(@CurrentUser() user: { clinicId: string }) {
-    return this.doctorsService.findAllByClinic(user.clinicId);
+  findAll(
+    @CurrentUser() user: { clinicId: string },
+    @Query('specialization_id') specializationId?: string,
+  ) {
+    return this.doctorsService.findAllByClinic(user.clinicId, specializationId);
   }
 
   @Get(':id')
