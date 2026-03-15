@@ -1,6 +1,17 @@
 import AppLayout from "@/components/AppLayout";
+import { useEffect } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function StaffDashboard() {
+  const { user } = useAuth();
+
+  useEffect(() => {
+    console.debug("[staff][dashboard] mounted", {
+      userId: user?.id,
+      role: user?.role,
+    });
+  }, [user?.id, user?.role]);
+
   return (
     <AppLayout>
       <div className="space-y-2">

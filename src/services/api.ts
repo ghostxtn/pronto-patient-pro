@@ -14,7 +14,16 @@ export class ApiError extends Error {
   }
 }
 
+function debugAuthLog(message: string, details?: unknown) {
+  console.debug(`[auth][api] ${message}`, details ?? "");
+}
+
 export function setTokens(access?: string | null, refresh?: string | null) {
+  debugAuthLog("setTokens", {
+    hasAccessToken: Boolean(access),
+    hasRefreshToken: Boolean(refresh),
+  });
+
   if (access) {
     localStorage.setItem(ACCESS_TOKEN_KEY, access);
   } else {
@@ -29,6 +38,7 @@ export function setTokens(access?: string | null, refresh?: string | null) {
 }
 
 export function clearTokens() {
+  debugAuthLog("clearTokens");
   localStorage.removeItem(ACCESS_TOKEN_KEY);
   localStorage.removeItem(REFRESH_TOKEN_KEY);
 }
@@ -56,8 +66,11 @@ async function refreshAccessToken() {
   const refreshToken = getRefreshToken();
 
   if (!refreshToken) {
+    debugAuthLog("refreshAccessToken missing refresh token");
     throw new ApiError(401, "Missing refresh token");
   }
+
+  debugAuthLog("refreshAccessToken start");
 
   const response = await fetch(`${API_BASE}/auth/refresh`, {
     method: "POST",
@@ -70,6 +83,10 @@ async function refreshAccessToken() {
   const body = await parseResponse(response);
 
   if (!response.ok || !body || typeof body !== "object") {
+    debugAuthLog("refreshAccessToken failed", {
+      status: response.status,
+      body,
+    });
     throw new ApiError(response.status, "Token refresh failed", body);
   }
 
@@ -83,10 +100,12 @@ async function refreshAccessToken() {
       : refreshToken;
 
   if (!accessToken) {
+    debugAuthLog("refreshAccessToken missing access token in response", body);
     throw new ApiError(response.status, "Missing access token in refresh response", body);
   }
 
   setTokens(accessToken, nextRefreshToken);
+  debugAuthLog("refreshAccessToken success");
   return accessToken;
 }
 
@@ -115,41 +134,77 @@ export async function request<T>(
   const body = await parseResponse(response);
 
   if (response.status === 401 && retry && endpoint !== "/auth/refresh") {
+    debugAuthLog("request received 401, attempting refresh", { endpoint });
+
+    let nextAccessToken: string;
+
     try {
-      const nextAccessToken = await refreshAccessToken();
-      const retryHeaders = new Headers(options.headers || {});
-
-      retryHeaders.set("Authorization", `Bearer ${nextAccessToken}`);
-      if (!isFormData && options.body && !retryHeaders.has("Content-Type")) {
-        retryHeaders.set("Content-Type", "application/json");
-      }
-
-      const retryResponse = await fetch(`${API_BASE}${endpoint}`, {
-        ...options,
-        headers: retryHeaders,
-      });
-
-      const retryBody = await parseResponse(retryResponse);
-
-      if (!retryResponse.ok) {
-        throw new ApiError(
-          retryResponse.status,
-          (retryBody as { message?: string })?.message || "Request failed",
-          retryBody,
-        );
-      }
-
-      return retryBody as T;
+      nextAccessToken = await refreshAccessToken();
     } catch (error) {
+      debugAuthLog("refresh failed, redirecting to /auth", {
+        endpoint,
+        error,
+      });
       clearTokens();
       if (typeof window !== "undefined") {
         window.location.href = "/auth";
       }
       throw error;
     }
+
+    const retryHeaders = new Headers(options.headers || {});
+
+    retryHeaders.set("Authorization", `Bearer ${nextAccessToken}`);
+    if (!isFormData && options.body && !retryHeaders.has("Content-Type")) {
+      retryHeaders.set("Content-Type", "application/json");
+    }
+
+    const retryResponse = await fetch(`${API_BASE}${endpoint}`, {
+      ...options,
+      headers: retryHeaders,
+    });
+
+    const retryBody = await parseResponse(retryResponse);
+
+    if (retryResponse.status === 401) {
+      debugAuthLog("retry after refresh still returned 401, redirecting to /auth", {
+        endpoint,
+        body: retryBody,
+      });
+      clearTokens();
+      if (typeof window !== "undefined") {
+        window.location.href = "/auth";
+      }
+      throw new ApiError(
+        retryResponse.status,
+        (retryBody as { message?: string })?.message || "Request failed",
+        retryBody,
+      );
+    }
+
+    if (!retryResponse.ok) {
+      debugAuthLog("retry after refresh failed without invalidating session", {
+        endpoint,
+        status: retryResponse.status,
+        body: retryBody,
+      });
+      throw new ApiError(
+        retryResponse.status,
+        (retryBody as { message?: string })?.message || "Request failed",
+        retryBody,
+      );
+    }
+
+    debugAuthLog("retry after refresh succeeded", { endpoint });
+    return retryBody as T;
   }
 
   if (!response.ok) {
+    debugAuthLog("request failed", {
+      endpoint,
+      status: response.status,
+      body,
+    });
     throw new ApiError(
       response.status,
       (body as { message?: string })?.message || "Request failed",

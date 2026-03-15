@@ -5,9 +5,12 @@ import {
   HttpCode,
   Post,
   Req,
+  Res,
   UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import { Response } from 'express';
+import { ConfigService } from '@nestjs/config';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Public } from '../common/decorators/public.decorator';
 import { TenantRequest } from '../common/interfaces/tenant-request.interface';
@@ -18,7 +21,10 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly configService: ConfigService,
+  ) {}
 
   @Post('register')
   @Public()
@@ -62,7 +68,29 @@ export class AuthController {
   @Get('google/callback')
   @Public()
   @UseGuards(AuthGuard('google'))
-  googleCallback(@Req() req: TenantRequest) {
-    return req.user;
+  googleCallback(@Req() req: TenantRequest, @Res() res: Response) {
+    console.log('[auth][googleCallback] start', {
+      clinicId: req.tenant?.clinicId,
+      hasUser: Boolean(req.user),
+    });
+
+    const frontendUrl = 'http://localhost:5173';
+
+    const { accessToken, refreshToken, user } = req.user as {
+      accessToken: string;
+      refreshToken: string;
+      user: { role?: string };
+    };
+
+    console.log('[auth][googleCallback] redirecting to frontend', {
+      frontendUrl,
+      hasAccessToken: Boolean(accessToken),
+      hasRefreshToken: Boolean(refreshToken),
+      role: user?.role,
+    });
+
+    return res.redirect(
+      `${frontendUrl}/auth/callback?accessToken=${encodeURIComponent(accessToken)}&refreshToken=${encodeURIComponent(refreshToken)}&role=${encodeURIComponent(user?.role || 'patient')}`,
+    );
   }
 }
