@@ -29,6 +29,22 @@ import Profile from "./pages/Profile";
 import StaffDashboard from "./pages/staff/StaffDashboard";
 import NotFound from "./pages/NotFound";
 
+// Public pages
+import WhyMedibook from "./pages/public/WhyMedibook";
+import AppointmentProcess from "./pages/public/AppointmentProcess";
+import Contact from "./pages/public/Contact";
+import LocationPage from "./pages/public/Location";
+import About from "./pages/public/About";
+import Faq from "./pages/public/Faq";
+import PatientRights from "./pages/public/PatientRights";
+import Accessibility from "./pages/public/Accessibility";
+import LegalKvkk from "./pages/public/LegalKvkk";
+import LegalPrivacyPolicy from "./pages/public/LegalPrivacyPolicy";
+import LegalCookiePolicy from "./pages/public/LegalCookiePolicy";
+import LegalDataSubject from "./pages/public/LegalDataSubject";
+import LegalMedicalDisclaimer from "./pages/public/LegalMedicalDisclaimer";
+import LegalTermsOfUse from "./pages/public/LegalTermsOfUse";
+
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -46,6 +62,25 @@ const App = () => (
               <Route path="/specialties" element={<Specialties />} />
               <Route path="/auth" element={<Auth />} />
               <Route path="/auth/callback" element={<AuthCallback />} />
+
+              {/* Public information pages */}
+              <Route path="/why-medibook" element={<WhyMedibook />} />
+              <Route path="/appointment-process" element={<AppointmentProcess />} />
+              <Route path="/contact" element={<Contact />} />
+              <Route path="/location" element={<LocationPage />} />
+              <Route path="/about" element={<About />} />
+              <Route path="/faq" element={<Faq />} />
+              <Route path="/patient-rights" element={<PatientRights />} />
+              <Route path="/accessibility" element={<Accessibility />} />
+
+              {/* Legal pages */}
+              <Route path="/legal/kvkk" element={<LegalKvkk />} />
+              <Route path="/legal/privacy-policy" element={<LegalPrivacyPolicy />} />
+              <Route path="/legal/cookie-policy" element={<LegalCookiePolicy />} />
+              <Route path="/legal/data-subject-application" element={<LegalDataSubject />} />
+              <Route path="/legal/medical-disclaimer" element={<LegalMedicalDisclaimer />} />
+              <Route path="/legal/terms-of-use" element={<LegalTermsOfUse />} />
+
               <Route element={<RequireAuth />}>
                 <Route path="/profile" element={<Profile />} />
 

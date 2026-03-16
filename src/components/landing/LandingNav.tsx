@@ -44,26 +44,16 @@ export default function LandingNav() {
           </span>
         </SmartLink>
 
-        <nav className="hidden items-center gap-7 lg:flex">
-          {content.navigation.map((item) => {
-            const href =
-              item.href === "#specialties-preview" ||
-              item.label === "Uzmanlik Alanlari" ||
-              item.label === "UzmanlÄ±k AlanlarÄ±" ||
-              item.label === "Specialties"
-                ? "/specialties"
-                : item.href;
-
-            return (
-              <SmartLink
-                key={`${item.label}-${href}`}
-                href={href}
+        <nav className="hidden items-center gap-7 lg:flex" aria-label="Ana menü">
+          {content.navigation.map((item) => (
+            <SmartLink
+              key={item.href}
+              href={item.href}
               className="homepage-focus rounded-full text-sm font-medium text-homepage-muted transition-colors duration-200 hover:text-homepage-ink"
-              >
-                {item.label}
-              </SmartLink>
-            );
-          })}
+            >
+              {item.label}
+            </SmartLink>
+          ))}
         </nav>
 
         <div className="flex items-center gap-2 sm:gap-3">

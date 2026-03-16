@@ -8,21 +8,9 @@ export default function LandingFooter() {
   const content = getLandingContent(lang);
   const { footer } = content;
 
-  function getFooterHref(label: string, href?: string) {
-    if (href) {
-      return href;
-    }
-
-    if (label === "Uzmanlik Alanlari" || label === "UzmanlÄ±k AlanlarÄ±" || label === "Specialties") {
-      return "/specialties";
-    }
-
-    return undefined;
-  }
-
   return (
     <footer
-      id="contact"
+      id="footer"
       className="homepage-footer-gradient mt-0 pb-10 pt-12 text-homepage-shell md:pb-12 md:pt-16"
     >
       <div className="container">
@@ -53,10 +41,10 @@ export default function LandingFooter() {
                 </h3>
                 <div className="mt-4 space-y-3">
                   {column.links.map((link) =>
-                    getFooterHref(link.label, link.href) ? (
+                    link.href ? (
                       <SmartLink
                         key={link.label}
-                        href={getFooterHref(link.label, link.href) ?? "#"}
+                        href={link.href}
                         className="homepage-focus-inverse block rounded-lg text-sm text-white/[0.78] transition-colors duration-200 hover:text-white"
                       >
                         {link.label}
