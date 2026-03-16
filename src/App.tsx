@@ -4,6 +4,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import RequireAuth from "@/components/auth/RequireAuth";
+import RequireDoctorAccess from "@/components/auth/RequireDoctorAccess";
 import RequireRole from "@/components/auth/RequireRole";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { LanguageProvider } from "@/contexts/LanguageContext";
@@ -52,7 +53,7 @@ const App = () => (
                   <Route path="/appointments" element={<MyAppointments />} />
                 </Route>
 
-                <Route element={<RequireRole allowedRoles={["doctor"]} />}>
+                <Route element={<RequireDoctorAccess />}>
                   <Route path="/doctor/dashboard" element={<DoctorDashboard />} />
                   <Route path="/doctor/schedule" element={<DoctorSchedule />} />
                   <Route path="/doctor/appointments" element={<DoctorAppointments />} />
@@ -70,9 +71,12 @@ const App = () => (
                   <Route path="/admin/appointments" element={<ManageAppointments />} />
                 </Route>
 
+                <Route element={<RequireRole allowedRoles={["owner", "admin"]} />}>
+                  <Route path="/admin/settings" element={<ClinicSettings />} />
+                </Route>
+
                 <Route element={<RequireRole allowedRoles={["owner"]} />}>
                   <Route path="/owner/dashboard" element={<OwnerDashboard />} />
-                  <Route path="/admin/settings" element={<ClinicSettings />} />
                 </Route>
               </Route>
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

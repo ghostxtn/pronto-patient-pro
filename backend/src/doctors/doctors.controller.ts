@@ -43,8 +43,16 @@ export class DoctorsController {
   findAll(
     @CurrentUser() user: { clinicId: string },
     @Query('specialization_id') specializationId?: string,
+    @Query('status') status?: string,
   ) {
-    return this.doctorsService.findAllByClinic(user.clinicId, specializationId);
+    return this.doctorsService.findAllByClinic(user.clinicId, specializationId, status);
+  }
+
+  @Get('me')
+  findMyDoctorProfile(
+    @CurrentUser() user: { userId: string; clinicId: string },
+  ) {
+    return this.doctorsService.findByUserId(user.userId, user.clinicId);
   }
 
   @Get(':id')

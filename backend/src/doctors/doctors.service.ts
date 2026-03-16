@@ -75,11 +75,20 @@ export class DoctorsService {
     return doctor;
   }
 
-  async findAllByClinic(clinicId: string, specializationId?: string) {
-    const conditions = [
-      eq(doctors.clinic_id, clinicId),
-      eq(doctors.is_active, true),
-    ];
+  async findAllByClinic(
+    clinicId: string,
+    specializationId?: string,
+    status: string = 'active',
+  ) {
+    const conditions = [eq(doctors.clinic_id, clinicId)];
+
+    if (status === 'active') {
+      conditions.push(eq(doctors.is_active, true));
+    }
+
+    if (status === 'inactive') {
+      conditions.push(eq(doctors.is_active, false));
+    }
 
     if (specializationId) {
       conditions.push(eq(doctors.specialization_id, specializationId));
@@ -144,6 +153,34 @@ export class DoctorsService {
     }
 
     return doctor;
+  }
+
+  async findByUserId(userId: string, clinicId: string) {
+    const [doctor] = await this.db
+      .select({
+        id: doctors.id,
+        user_id: doctors.user_id,
+        specialization_id: doctors.specialization_id,
+        clinic_id: doctors.clinic_id,
+        title: doctors.title,
+        bio: doctors.bio,
+        phone: doctors.phone,
+        is_active: doctors.is_active,
+        firstName: users.first_name,
+        lastName: users.last_name,
+        email: users.email,
+        specialization: {
+          id: specializations.id,
+          name: specializations.name,
+        },
+      })
+      .from(doctors)
+      .innerJoin(users, eq(doctors.user_id, users.id))
+      .leftJoin(specializations, eq(doctors.specialization_id, specializations.id))
+      .where(and(eq(doctors.user_id, userId), eq(doctors.clinic_id, clinicId), eq(doctors.is_active, true)))
+      .limit(1);
+
+    return doctor ?? null;
   }
 
   async update(id: string, dto: UpdateDoctorDto, clinicId: string) {
