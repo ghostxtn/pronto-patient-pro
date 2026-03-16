@@ -45,20 +45,30 @@ export default function LandingNav() {
         </SmartLink>
 
         <nav className="hidden items-center gap-7 lg:flex">
-          {content.navigation.map((item) => (
-            <SmartLink
-              key={item.href}
-              href={item.href}
+          {content.navigation.map((item) => {
+            const href =
+              item.href === "#specialties-preview" ||
+              item.label === "Uzmanlik Alanlari" ||
+              item.label === "UzmanlÄ±k AlanlarÄ±" ||
+              item.label === "Specialties"
+                ? "/specialties"
+                : item.href;
+
+            return (
+              <SmartLink
+                key={`${item.label}-${href}`}
+                href={href}
               className="homepage-focus rounded-full text-sm font-medium text-homepage-muted transition-colors duration-200 hover:text-homepage-ink"
-            >
-              {item.label}
-            </SmartLink>
-          ))}
+              >
+                {item.label}
+              </SmartLink>
+            );
+          })}
         </nav>
 
         <div className="flex items-center gap-2 sm:gap-3">
           <SmartLink
-            href="#search-hub"
+            href="#quick-access"
             className="homepage-focus hidden h-11 items-center gap-2 rounded-full border border-homepage-border bg-white/[0.88] px-4 text-sm text-homepage-muted transition-colors duration-200 hover:border-homepage-border-strong hover:text-homepage-ink md:inline-flex"
           >
             <Search className="h-4 w-4" />
@@ -79,7 +89,7 @@ export default function LandingNav() {
             asChild
             className="homepage-focus rounded-full border border-homepage-brand bg-homepage-brand px-5 text-sm font-medium text-white hover:bg-homepage-brand-deep"
           >
-            <SmartLink href="/auth?tab=signup">{content.auth.requestLabel}</SmartLink>
+            <SmartLink href="/request-appointment">{content.auth.requestLabel}</SmartLink>
           </Button>
         </div>
       </div>

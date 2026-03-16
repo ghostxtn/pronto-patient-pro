@@ -11,6 +11,10 @@ export default function QuickAccessSection() {
   const { lang } = useLanguage();
   const content = getLandingContent(lang);
   const { quickAccess } = content;
+  const browseHref =
+    quickAccess.browseAction.href === "#specialties-preview"
+      ? "/specialties"
+      : (quickAccess.browseAction.href ?? "/specialties");
   const [activeFilter, setActiveFilter] = useState(quickAccess.filters[0]);
   const [query, setQuery] = useState("");
 
@@ -19,7 +23,10 @@ export default function QuickAccessSection() {
   }, [quickAccess]);
 
   return (
-    <section id="search-hub" className="relative z-10 -mt-10 pb-8 md:-mt-14 md:pb-10">
+    <section
+      id={quickAccess.sectionId}
+      className="relative z-10 -mt-10 pb-8 md:-mt-14 md:pb-10"
+    >
       <div className="container">
         <motion.div
           initial={{ opacity: 0, y: 28 }}
@@ -77,18 +84,17 @@ export default function QuickAccessSection() {
 
             <div className="rounded-[1.5rem] border border-homepage-border bg-homepage-shell p-5">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-homepage-soft">
-                {lang === "tr" ? "Seçili hizmet" : "Selected service"}
+                {quickAccess.panelEyebrow}
               </p>
               <div className="mt-3 flex items-center justify-between gap-4">
                 <div>
                   <p className="font-display text-2xl tracking-tight text-homepage-ink">{activeFilter}</p>
-                  <p className="mt-1 text-sm text-homepage-muted">
-                    {query
-                      ? `${lang === "tr" ? "Arama girdisi" : "Search input"}: ${query}`
-                      : lang === "tr"
-                        ? "Hızlı keşif için odak alanını seçin veya doğrudan uzman listesine geçin."
-                        : "Select a focus area for faster discovery or move directly into the specialist list."}
-                  </p>
+                  <p className="mt-1 text-sm text-homepage-muted">{quickAccess.panelDescription}</p>
+                  {query ? (
+                    <p className="mt-2 text-xs uppercase tracking-[0.16em] text-homepage-soft">
+                      {lang === "tr" ? "Arama girdisi korunuyor" : "Search input preserved"}: {query}
+                    </p>
+                  ) : null}
                 </div>
               </div>
 
@@ -97,7 +103,7 @@ export default function QuickAccessSection() {
                   asChild
                   className="homepage-focus-soft h-11 rounded-full border border-homepage-brand bg-homepage-brand px-5 text-sm text-white hover:bg-homepage-brand-deep"
                 >
-                  <SmartLink href={quickAccess.browseAction.href}>
+                  <SmartLink href={browseHref}>
                     {quickAccess.browseAction.label}
                     <ArrowRight className="h-4 w-4" />
                   </SmartLink>
@@ -107,7 +113,7 @@ export default function QuickAccessSection() {
                   asChild
                   className="homepage-focus-soft h-11 rounded-full border-homepage-border-strong bg-transparent px-5 text-sm text-homepage-muted hover:bg-homepage-shell-cool hover:text-homepage-ink"
                 >
-                  <SmartLink href={quickAccess.requestAction.href}>
+                  <SmartLink href={quickAccess.requestAction.href ?? "/request-appointment"}>
                     {quickAccess.requestAction.label}
                   </SmartLink>
                 </Button>

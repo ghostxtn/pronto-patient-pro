@@ -18,6 +18,7 @@ import { TenantResolverService } from './common/services/tenant-resolver.service
 import { DatabaseModule } from './database/database.module';
 import { DoctorsModule } from './doctors/doctors.module';
 import { HealthModule } from './health/health.module';
+import { HomepagePreviewModule } from './homepage-preview/homepage-preview.module';
 import { PatientsModule } from './patients/patients.module';
 import { ProfilesModule } from './profiles/profiles.module';
 import { RedisModule } from './redis/redis.module';
@@ -32,6 +33,7 @@ import { StorageModule } from './storage/storage.module';
       envFilePath: ['.env', '../.env'],
     }),
     HealthModule,
+    HomepagePreviewModule,
     DatabaseModule,
     RedisModule,
     AuthModule,

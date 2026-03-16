@@ -109,6 +109,25 @@ export class DoctorsService {
       .where(and(...conditions));
   }
 
+  async findPublicDiscoveryByClinic(clinicId: string) {
+    return this.db
+      .select({
+        id: doctors.id,
+        title: doctors.title,
+        bio: doctors.bio,
+        firstName: users.first_name,
+        lastName: users.last_name,
+        specialization: {
+          id: specializations.id,
+          name: specializations.name,
+        },
+      })
+      .from(doctors)
+      .innerJoin(users, eq(doctors.user_id, users.id))
+      .leftJoin(specializations, eq(doctors.specialization_id, specializations.id))
+      .where(and(eq(doctors.clinic_id, clinicId), eq(doctors.is_active, true)));
+  }
+
   async findById(id: string, clinicId: string) {
     const [doctor] = await this.db
       .select({

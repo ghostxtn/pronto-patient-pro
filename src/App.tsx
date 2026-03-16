@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -12,6 +12,7 @@ import Auth from "./pages/Auth";
 import AuthCallback from "./pages/AuthCallback";
 import Dashboard from "./pages/Dashboard";
 import FindDoctors from "./pages/FindDoctors";
+import Specialties from "./pages/Specialties";
 import DoctorProfile from "./pages/DoctorProfile";
 import MyAppointments from "./pages/MyAppointments";
 import DoctorDashboard from "./pages/doctor/DoctorDashboard";
@@ -40,6 +41,9 @@ const App = () => (
           <AuthProvider>
             <Routes>
               <Route path="/" element={<Landing />} />
+              <Route path="/request-appointment" element={<Navigate to="/auth?tab=signup" replace />} />
+              <Route path="/doctors" element={<FindDoctors />} />
+              <Route path="/specialties" element={<Specialties />} />
               <Route path="/auth" element={<Auth />} />
               <Route path="/auth/callback" element={<AuthCallback />} />
               <Route element={<RequireAuth />}>
@@ -47,7 +51,6 @@ const App = () => (
 
                 <Route element={<RequireRole allowedRoles={["patient"]} />}>
                   <Route path="/dashboard" element={<Dashboard />} />
-                  <Route path="/doctors" element={<FindDoctors />} />
                   <Route path="/doctors/:id" element={<DoctorProfile />} />
                   <Route path="/appointments" element={<MyAppointments />} />
                 </Route>
