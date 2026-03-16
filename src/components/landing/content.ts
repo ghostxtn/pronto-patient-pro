@@ -28,13 +28,12 @@ type QuickAccessCopy = {
   eyebrow: string;
   title: string;
   description: string;
-  filters: string[];
-  searchPlaceholder: string;
-  helperText: string;
-  panelEyebrow: string;
-  panelDescription: string;
-  browseAction: ActionLink;
-  requestAction: ActionLink;
+  items: Array<{
+    title: string;
+    description: string;
+  }>;
+  primaryAction: ActionLink;
+  secondaryAction: ActionLink;
 };
 
 type SplitSectionCopy = {
@@ -118,223 +117,220 @@ const sharedImages = {
 const trContent: LandingContent = {
   brand: {
     name: "MediBook",
-    label: "Koordinasyon destekli klinik bakım",
+    label: "Koordinasyon destekli klinik bakim",
   },
   navigation: [
-    { label: "Uzmanlık Alanları", href: "#specialties-preview" },
-    { label: "Doktorlarımız", href: "/doctors" },
-    { label: "Randevu Süreci", href: "#appointment-process" },
-    { label: "İletişim", href: "#contact" },
+    { label: "Uzmanlik Alanlari", href: "/specialties" },
+    { label: "Doktorlarimiz", href: "/doctors" },
+    { label: "Randevu Sureci", href: "#appointment-process" },
+    { label: "Iletisim", href: "#contact" },
   ],
   auth: {
     searchLabel: "Arama",
-    signInLabel: "Giriş Yap",
-    requestLabel: "Randevu Talebi Oluştur",
+    signInLabel: "Giris Yap",
+    requestLabel: "Randevu Talebi Olustur",
   },
   hero: {
-    eyebrow: "Koordinasyon destekli klinik bakım",
-    title: "Doğru uzmanlığa, daha düzenli bir randevu süreciyle ulaşın.",
+    eyebrow: "Koordinasyon destekli klinik bakim",
+    title: "Dogru uzmanliga, daha duzenli bir randevu sureciyle ulasin.",
     description:
-      "Randevu talebinizi oluşturun. Klinik ekibimiz ihtiyacınızı değerlendirip uygun uzmanlık ve zaman planlaması için sizinle iletişime geçsin.",
+      "Randevu talebinizi olusturun. Klinik ekibimiz ihtiyacinizi degerlendirip uygun uzmanlik ve zaman planlamasi icin sizinle iletisime gecsin.",
     primaryAction: {
-      label: "Randevu Talebi Oluştur",
+      label: "Randevu Talebi Olustur",
       href: "/request-appointment",
     },
     secondaryAction: {
-      label: "Doktorlarımızı İncele",
+      label: "Doktorlarimizi Incele",
       href: "/doctors",
     },
     panelAction: {
-      label: "Randevu yaklaşımımız",
+      label: "Randevu yaklasimimiz",
       href: "#appointment-process",
     },
-    panelTitle: "Randevu yaklaşımımız",
+    panelTitle: "Randevu yaklasimimiz",
     panelItems: [
-      "İhtiyaca göre uzmanlık yönlendirmesi",
-      "Talep sonrası koordinasyon",
+      "Ihtiyaca gore uzmanlik yonlendirmesi",
+      "Talep sonrasi koordinasyon",
       "Onay ve takip bilgilendirmesi",
     ],
     image: sharedImages.hero,
-    imageAlt: "Sakin bir klinik ortamında hasta ile görüşen doktor",
+    imageAlt: "Sakin bir klinik ortaminda hasta ile gorusen doktor",
   },
   quickAccess: {
-    sectionId: "quick-access",
-    eyebrow: "Hızlı Erişim",
-    title: "Hangi konuda destek arıyorsunuz?",
+    sectionId: "first-step",
+    eyebrow: "Ilk Adim",
+    title:
+      "Nereden baslayacaginizi bilmiyorsaniz, talebinizi birakin; uygun uzmanliga birlikte yonlendirelim.",
     description:
-      "Öne çıkan başlıklardan başlayabilir ya da doktor, branş ve yardımcı sayfalar arasında arama yapabilirsiniz.",
-    filters: [
-      "Genel Konsültasyon",
-      "Kadın Sağlığı",
-      "Pediatri",
-      "Dermatoloji",
-      "Psikolojik Destek",
-      "Kontrol / Takip",
+      "Klinik ekibi, ihtiyac basliginizi ve temel tercihlerinizi degerlendirerek sizi dogru uzmanlik ve uygun surec adimina yonlendirir.",
+    items: [
+      {
+        title: "Talebinizi birakin",
+        description: "Kisa bilgi verin, ihtiyacinizi ve varsa tercihlerinizi paylasin.",
+      },
+      {
+        title: "Uygun uzmanliga yonlendirelim",
+        description: "Klinik ekibi dogru uzmanlik ve uygun doktor hattini belirlesin.",
+      },
+      {
+        title: "Onay ve bilgilendirme ile ilerleyin",
+        description: "Surec netlestiginde gerekli geri donus ve yonlendirme sizinle paylasilsin.",
+      },
     ],
-    searchPlaceholder: "Doktor, branş veya sayfa ara",
-    helperText:
-      "Arama alanı bu adımda yalnızca başlangıç keşfi içindir. Gerçek arama sonuç yönlendirmesi bu pass kapsamında eklenmedi.",
-    panelEyebrow: "Öne çıkan başlangıç noktası",
-    panelDescription:
-      "İlk değerlendirme ve doğru yönlendirme için uygun başlangıç alanı.",
-    browseAction: {
-      label: "Uzmanlık Alanlarını Gör",
-      href: "#specialties-preview",
-    },
-    requestAction: {
-      label: "Randevu Talebi Oluştur",
+    primaryAction: {
+      label: "Randevu Talebi Olustur",
       href: "/request-appointment",
+    },
+    secondaryAction: {
+      label: "Randevu Surecini Gor",
+      href: "#appointment-process",
     },
   },
   splitSections: [
     {
       id: "why-medibook",
-      eyebrow: "Yaklaşımımız",
+      eyebrow: "Yaklasimimiz",
       title:
-        "İyi bir klinik deneyimi, yalnızca muayenede değil, sürecin tamamında hissedilir.",
+        "Iyi bir klinik deneyimi, yalnizca muayenede degil, surecin tamaminda hissedilir.",
       description:
-        "İlk talep anından takip adımına kadar, kliniğin işleyişini hastanın gözünden kuruyoruz. Doğru uzmanlığa yönlendirme, net iletişim ve düzenli koordinasyon bu yaklaşımın temelidir.",
+        "Ilk talep anindan takip adimina kadar, klinigin isleyisini hastanin gozunden kuruyoruz. Dogru uzmanliga yonlendirme, net iletisim ve duzenli koordinasyon bu yaklasimin temelidir.",
       points: [
-        "İhtiyaca göre yönlendirme",
-        "Süreç boyunca net iletişim",
-        "Takipte kopmayan düzen",
+        "Ihtiyaca gore yonlendirme",
+        "Surec boyunca net iletisim",
+        "Takipte kopmayan duzen",
       ],
       note:
-        "Klinik deneyimini güçlü yapan şey yalnızca görsel kalite değil, başvuru ile takip arasındaki akışın anlaşılır kalmasıdır.",
+        "Klinik deneyimini guclu yapan sey yalnizca gorsel kalite degil, basvuru ile takip arasindaki akisin anlasilir kalmasidir.",
       action: {
-        label: "Yaklaşımımızı Gör",
+        label: "Yaklasimimizi Gor",
         href: "#why-medibook",
       },
       image: sharedImages.trust,
-      imageAlt: "Hasta notları üzerinden değerlendirme yapan klinik ekip",
+      imageAlt: "Hasta notlari uzerinden degerlendirme yapan klinik ekip",
     },
     {
       id: "appointment-process",
-      eyebrow: "Randevu Süreci",
-      title: "Talep, değerlendirme ve onay tek bir akışta ilerler.",
+      eyebrow: "Randevu Sureci",
+      title:
+        "Talep, degerlendirme ve onay; dogru uzmanliga ulasmak icin tek bir akista ilerler.",
       description:
-        "Amaç yalnızca hızlı görünmek değil; doğru uzmanlık eşleşmesini ve düzenli ilerleyişi sağlamaktır. Bu yüzden randevu talebi, klinik ekibiyle koordineli biçimde değerlendirilir.",
+        "Amac yalnizca hizli gorunmek degil; ihtiyaciniza uygun uzmanlik eslesmesini ve duzenli ilerleyisi saglamaktir. Bu yuzden randevu talebi, klinik ekibi tarafindan degerlendirilir ve dogru yonlendirme ile netlestirilir.",
       points: [
-        "Talep Oluşturun: Temel bilgilerinizi, ihtiyaç başlığınızı ve tercihlerinizi paylaşın.",
-        "Koordinasyon ve Değerlendirme: Klinik ekibi talebinizi uygun uzmanlık ve zaman planlaması açısından değerlendirir.",
-        "Onay ve Takip: Uygun yönlendirme sonrası randevu akışı netleştirilir ve gerekli bilgilendirmeler paylaşılır.",
+        "Talep Olusturun: Ihtiyacinizi ve temel tercihlerinizi paylasin.",
+        "Degerlendirme ve Yonlendirme: Klinik ekibi uygun uzmanlik ve surec adimini belirlesin.",
+        "Onay ve Takip: Uygun yonlendirme sonrasi surec netlestirilir ve gerekli bilgilendirmeler paylasilir.",
       ],
       note:
-        "Bu akış, hızlı görünmekten çok doğru uzmanlık yönlendirmesini ve hastaya düzenli geri dönüşü önceler.",
+        "Bu akis, hiz vaatlerinden cok dogru uzmanlik eslesmesini ve hastaya okunabilir bir surec aktarimini onceleyecek sekilde kurulur.",
       action: {
-        label: "Randevu Sürecini Gör",
+        label: "Randevu Surecini Gor",
         href: "#appointment-process",
       },
       image: sharedImages.journey,
-      imageAlt: "Masa başında hasta sürecini koordine eden klinik ekibi",
+      imageAlt: "Masa basinda hasta surecini koordine eden klinik ekibi",
       reverse: true,
     },
   ],
   doctorPreview: {
     sectionId: "doctors-preview",
     eyebrow: "Hekim Kadromuz",
-    title:
-      "Bakım sürecinin merkezinde, alanında çalışan gerçek bir klinik ekip var.",
+    title: "Bakim surecinin merkezinde, alaninda calisan gercek bir klinik ekip var.",
     description:
-      "Uzmanlık alanları, klinik ilgi odakları ve kısa profilleriyle hekim kadromuzu yakından tanıyın.",
+      "Uzmanlik alanlari, klinik ilgi odaklari ve kisa profilleriyle hekim kadromuzu yakindan taniyin.",
     action: {
-      label: "Tüm Doktorlarımızı Gör",
+      label: "Tum Doktorlarimizi Gor",
       href: "/doctors",
     },
-    errorState:
-      "Doktor onizlemesi su anda yuklenemiyor. Lutfen biraz sonra tekrar deneyin.",
+    errorState: "Doktor onizlemesi su anda yuklenemiyor. Lutfen biraz sonra tekrar deneyin.",
     emptyState:
-      "Aktif hekim önizlemesi şu anda gösterilemiyor. Klinik ekibi güncel kadroyu yakında yayınlayacak.",
+      "Aktif hekim onizlemesi su anda gosterilemiyor. Klinik ekibi guncel kadroyu yakinda yayinlayacak.",
   },
   specialtyPreview: {
     sectionId: "specialties-preview",
-    eyebrow: "Uzmanlık Alanları",
-    title:
-      "Destek verdiğimiz alanları sade ve erişilebilir bir yapı içinde inceleyin.",
+    eyebrow: "Uzmanlik Alanlari",
+    title: "Destek verdigimiz alanlari sade ve erisilebilir bir yapi icinde inceleyin.",
     description:
-      "Temel değerlendirme, takip ve öne çıkan klinik başlıkları tek bir yapı içinde sunuyoruz. Her alan, ilgili uzmanlık ve doktor profillerine bağlanır.",
+      "Temel degerlendirme, takip ve one cikan klinik basliklari tek bir yapi icinde sunuyoruz. Her alan, ilgili uzmanlik ve doktor profillerine baglanir.",
     action: {
-      label: "Tüm Uzmanlık Alanlarını Gör",
+      label: "Tum Uzmanlik Alanlarini Gor",
       href: "/specialties",
     },
-    errorState:
-      "Uzmanlik onizlemesi su anda yuklenemiyor. Lutfen biraz sonra tekrar deneyin.",
+    errorState: "Uzmanlik onizlemesi su anda yuklenemiyor. Lutfen biraz sonra tekrar deneyin.",
     emptyState:
-      "Klinik uzmanlık önizlemesi şu anda sınırlı. Güncel alanlar hazır olduğunda burada gösterilecek.",
+      "Klinik uzmanlik onizlemesi su anda sinirli. Guncel alanlar hazir oldugunda burada gosterilecek.",
   },
   faqPreview: {
     sectionId: "faq",
-    eyebrow: "Sık Sorulan Sorular",
-    title: "Karar vermeden önce en çok merak edilen konular",
+    eyebrow: "Sik Sorulan Sorular",
+    title: "Karar vermeden once en cok merak edilen konular",
     description:
-      "Randevu talebinden geri dönüş süresine kadar en sık sorulan başlıkları tek yerde topladık.",
+      "Randevu talebinden geri donus suresine kadar en sik sorulan basliklari tek yerde topladik.",
     action: {
-      label: "Tüm Soruları Gör",
+      label: "Tum Sorulari Gor",
       href: "#faq",
     },
     items: [
       {
-        question: "Randevu talebi nasıl oluşturulur?",
+        question: "Randevu talebi nasil olusturulur?",
         answer:
-          "Ana talep akışı üzerinden temel bilgilerinizi ve ihtiyacınızı paylaşmanız yeterlidir. Klinik ekibi uygun yönlendirme için talebi değerlendirir.",
+          "Ana talep akisi uzerinden temel bilgilerinizi ve ihtiyacinizi paylasmaniz yeterlidir. Klinik ekibi uygun yonlendirme icin talebi degerlendirir.",
       },
       {
-        question: "Talebime ne kadar sürede dönüş yapılır?",
+        question: "Talebime ne kadar surede donus yapilir?",
         answer:
-          "Geri dönüş süresi klinik yoğunluğuna göre değişebilir. Amaç otomatik hız vaadi değil, doğru uzmanlık eşleşmesiyle net bilgilendirme sağlamaktır.",
+          "Geri donus suresi klinik yogunluguna gore degisebilir. Amac otomatik hiz vaadi degil, dogru uzmanlik eslesmesiyle net bilgilendirme saglamaktir.",
       },
       {
-        question: "Doktor seçebilir miyim?",
+        question: "Doktor secebilir miyim?",
         answer:
-          "Uygun olduğu durumlarda hekim tercihinizi belirtebilirsiniz. Klinik ekibi, ihtiyacınız ve mevcut planlamaya göre en doğru yönlendirmeyi yapar.",
+          "Uygun oldugu durumlarda hekim tercihinizi belirtebilirsiniz. Klinik ekibi, ihtiyaciniz ve mevcut planlamaya gore en dogru yonlendirmeyi yapar.",
       },
       {
-        question: "İptal veya erteleme nasıl işler?",
+        question: "Iptal veya erteleme nasil isler?",
         answer:
-          "İptal ya da erteleme talepleri klinik koordinasyonu üzerinden yürütülür. Uygun yeni zaman planı için sizinle yeniden iletişime geçilir.",
+          "Iptal ya da erteleme talepleri klinik koordinasyonu uzerinden yurutulur. Uygun yeni zaman plani icin sizinle yeniden iletisime gecilir.",
       },
     ],
   },
   footer: {
-    description:
-      "Tek bir klinik için dürüst, düzenli ve koordinasyon odaklı bir dijital karşılama akışı.",
+    description: "Tek bir klinik icin durust, duzenli ve koordinasyon odakli bir dijital karsilama akisi.",
     columns: [
       {
         title: "Klinik",
         links: [
-          { label: "Hakkımızda" },
-          { label: "Doktorlarımız", href: "/doctors" },
-          { label: "Uzmanlık Alanları" },
-          { label: "İletişim" },
+          { label: "Hakkimizda" },
+          { label: "Doktorlarimiz", href: "/doctors" },
+          { label: "Uzmanlik Alanlari", href: "/specialties" },
+          { label: "Iletisim" },
         ],
       },
       {
         title: "Hasta Bilgilendirme",
         links: [
-          { label: "Randevu Süreci" },
-          { label: "Sık Sorulan Sorular" },
-          { label: "Adres ve Ulaşım" },
-          { label: "Hasta Hakları" },
+          { label: "Randevu Sureci" },
+          { label: "Sik Sorulan Sorular" },
+          { label: "Adres ve Ulasim" },
+          { label: "Hasta Haklari" },
         ],
       },
       {
         title: "Yasal",
         links: [
-          { label: "KVKK Aydınlatma Metni" },
-          { label: "Veri Sahibi Başvuru" },
-          { label: "Gizlilik Politikası" },
-          { label: "Çerez Politikası" },
-          { label: "Kullanım Koşulları" },
-          { label: "Tıbbi Bilgilendirme" },
+          { label: "KVKK Aydinlatma Metni" },
+          { label: "Veri Sahibi Basvuru" },
+          { label: "Gizlilik Politikasi" },
+          { label: "Cerez Politikasi" },
+          { label: "Kullanim Kosullari" },
+          { label: "Tibbi Bilgilendirme" },
         ],
       },
     ],
     bottomLinks: [
-      { label: "Gizlilik Politikası" },
-      { label: "Kullanım Koşulları" },
-      { label: "İletişim" },
+      { label: "Gizlilik Politikasi" },
+      { label: "Kullanim Kosullari" },
+      { label: "Iletisim" },
     ],
-    copyright: "© 2026 MediBook. Tüm hakları saklıdır.",
+    copyright: "© 2026 MediBook. Tum haklari saklidir.",
   },
 };
 
@@ -344,7 +340,7 @@ const enContent: LandingContent = {
     label: "Coordination-led clinic care",
   },
   navigation: [
-    { label: "Specialties", href: "#specialties-preview" },
+    { label: "Specialties", href: "/specialties" },
     { label: "Doctors", href: "/doctors" },
     { label: "Appointment Process", href: "#appointment-process" },
     { label: "Contact", href: "#contact" },
@@ -381,32 +377,33 @@ const enContent: LandingContent = {
     imageAlt: "Doctor speaking with a patient in a calm clinic setting",
   },
   quickAccess: {
-    sectionId: "quick-access",
-    eyebrow: "Quick Access",
-    title: "What kind of support are you looking for?",
+    sectionId: "first-step",
+    eyebrow: "First Step",
+    title:
+      "If you are not sure where to begin, leave your request and let the clinic guide you to the right specialty.",
     description:
-      "Start with highlighted care topics or browse between doctors, specialties, and supporting pages.",
-    filters: [
-      "General Consultation",
-      "Women's Health",
-      "Pediatrics",
-      "Dermatology",
-      "Psychological Support",
-      "Control / Follow-up",
+      "The clinic team reviews your care need and core preferences, then helps direct you to the right specialty and next step.",
+    items: [
+      {
+        title: "Leave your request",
+        description: "Share a short note about your need and any preferences you already have.",
+      },
+      {
+        title: "Let us guide the right specialty",
+        description: "The clinic team identifies the right specialty path and the suitable doctor line.",
+      },
+      {
+        title: "Move forward with confirmation",
+        description: "Once the path is clarified, the clinic shares the next steps and the needed updates.",
+      },
     ],
-    searchPlaceholder: "Search doctor, specialty, or page",
-    helperText:
-      "The search field stays visual in this pass. It does not introduce real result routing yet.",
-    panelEyebrow: "Featured starting point",
-    panelDescription:
-      "A strong starting point for initial evaluation and the right specialty direction.",
-    browseAction: {
-      label: "View Specialties",
-      href: "#specialties-preview",
-    },
-    requestAction: {
+    primaryAction: {
       label: "Create Appointment Request",
       href: "/request-appointment",
+    },
+    secondaryAction: {
+      label: "View Appointment Process",
+      href: "#appointment-process",
     },
   },
   splitSections: [
@@ -434,16 +431,16 @@ const enContent: LandingContent = {
     {
       id: "appointment-process",
       eyebrow: "Appointment Process",
-      title: "Request, review, and confirmation move in one clear flow.",
+      title: "Request, review, and confirmation move in one flow to reach the right specialty.",
       description:
-        "The goal is not to look fast, but to secure the right specialty match and a more orderly process. Appointment requests are reviewed in coordination with the clinic team.",
+        "The goal is not to look fast, but to secure the right specialty match and a more orderly process. Appointment requests are reviewed by the clinic team and clarified through the right direction.",
       points: [
-        "Create a Request: Share your core information, need, and preferences.",
-        "Coordination and Review: The clinic team reviews your request for specialty fit and scheduling.",
-        "Confirmation and Follow-up: After routing, the appointment flow is clarified and updates are shared.",
+        "Create a Request: Share your need and your core preferences.",
+        "Review and Direction: The clinic team identifies the right specialty and next process step.",
+        "Confirmation and Follow-up: After the right direction, the flow is clarified and updates are shared.",
       ],
       note:
-        "The flow is designed around accurate routing and readable communication, not instant-booking theater.",
+        "The flow is built around accurate routing and readable communication, not instant-booking theater.",
       action: {
         label: "View Appointment Process",
         href: "#appointment-process",
@@ -463,8 +460,7 @@ const enContent: LandingContent = {
       label: "View All Doctors",
       href: "/doctors",
     },
-    errorState:
-      "The doctor preview could not be loaded right now. Please try again shortly.",
+    errorState: "The doctor preview could not be loaded right now. Please try again shortly.",
     emptyState:
       "The active doctor preview is not available right now. The clinic team will publish the current roster here soon.",
   },
@@ -478,8 +474,7 @@ const enContent: LandingContent = {
       label: "View All Specialties",
       href: "/specialties",
     },
-    errorState:
-      "The specialty preview could not be loaded right now. Please try again shortly.",
+    errorState: "The specialty preview could not be loaded right now. Please try again shortly.",
     emptyState:
       "The clinic specialty preview is currently limited. Active areas will appear here as they are available.",
   },
@@ -525,7 +520,7 @@ const enContent: LandingContent = {
         links: [
           { label: "About" },
           { label: "Doctors", href: "/doctors" },
-          { label: "Specialties" },
+          { label: "Specialties", href: "/specialties" },
           { label: "Contact" },
         ],
       },
