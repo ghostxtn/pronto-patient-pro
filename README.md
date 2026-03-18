@@ -36,14 +36,14 @@ The Drizzle schema and SQL migration files are tracked in git under `backend/src
 
 After `git pull`, the missing step is applying those migrations to the local PostgreSQL instance. Pulling the repo does not create tables automatically.
 
-Recommended flow
+Recommended flow for a fresh database
 
 1. Copy `.env.example` to `.env` and fill in the secrets.
 2. Install dependencies:
    - `npm install`
    - `npm run backend:install`
-3. Start infrastructure:
-   - `npm run db:up`
+3. Start the Docker services:
+   - `docker compose up -d`
 4. Apply database migrations:
    - `npm run db:migrate`
 5. Seed the minimum tenant data:
@@ -55,7 +55,7 @@ Useful commands
 - `npm run db:migrate`: apply committed SQL migrations to the database.
 - `npm run db:push`: push the current schema directly to the database without generating a migration.
 - `npm run db:seed`: create the default clinics, owner/admin/doctor/patient accounts, and specializations for local development.
-- `npm run backend:dev`: start the NestJS backend in watch mode.
+- `docker compose up -d`: start the Docker services, including the backend container.
 
 If a teammate pulls new backend schema changes later, they should run `npm run db:migrate` again.
 
@@ -67,25 +67,29 @@ This means the database schema exists, but Drizzle migration history is missing 
 
 Repair steps
 
-1. Make sure PostgreSQL is running:
-   - `npm run db:up`
+1. Make sure the Docker services are running:
+   - `docker compose up -d`
 2. Apply the baseline repair script:
    - `Get-Content .\backend\drizzle\baseline_existing_db.sql -Raw | docker compose exec -T postgres psql -U clinic_user -d clinic_db`
-3. Restart the backend:
-   - `npm run backend:dev`
-4. After this, future schema changes can use the normal flow again:
+3. Apply any remaining committed migrations:
    - `npm run db:migrate`
+4. Seed the minimum tenant data if needed:
+   - `npm run db:seed`
+5. Restart the backend container if needed:
+   - `docker compose restart api`
 
 What the repair script does
 
 - Creates `drizzle.__drizzle_migrations` if it does not exist.
-- Marks migrations `0000` through `0005` as already applied, only if they are missing.
-- Adds `users.phone` if it is missing.
+- Applies the idempotent schema repairs needed for the older existing local database, including the `patients.user_id` column and foreign key added by `0006`.
+- Marks migrations `0000` through `0006` as already applied, only if they are missing.
 
 Important
 
 - Use the repair script only for an existing local database that already contains the clinic tables.
 - Do not use it as the default setup for a brand new empty database.
+- The baseline repair script is not a substitute for `npm run db:migrate`.
+- The baseline repair script includes the equivalent of migration `0006`, but `npm run db:migrate` is still required for any remaining or future migrations.
 - For a fresh database, keep using:
   - `npm run db:migrate`
   - `npm run db:seed`
