@@ -14,6 +14,7 @@ export type HomepagePreviewDoctorRecord = {
   id: string;
   firstName?: string | null;
   lastName?: string | null;
+  avatarUrl?: string | null;
   title?: string | null;
   bio?: string | null;
   specialization?: {
@@ -155,7 +156,7 @@ function mapDoctorPreviewItem(
     title: doctor.title?.trim() || (lang === "tr" ? "Uzman Hekim" : "Specialist Physician"),
     specialtyName:
       doctor.specialization?.name?.trim() || (lang === "tr" ? "Genel Konsültasyon" : "General Consultation"),
-    imageSrc: presentation?.imageSrc || DOCTOR_FALLBACK_IMAGE,
+    imageSrc: doctor.avatarUrl?.trim() || presentation?.imageSrc || DOCTOR_FALLBACK_IMAGE,
     previewText: getDoctorPreviewText(doctor, presentation, lang),
     shortBio: presentation?.shortBio,
     focusTags: getDoctorFocusTags(doctor, presentation, lang),

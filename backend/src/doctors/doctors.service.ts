@@ -126,6 +126,7 @@ export class DoctorsService {
         bio: doctors.bio,
         firstName: users.first_name,
         lastName: users.last_name,
+        avatarUrl: users.avatar_url,
         specialization: {
           id: specializations.id,
           name: specializations.name,

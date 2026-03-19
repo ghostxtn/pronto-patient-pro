@@ -24,6 +24,7 @@ export class HomepagePreviewService {
         id: doctors.id,
         firstName: users.first_name,
         lastName: users.last_name,
+        avatarUrl: users.avatar_url,
         title: doctors.title,
         bio: doctors.bio,
         specialization: {

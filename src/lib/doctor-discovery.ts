@@ -9,6 +9,7 @@ export type PublicDoctorRecord = {
   id: string;
   firstName?: string | null;
   lastName?: string | null;
+  avatarUrl?: string | null;
   title?: string | null;
   bio?: string | null;
   specialization?: {
@@ -64,7 +65,7 @@ export function shapeDoctorDiscovery(records: PublicDoctorRecord[] | undefined) 
         title: record.title?.trim() || "Uzman Hekim",
         specialtyId: record.specialization?.id ?? undefined,
         specialtyName: record.specialization?.name?.trim() || "Genel Konsultasyon",
-        imageSrc: presentation?.imageSrc || DOCTOR_FALLBACK_IMAGE,
+        imageSrc: record.avatarUrl?.trim() || presentation?.imageSrc || DOCTOR_FALLBACK_IMAGE,
         previewText:
           presentation?.previewText ||
           record.bio?.trim() ||
