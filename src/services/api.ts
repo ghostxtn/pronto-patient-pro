@@ -334,10 +334,13 @@ const api = {
       }),
   },
   doctors: {
-    list: (params?: { specialization_id?: string }) => {
+    list: (params?: { specialization_id?: string; status?: "active" | "inactive" | "all" }) => {
       const search = new URLSearchParams();
       if (params?.specialization_id) {
         search.set("specialization_id", params.specialization_id);
+      }
+      if (params?.status) {
+        search.set("status", params.status);
       }
       return request<any[]>(`/doctors${search.toString() ? `?${search.toString()}` : ""}`);
     },
@@ -394,7 +397,7 @@ const api = {
       if (params?.search) search.set("search", params.search);
       if (params?.page !== undefined) search.set("page", String(params.page));
       if (params?.limit !== undefined) search.set("limit", String(params.limit));
-      return request<{ data: any[]; total: number }>(
+      return request<any[] | { data: any[]; total: number }>(
         `/patients${search.toString() ? `?${search.toString()}` : ""}`,
       );
     },
