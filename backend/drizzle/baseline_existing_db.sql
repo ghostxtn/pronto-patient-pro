@@ -7,6 +7,22 @@ CREATE TABLE IF NOT EXISTS drizzle.__drizzle_migrations (
 );
 
 ALTER TABLE users ADD COLUMN IF NOT EXISTS phone varchar(20);
+ALTER TABLE "patients"
+ADD COLUMN IF NOT EXISTS "user_id" uuid;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'patients_user_id_users_id_fk'
+  ) THEN
+    ALTER TABLE "patients"
+    ADD CONSTRAINT "patients_user_id_users_id_fk"
+    FOREIGN KEY ("user_id") REFERENCES "public"."users"("id")
+    ON DELETE no action ON UPDATE no action;
+  END IF;
+END $$;
 
 INSERT INTO drizzle.__drizzle_migrations (hash, created_at)
 SELECT '0000_needy_matthew_murdock', 1773350781397
@@ -54,4 +70,12 @@ WHERE NOT EXISTS (
   SELECT 1
   FROM drizzle.__drizzle_migrations
   WHERE hash = '0005_staff_phone_on_users'
+);
+
+INSERT INTO drizzle.__drizzle_migrations (hash, created_at)
+SELECT '0006_add_user_id_to_patients', 1774200000000
+WHERE NOT EXISTS (
+  SELECT 1
+  FROM drizzle.__drizzle_migrations
+  WHERE hash = '0006_add_user_id_to_patients'
 );
