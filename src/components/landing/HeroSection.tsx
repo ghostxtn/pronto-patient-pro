@@ -104,11 +104,11 @@ export default function HeroSection() {
               className="justify-self-end rounded-[1.75rem] border border-white/[0.18] bg-homepage-ink/20 p-5 text-white backdrop-blur-md sm:p-6 lg:max-w-[360px]"
             >
               <SmartLink
-                href="#services"
+                href={hero.panelAction.href ?? "#appointment-process"}
                 className="homepage-focus-inverse mb-6 inline-flex items-center gap-3 rounded-full border border-white/[0.18] px-4 py-2 text-sm text-white/[0.92] transition-colors duration-200 hover:bg-white/[0.12]"
               >
                 <CirclePlay className="h-4 w-4" />
-                {hero.playLabel}
+                {hero.panelAction.label}
               </SmartLink>
 
               <div className="rounded-[1.4rem] border border-white/[0.12] bg-homepage-ink/[0.28] p-5">

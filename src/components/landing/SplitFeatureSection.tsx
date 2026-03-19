@@ -12,7 +12,7 @@ type SplitFeatureSectionProps = {
   note: string;
   action: {
     label: string;
-    href: string;
+    href?: string;
   };
   image: string;
   imageAlt: string;

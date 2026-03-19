@@ -37,6 +37,22 @@ export class SpecializationsService {
       );
   }
 
+  async findPublicDiscoveryByClinic(clinicId: string) {
+    return this.db
+      .select({
+        id: specializations.id,
+        name: specializations.name,
+        description: specializations.description,
+      })
+      .from(specializations)
+      .where(
+        and(
+          eq(specializations.clinic_id, clinicId),
+          eq(specializations.is_active, true),
+        ),
+      );
+  }
+
   async findById(id: string, clinicId: string) {
     const [specialization] = await this.db
       .select()

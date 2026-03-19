@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Search, Stethoscope } from "lucide-react";
+import { Stethoscope } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -44,7 +44,7 @@ export default function LandingNav() {
           </span>
         </SmartLink>
 
-        <nav className="hidden items-center gap-7 lg:flex">
+        <nav className="hidden items-center gap-7 lg:flex" aria-label="Ana menü">
           {content.navigation.map((item) => (
             <SmartLink
               key={item.href}
@@ -57,14 +57,6 @@ export default function LandingNav() {
         </nav>
 
         <div className="flex items-center gap-2 sm:gap-3">
-          <SmartLink
-            href="#search-hub"
-            className="homepage-focus hidden h-11 items-center gap-2 rounded-full border border-homepage-border bg-white/[0.88] px-4 text-sm text-homepage-muted transition-colors duration-200 hover:border-homepage-border-strong hover:text-homepage-ink md:inline-flex"
-          >
-            <Search className="h-4 w-4" />
-            {content.auth.searchLabel}
-          </SmartLink>
-
           <LanguageSwitcher className="h-11 w-11 rounded-full border border-homepage-border text-homepage-muted hover:border-homepage-border-strong hover:bg-homepage-shell" />
 
           <Button
@@ -79,7 +71,7 @@ export default function LandingNav() {
             asChild
             className="homepage-focus rounded-full border border-homepage-brand bg-homepage-brand px-5 text-sm font-medium text-white hover:bg-homepage-brand-deep"
           >
-            <SmartLink href="/auth?tab=signup">{content.auth.requestLabel}</SmartLink>
+            <SmartLink href="/request-appointment">{content.auth.requestLabel}</SmartLink>
           </Button>
         </div>
       </div>

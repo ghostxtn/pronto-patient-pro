@@ -20,16 +20,22 @@ export class TenantMiddleware implements NestMiddleware {
     _response: Response,
     next: NextFunction,
   ) {
+    const clinicDomainHeader = request.headers['x-clinic-domain'];
     const forwardedHost = request.headers['x-forwarded-host'];
-    const rawHost = Array.isArray(forwardedHost)
-      ? forwardedHost[0]
-      : forwardedHost || request.headers.host;
+    const rawHost =
+      (Array.isArray(clinicDomainHeader)
+        ? clinicDomainHeader[0]
+        : clinicDomainHeader) ||
+      (Array.isArray(forwardedHost)
+        ? forwardedHost[0]
+        : forwardedHost) ||
+      request.headers.host;
 
     let host = rawHost?.toLowerCase().split(':')[0];
 
     const isDev = this.configService.get<string>('NODE_ENV') !== 'production';
 
-    if (isDev && host === 'localhost') {
+    if (isDev && ['localhost', '127.0.0.1', '[::1]'].includes(host ?? '')) {
       host = 'test-klinik.localhost';
     }
 

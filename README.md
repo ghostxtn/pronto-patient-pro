@@ -1,3 +1,10 @@
+fast open with precommands :
+
+docker compose down
+docker compose up -d --build
+$env:VITE_PROXY_TARGET="http://localhost"
+npm run dev
+
 Local Tenant Development
 
 This project uses domain-based tenant resolution.

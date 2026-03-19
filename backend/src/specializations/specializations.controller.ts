@@ -3,12 +3,16 @@ import {
   Controller,
   Delete,
   Get,
+  NotFoundException,
   Param,
   Patch,
   Post,
+  Req,
 } from '@nestjs/common';
+import { Public } from '../common/decorators/public.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
+import { TenantRequest } from '../common/interfaces/tenant-request.interface';
 import { CreateSpecializationDto } from './dto/create-specialization.dto';
 import { UpdateSpecializationDto } from './dto/update-specialization.dto';
 import { SpecializationsService } from './specializations.service';
@@ -26,6 +30,18 @@ export class SpecializationsController {
     @CurrentUser() user: { clinicId: string },
   ) {
     return this.specializationsService.create(dto, user.clinicId);
+  }
+
+  @Get('public-discovery')
+  @Public()
+  findPublicDiscovery(@Req() request: TenantRequest) {
+    const clinicId = request.tenant?.clinicId;
+
+    if (!clinicId) {
+      throw new NotFoundException('Clinic not found');
+    }
+
+    return this.specializationsService.findPublicDiscoveryByClinic(clinicId);
   }
 
   @Get()

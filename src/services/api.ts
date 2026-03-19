@@ -51,6 +51,20 @@ function getRefreshToken() {
   return localStorage.getItem(REFRESH_TOKEN_KEY);
 }
 
+function getClinicDomainHeader() {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const hostname = window.location.hostname.toLowerCase();
+
+  if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]") {
+    return "test-klinik.localhost";
+  }
+
+  return hostname || null;
+}
+
 async function parseResponse(response: Response) {
   const contentType = response.headers.get("content-type") || "";
 
@@ -117,9 +131,14 @@ export async function request<T>(
   const headers = new Headers(options.headers || {});
   const accessToken = getAccessToken();
   const isFormData = typeof FormData !== "undefined" && options.body instanceof FormData;
+  const clinicDomain = getClinicDomainHeader();
 
   if (accessToken) {
     headers.set("Authorization", `Bearer ${accessToken}`);
+  }
+
+  if (clinicDomain && !headers.has("X-Clinic-Domain")) {
+    headers.set("X-Clinic-Domain", clinicDomain);
   }
 
   if (!isFormData && options.body && !headers.has("Content-Type")) {
@@ -267,7 +286,36 @@ const api = {
         body: JSON.stringify(data),
       }),
   },
+  homepagePreview: {
+    get: () =>
+      request<{
+        doctors: Array<{
+          id: string;
+          firstName?: string | null;
+          lastName?: string | null;
+          title?: string | null;
+          bio?: string | null;
+          specialization?: {
+            id?: string | null;
+            name?: string | null;
+          } | null;
+        }>;
+        specialties: Array<{
+          id: string;
+          name: string;
+          description?: string | null;
+        }>;
+      }>("/homepage-preview"),
+  },
   specializations: {
+    publicDiscovery: () =>
+      request<
+        Array<{
+          id: string;
+          name: string;
+          description?: string | null;
+        }>
+      >("/specializations/public-discovery"),
     list: () => request<any[]>("/specializations"),
     get: (id: string) => request<any>(`/specializations/${id}`),
     create: (data: unknown) =>
@@ -296,7 +344,20 @@ const api = {
       }
       return request<any[]>(`/doctors${search.toString() ? `?${search.toString()}` : ""}`);
     },
-    me: () => request<any | null>("/doctors/me"),
+    publicDiscovery: () =>
+      request<
+        Array<{
+          id: string;
+          firstName?: string | null;
+          lastName?: string | null;
+          title?: string | null;
+          bio?: string | null;
+          specialization?: {
+            id?: string | null;
+            name?: string | null;
+          } | null;
+        }>
+      >("/doctors/public-discovery"),
     get: (id: string) => request<any>(`/doctors/${id}`),
     create: (data: unknown) =>
       request<any>("/doctors", {

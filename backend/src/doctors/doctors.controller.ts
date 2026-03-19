@@ -3,12 +3,16 @@ import {
   Controller,
   Delete,
   Get,
+  NotFoundException,
   Param,
   Patch,
   Post,
   Query,
+  Req,
 } from '@nestjs/common';
+import { Public } from '../common/decorators/public.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { TenantRequest } from '../common/interfaces/tenant-request.interface';
 import { Roles } from '../common/decorators/roles.decorator';
 import { AdminSetDoctorStatusDto } from './dto/admin-set-doctor-status.dto';
 import { AdminUpdateDoctorDto } from './dto/admin-update-doctor.dto';
@@ -37,6 +41,18 @@ export class DoctorsController {
     @CurrentUser() user: { clinicId: string },
   ) {
     return this.doctorsService.onboardDoctor(dto, user.clinicId);
+  }
+
+  @Get('public-discovery')
+  @Public()
+  findPublicDiscovery(@Req() request: TenantRequest) {
+    const clinicId = request.tenant?.clinicId;
+
+    if (!clinicId) {
+      throw new NotFoundException('Clinic not found');
+    }
+
+    return this.doctorsService.findPublicDiscoveryByClinic(clinicId);
   }
 
   @Get()
