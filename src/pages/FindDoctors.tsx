@@ -8,6 +8,7 @@ import LanguageSwitcher from "@/components/LanguageSwitcher";
 import LandingFooter from "@/components/landing/LandingFooter";
 import SmartLink from "@/components/landing/SmartLink";
 import { getLandingContent } from "@/components/landing/content";
+import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { usePublicDoctors } from "@/hooks/usePublicDoctors";
 
@@ -37,6 +38,7 @@ function getGridColumns(width: number) {
 }
 
 export default function FindDoctors() {
+  const { user } = useAuth();
   const { lang } = useLanguage();
   const content = getLandingContent(lang);
   const { doctors, specialties, isLoading, isError, hasLoadedEmptyDoctors } = usePublicDoctors();
@@ -161,6 +163,14 @@ export default function FindDoctors() {
     ? filteredDoctors.findIndex((doctor) => doctor.slug === selectedDoctor.slug)
     : -1;
 
+  function getAppointmentHref(doctorId?: string) {
+    if (user?.role === "patient" && doctorId) {
+      return `/doctors/${doctorId}`;
+    }
+
+    return "/request-appointment";
+  }
+
   return (
     <div className="homepage-shell-gradient min-h-screen bg-homepage-shell text-homepage-ink">
       <header className="sticky top-0 z-40 border-b border-homepage-border bg-white/90 backdrop-blur-md">
@@ -197,8 +207,14 @@ export default function FindDoctors() {
               asChild
               className="homepage-focus rounded-full border border-homepage-brand bg-homepage-brand px-5 text-sm font-medium text-white hover:bg-homepage-brand-deep"
             >
-              <SmartLink href="/request-appointment">
-                {lang === "tr" ? "Randevu Talebi Olustur" : "Create Appointment Request"}
+              <SmartLink href={getAppointmentHref(selectedDoctor?.id)}>
+                {user?.role === "patient"
+                  ? lang === "tr"
+                    ? "Randevu Al"
+                    : "Book Appointment"
+                  : lang === "tr"
+                    ? "Randevu Talebi Olustur"
+                    : "Create Appointment Request"}
               </SmartLink>
             </Button>
           </div>
@@ -444,8 +460,14 @@ export default function FindDoctors() {
 
                             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                               <Button asChild className="rounded-full px-6">
-                                <SmartLink href="/request-appointment">
-                                  {lang === "tr" ? "Randevu Talebi Olustur" : "Create Appointment Request"}
+                                <SmartLink href={getAppointmentHref(selectedDoctor.id)}>
+                                  {user?.role === "patient"
+                                    ? lang === "tr"
+                                      ? "Randevu Al"
+                                      : "Book Appointment"
+                                    : lang === "tr"
+                                      ? "Randevu Talebi Olustur"
+                                      : "Create Appointment Request"}
                                   <ArrowRight className="ml-2 h-4 w-4" />
                                 </SmartLink>
                               </Button>
