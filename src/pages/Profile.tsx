@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import api from "@/services/api";
 import { useAuth } from "@/contexts/AuthContext";
@@ -26,6 +26,7 @@ export default function Profile() {
   const roles = user?.role ? [user.role] : [];
   const { t } = useLanguage();
   const navigate = useNavigate();
+  const location = useLocation();
   const queryClient = useQueryClient();
 
   const [firstName, setFirstName] = useState("");
@@ -92,6 +93,10 @@ export default function Profile() {
 
   const initials = [firstName, lastName].filter(Boolean).map((w) => w[0]).join("").toUpperCase() || "U";
   const displayAvatar = avatarPreview || profile?.avatar_url || "";
+
+  if (!authLoading && user?.role === "patient" && location.pathname === "/profile") {
+    return <Navigate to="/patient/profile" replace />;
+  }
 
   if (authLoading || isLoading) {
     return <AppLayout><div className="flex items-center justify-center min-h-[60vh]"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div></AppLayout>;

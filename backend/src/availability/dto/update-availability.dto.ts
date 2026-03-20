@@ -1,4 +1,12 @@
-import { IsInt, IsOptional, IsString, Matches, Max, Min } from 'class-validator';
+import {
+  IsBoolean,
+  IsInt,
+  IsOptional,
+  IsString,
+  Matches,
+  Max,
+  Min,
+} from 'class-validator';
 
 export class UpdateAvailabilityDto {
   @IsOptional()
@@ -26,4 +34,8 @@ export class UpdateAvailabilityDto {
   @Min(5)
   @Max(120)
   slotDuration?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
 }

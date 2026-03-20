@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { useSearchParams } from "react-router-dom";
+import { Navigate, useLocation, useSearchParams } from "react-router-dom";
 import { ArrowRight, ChevronDown, Stethoscope } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
+import AppLayout from "@/components/AppLayout";
 import LandingFooter from "@/components/landing/LandingFooter";
 import SmartLink from "@/components/landing/SmartLink";
 import { getLandingContent } from "@/components/landing/content";
@@ -40,6 +41,9 @@ function getGridColumns(width: number) {
 export default function FindDoctors() {
   const { user } = useAuth();
   const { lang } = useLanguage();
+  const location = useLocation();
+  const isPatientDoctorsRoute =
+    user?.role === "patient" && location.pathname.startsWith("/patient/doctors");
   const content = getLandingContent(lang);
   const { doctors, specialties, isLoading, isError, hasLoadedEmptyDoctors } = usePublicDoctors();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -165,63 +169,70 @@ export default function FindDoctors() {
 
   function getAppointmentHref(doctorId?: string) {
     if (user?.role === "patient" && doctorId) {
-      return `/doctors/${doctorId}`;
+      return `/patient/doctors/${doctorId}`;
     }
 
     return "/request-appointment";
   }
 
-  return (
+  if (user?.role === "patient" && location.pathname === "/doctors") {
+    const target = `/patient/doctors${location.search}`;
+    return <Navigate to={target} replace />;
+  }
+
+  const pageContent = (
     <div className="homepage-shell-gradient min-h-screen bg-homepage-shell text-homepage-ink">
-      <header className="sticky top-0 z-40 border-b border-homepage-border bg-white/90 backdrop-blur-md">
-        <div className="container flex h-20 items-center justify-between gap-4">
-          <SmartLink href="/" className="flex min-w-0 items-center gap-3">
-            <span className="flex h-11 w-11 items-center justify-center rounded-full border border-homepage-border bg-homepage-brand-deep text-white">
-              <Stethoscope className="h-5 w-5" />
-            </span>
-            <span className="min-w-0">
-              <span className="block truncate font-display text-[1.7rem] leading-none tracking-tight text-homepage-ink">
-                {content.brand.name}
+      {!isPatientDoctorsRoute ? (
+        <header className="sticky top-0 z-40 border-b border-homepage-border bg-white/90 backdrop-blur-md">
+          <div className="container flex h-20 items-center justify-between gap-4">
+            <SmartLink href="/" className="flex min-w-0 items-center gap-3">
+              <span className="flex h-11 w-11 items-center justify-center rounded-full border border-homepage-border bg-homepage-brand-deep text-white">
+                <Stethoscope className="h-5 w-5" />
               </span>
-              <span className="mt-1 block truncate text-[0.68rem] uppercase tracking-[0.22em] text-homepage-soft">
-                {content.brand.label}
+              <span className="min-w-0">
+                <span className="block truncate font-display text-[1.7rem] leading-none tracking-tight text-homepage-ink">
+                  {content.brand.name}
+                </span>
+                <span className="mt-1 block truncate text-[0.68rem] uppercase tracking-[0.22em] text-homepage-soft">
+                  {content.brand.label}
+                </span>
               </span>
-            </span>
-          </SmartLink>
+            </SmartLink>
 
-          <div className="flex items-center gap-3">
-            <SmartLink
-              href="/"
-              className="homepage-focus hidden rounded-full px-4 py-2 text-sm font-medium text-homepage-muted transition-colors duration-200 hover:text-homepage-ink md:inline-flex"
-            >
-              {lang === "tr" ? "Anasayfa" : "Home"}
-            </SmartLink>
-            <SmartLink
-              href="/specialties"
-              className="homepage-focus hidden rounded-full px-4 py-2 text-sm font-medium text-homepage-muted transition-colors duration-200 hover:text-homepage-ink md:inline-flex"
-            >
-              {lang === "tr" ? "Uzmanlik Alanlari" : "Specialties"}
-            </SmartLink>
-            <LanguageSwitcher className="h-11 w-11 rounded-full border border-homepage-border text-homepage-muted hover:border-homepage-border-strong hover:bg-homepage-shell" />
-            <Button
-              asChild
-              className="homepage-focus rounded-full border border-homepage-brand bg-homepage-brand px-5 text-sm font-medium text-white hover:bg-homepage-brand-deep"
-            >
-              <SmartLink href={getAppointmentHref(selectedDoctor?.id)}>
-                {user?.role === "patient"
-                  ? lang === "tr"
-                    ? "Randevu Al"
-                    : "Book Appointment"
-                  : lang === "tr"
-                    ? "Randevu Talebi Olustur"
-                    : "Create Appointment Request"}
+            <div className="flex items-center gap-3">
+              <SmartLink
+                href="/"
+                className="homepage-focus hidden rounded-full px-4 py-2 text-sm font-medium text-homepage-muted transition-colors duration-200 hover:text-homepage-ink md:inline-flex"
+              >
+                {lang === "tr" ? "Anasayfa" : "Home"}
               </SmartLink>
-            </Button>
+              <SmartLink
+                href="/specialties"
+                className="homepage-focus hidden rounded-full px-4 py-2 text-sm font-medium text-homepage-muted transition-colors duration-200 hover:text-homepage-ink md:inline-flex"
+              >
+                {lang === "tr" ? "Uzmanlik Alanlari" : "Specialties"}
+              </SmartLink>
+              <LanguageSwitcher className="h-11 w-11 rounded-full border border-homepage-border text-homepage-muted hover:border-homepage-border-strong hover:bg-homepage-shell" />
+              <Button
+                asChild
+                className="homepage-focus rounded-full border border-homepage-brand bg-homepage-brand px-5 text-sm font-medium text-white hover:bg-homepage-brand-deep"
+              >
+                <SmartLink href={getAppointmentHref(selectedDoctor?.id)}>
+                  {user?.role === "patient"
+                    ? lang === "tr"
+                      ? "Randevu Al"
+                      : "Book Appointment"
+                    : lang === "tr"
+                      ? "Randevu Talebi Olustur"
+                      : "Create Appointment Request"}
+                </SmartLink>
+              </Button>
+            </div>
           </div>
-        </div>
-      </header>
+        </header>
+      ) : null}
 
-      <main className="pb-16 pt-10 md:pb-20 md:pt-14">
+      <main className={isPatientDoctorsRoute ? "py-2" : "pb-16 pt-10 md:pb-20 md:pt-14"}>
         <div className="container">
           <motion.section initial="hidden" animate="visible">
             <motion.div custom={0} variants={fadeUp} className="max-w-3xl">
@@ -499,7 +510,13 @@ export default function FindDoctors() {
         </div>
       </main>
 
-      <LandingFooter />
+      {!isPatientDoctorsRoute ? <LandingFooter /> : null}
     </div>
   );
+
+  if (isPatientDoctorsRoute) {
+    return <AppLayout>{pageContent}</AppLayout>;
+  }
+
+  return pageContent;
 }

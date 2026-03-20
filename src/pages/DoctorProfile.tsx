@@ -105,7 +105,7 @@ export default function DoctorProfile() {
         notes: notes || null,
       });
     },
-    onSuccess: () => { toast.success(t.bookingSuccess); queryClient.invalidateQueries({ queryKey: ["doctor-appointments"] }); navigate("/appointments"); },
+    onSuccess: () => { toast.success(t.bookingSuccess); queryClient.invalidateQueries({ queryKey: ["doctor-appointments"] }); navigate("/patient/appointments"); },
     onError: (err: any) => toast.error(err.message || t.bookingFailed),
   });
 
@@ -117,7 +117,7 @@ export default function DoctorProfile() {
   const availableSlots = allSlots.filter((s) => !bookedSlots.includes(s));
 
   if (isLoading) return <AppLayout><div className="flex items-center justify-center py-20"><div className="h-8 w-8 rounded-full border-2 border-primary border-t-transparent animate-spin" /></div></AppLayout>;
-  if (!doctor) return <AppLayout><div className="text-center py-20"><h2 className="font-display font-bold text-xl mb-2">{t.doctorNotFound}</h2><Button variant="outline" onClick={() => navigate("/doctors")}>{t.backToDoctors}</Button></div></AppLayout>;
+  if (!doctor) return <AppLayout><div className="text-center py-20"><h2 className="font-display font-bold text-xl mb-2">{t.doctorNotFound}</h2><Button variant="outline" onClick={() => navigate("/patient/doctors")}>{t.backToDoctors}</Button></div></AppLayout>;
 
   const profile = {
     full_name: [doctor.firstName, doctor.lastName].filter(Boolean).join(" "),
@@ -130,7 +130,7 @@ export default function DoctorProfile() {
     <AppLayout>
       <motion.div initial="hidden" animate="visible">
         <motion.div custom={0} variants={fadeUp}>
-          <Button variant="ghost" size="sm" className="mb-4" onClick={() => navigate("/doctors")}><ArrowLeft className="h-4 w-4 mr-1" /> {t.backToDoctors}</Button>
+          <Button variant="ghost" size="sm" className="mb-4" onClick={() => navigate("/patient/doctors")}><ArrowLeft className="h-4 w-4 mr-1" /> {t.backToDoctors}</Button>
         </motion.div>
 
         <div className="grid lg:grid-cols-3 gap-6">

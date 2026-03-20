@@ -4,28 +4,52 @@ import api from "@/services/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import AppLayout from "@/components/AppLayout";
+import { AppointmentDetailSheet } from "@/components/appointments/AppointmentDetailSheet";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { format, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
-import { CalendarDays, Clock, CheckCircle2, XCircle, AlertCircle, FileText, Loader2, Check, X, MessageSquarePlus, Send } from "lucide-react";
+import { CalendarDays, Clock, CheckCircle2, XCircle, AlertCircle, FileText } from "lucide-react";
+import type { Appointment } from "@/types/calendar";
 
 const fadeUp = {
   hidden: { opacity: 0, y: 20 },
   visible: (i: number) => ({ opacity: 1, y: 0, transition: { delay: i * 0.06, duration: 0.5, ease: [0.22, 1, 0.36, 1] as const } }),
 };
 
+interface DoctorRecord {
+  id: string;
+  user_id: string;
+}
+
+interface AppointmentProfile {
+  id?: string;
+  full_name?: string;
+  email?: string;
+  phone?: string;
+}
+
+interface DoctorAppointmentRow {
+  id: string;
+  doctor_id: string;
+  patient_id: string;
+  appointment_date: string;
+  start_time: string;
+  end_time: string;
+  status: string;
+  type?: string;
+  notes?: string;
+  profiles: AppointmentProfile | null;
+}
+
 export default function DoctorAppointments() {
   const { user } = useAuth();
   const { t } = useLanguage();
   const queryClient = useQueryClient();
   const [detailId, setDetailId] = useState<string | null>(null);
-  const [clinicalNote, setClinicalNote] = useState("");
 
   const statusConfig: Record<string, { color: string; icon: React.ElementType; label: string }> = {
     pending: { color: "bg-warning/10 text-warning border-warning/20", icon: AlertCircle, label: t.pending },
@@ -34,22 +58,35 @@ export default function DoctorAppointments() {
     cancelled: { color: "bg-destructive/10 text-destructive border-destructive/20", icon: XCircle, label: t.cancelled },
   };
 
-  const { data: doctorRecord } = useQuery({
+  const { data: doctorRecord } = useQuery<DoctorRecord>({
     queryKey: ["my-doctor-record", user?.id],
     queryFn: async () => {
-      const doctors = await api.doctors.list();
-      const doctor = doctors.find((item: any) => item.user_id === user!.id);
+      const doctors = await api.doctors.list() as DoctorRecord[];
+      const doctor = doctors.find((item) => item.user_id === user!.id);
       if (!doctor) throw new Error("Doctor record not found");
       return doctor;
     },
     enabled: !!user,
   });
-  const { data: appointments, isLoading } = useQuery({
+  const { data: appointments, isLoading } = useQuery<DoctorAppointmentRow[]>({
     queryKey: ["doctor-appointments-list", doctorRecord?.id],
     queryFn: async () => {
-      const data = await api.appointments.list({ doctor_id: doctorRecord!.id });
+      const data = await api.appointments.list({ doctor_id: doctorRecord!.id }) as Array<{
+        id: string;
+        doctor_id: string;
+        patient_id: string;
+        appointment_date: string;
+        start_time: string;
+        end_time: string;
+        status: string;
+        type?: string;
+        notes?: string;
+        profiles?: AppointmentProfile | null;
+        profile?: AppointmentProfile | null;
+        patient?: AppointmentProfile | null;
+      }>;
       return data
-        .map((appointment: any) => ({
+        .map((appointment) => ({
           ...appointment,
           profiles:
             appointment.profiles ??
@@ -57,30 +94,44 @@ export default function DoctorAppointments() {
             appointment.patient ??
             null,
         }))
-        .sort((a: any, b: any) => new Date(b.appointment_date).getTime() - new Date(a.appointment_date).getTime());
+        .sort((a, b) => new Date(b.appointment_date).getTime() - new Date(a.appointment_date).getTime());
     },
     enabled: !!doctorRecord,
   });
-  const { data: notes } = useQuery({
-    queryKey: ["appointment-notes", detailId],
-    queryFn: async () => api.appointments.notes.list(detailId!),
-    enabled: !!detailId,
-  });
-
-  const updateStatus = useMutation({ mutationFn: async ({ id, status }: { id: string; status: string }) => api.appointments.updateStatus(id, status), onSuccess: () => { toast.success(t.appointmentUpdated); queryClient.invalidateQueries({ queryKey: ["doctor-appointments-list"] }); queryClient.invalidateQueries({ queryKey: ["doctor-all-appointments"] }); }, onError: (err: any) => toast.error(err.message) });
-  const addNote = useMutation({ mutationFn: async () => { if (!detailId || !clinicalNote.trim()) throw new Error("Missing data"); return api.appointments.notes.create(detailId, { content: clinicalNote.trim() }); }, onSuccess: () => { toast.success(t.noteAdded); setClinicalNote(""); queryClient.invalidateQueries({ queryKey: ["appointment-notes"] }); }, onError: (err: any) => toast.error(err.message) });
+  const updateStatus = useMutation({ mutationFn: async ({ id, status }: { id: string; status: string }) => api.appointments.updateStatus(id, status), onSuccess: () => { toast.success(t.appointmentUpdated); queryClient.invalidateQueries({ queryKey: ["doctor-appointments-list"] }); queryClient.invalidateQueries({ queryKey: ["doctor-all-appointments"] }); }, onError: (err: unknown) => toast.error(err instanceof Error ? err.message : "Failed to update appointment") });
 
   const confirmed = appointments?.filter((a) => a.status === "confirmed") || [];
   const completed = appointments?.filter((a) => a.status === "completed") || [];
   const cancelled = appointments?.filter((a) => a.status === "cancelled") || [];
   const selectedAppointment = appointments?.find((a) => a.id === detailId);
+  const selectedAppointmentDetail: Appointment | null = selectedAppointment
+    ? {
+        id: selectedAppointment.id,
+        doctor_id: selectedAppointment.doctor_id,
+        patient_id: selectedAppointment.patient_id,
+        appointment_date: selectedAppointment.appointment_date,
+        start_time: selectedAppointment.start_time,
+        end_time: selectedAppointment.end_time,
+        status: selectedAppointment.status,
+        type: selectedAppointment.type ?? "",
+        notes: selectedAppointment.notes,
+        patient: {
+          id: selectedAppointment.profiles?.id ?? selectedAppointment.patient_id,
+          firstName: selectedAppointment.profiles?.full_name?.split(" ")[0] ?? "",
+          lastName: selectedAppointment.profiles?.full_name?.split(" ").slice(1).join(" ") ?? "",
+          fullName: selectedAppointment.profiles?.full_name ?? t.patient,
+          email: selectedAppointment.profiles?.email,
+          phone: selectedAppointment.profiles?.phone,
+        },
+      }
+    : null;
 
   const renderList = (list: typeof appointments) => {
     if (!list || list.length === 0) return <div className="text-center py-12 text-muted-foreground text-sm">{t.noAppointmentsInCategory}</div>;
     return (
       <div className="space-y-3">
-        {list.map((apt, i) => { const patient = apt.profiles as any; const status = statusConfig[apt.status]; const StatusIcon = status.icon; return (
-          <motion.div key={apt.id} className="glass rounded-2xl p-5 shadow-card hover:shadow-elevated transition-all cursor-pointer" custom={i} variants={fadeUp} initial="hidden" animate="visible" onClick={() => { setDetailId(apt.id); setClinicalNote(""); }}>
+        {list.map((apt, i) => { const patient = apt.profiles; const status = statusConfig[apt.status]; const StatusIcon = status.icon; return (
+          <motion.div key={apt.id} className="glass rounded-2xl p-5 shadow-card hover:shadow-elevated transition-all cursor-pointer" custom={i} variants={fadeUp} initial="hidden" animate="visible" onClick={() => { setDetailId(apt.id); }}>
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-4 min-w-0">
                 <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-secondary to-success flex items-center justify-center flex-shrink-0"><span className="text-secondary-foreground font-display font-bold">{patient?.full_name?.[0] || "P"}</span></div>
@@ -114,24 +165,12 @@ export default function DoctorAppointments() {
         </Tabs>
       </motion.div>
 
-      <Dialog open={!!detailId} onOpenChange={() => setDetailId(null)}>
-        <DialogContent className="sm:max-w-lg rounded-2xl max-h-[85vh] overflow-y-auto">
-          {selectedAppointment && (() => { const patient = selectedAppointment.profiles as any; const status = statusConfig[selectedAppointment.status]; const StatusIcon = status.icon; return (<>
-            <DialogHeader><DialogTitle className="font-display">{t.appointmentDetails}</DialogTitle><DialogDescription><Badge className={cn("mt-2 rounded-full border", status.color)} variant="outline"><StatusIcon className="h-3 w-3 mr-1" /> {status.label}</Badge></DialogDescription></DialogHeader>
-            <div className="space-y-4">
-              <div className="flex items-center gap-3"><div className="h-12 w-12 rounded-xl bg-gradient-to-br from-secondary to-success flex items-center justify-center"><span className="text-secondary-foreground font-display font-bold">{patient?.full_name?.[0] || "P"}</span></div><div><div className="font-semibold">{patient?.full_name || t.patient}</div><div className="text-sm text-muted-foreground">{patient?.email}</div>{patient?.phone && <div className="text-sm text-muted-foreground">{patient.phone}</div>}</div></div>
-              <div className="grid grid-cols-2 gap-3 text-sm"><div className="p-3 rounded-xl bg-muted"><div className="text-muted-foreground mb-1">{t.date}</div><div className="font-medium">{format(parseISO(selectedAppointment.appointment_date), "EEE, MMM d, yyyy")}</div></div><div className="p-3 rounded-xl bg-muted"><div className="text-muted-foreground mb-1">{t.time}</div><div className="font-medium">{selectedAppointment.start_time.slice(0, 5)} — {selectedAppointment.end_time.slice(0, 5)}</div></div></div>
-              {selectedAppointment.notes && <div className="p-3 rounded-xl bg-muted"><div className="text-muted-foreground text-sm mb-1 flex items-center gap-1"><FileText className="h-3 w-3" /> {t.patientNotes}</div><p className="text-sm">{selectedAppointment.notes}</p></div>}
-              {selectedAppointment.status === "confirmed" && <Button className="w-full rounded-xl" onClick={() => updateStatus.mutate({ id: selectedAppointment.id, status: "completed" })} disabled={updateStatus.isPending}><CheckCircle2 className="mr-2 h-4 w-4" /> {t.markCompleted}</Button>}
-              <div className="border-t pt-4">
-                <h4 className="font-display font-semibold mb-3 flex items-center gap-2"><MessageSquarePlus className="h-4 w-4" /> {t.clinicalNotes}</h4>
-                {notes && notes.length > 0 ? <div className="space-y-2 mb-4">{notes.map((note) => <div key={note.id} className="p-3 rounded-xl bg-accent/50 text-sm"><p>{note.content}</p><div className="text-xs text-muted-foreground mt-1">{format(new Date(note.created_at), "MMM d, yyyy h:mm a")}</div></div>)}</div> : <p className="text-sm text-muted-foreground mb-4">{t.noClinicalNotes}</p>}
-                <div className="flex gap-2"><Textarea placeholder={t.addClinicalNote} value={clinicalNote} onChange={(e) => setClinicalNote(e.target.value)} className="rounded-xl text-sm" rows={2} /><Button size="icon" className="rounded-xl h-auto" onClick={() => addNote.mutate()} disabled={!clinicalNote.trim() || addNote.isPending}>{addNote.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}</Button></div>
-              </div>
-            </div>
-          </>); })()}
-        </DialogContent>
-      </Dialog>
+      <AppointmentDetailSheet
+        appointment={selectedAppointmentDetail}
+        open={Boolean(detailId)}
+        onClose={() => setDetailId(null)}
+        onStatusUpdate={(id, status) => updateStatus.mutate({ id, status })}
+      />
     </AppLayout>
   );
 }
