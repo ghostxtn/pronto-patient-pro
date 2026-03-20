@@ -21,10 +21,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const isPatient = user?.role === "patient";
 
   const patientLinks = [
-    { to: "/dashboard", label: t.dashboard, icon: LayoutDashboard },
-    { to: "/doctors", label: t.findDoctorsNav, icon: Search },
-    { to: "/appointments", label: t.myAppointments, icon: CalendarDays },
-    { to: "/profile", label: t.profile, icon: User },
+    { to: "/patient/dashboard", label: t.dashboard, icon: LayoutDashboard },
+    { to: "/patient/doctors", label: t.findDoctorsNav, icon: Search },
+    { to: "/patient/appointments", label: t.myAppointments, icon: CalendarDays },
+    { to: "/patient/profile", label: t.profile, icon: User },
   ];
 
   const doctorLinks = [
@@ -68,7 +68,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     isOwner || isAdmin ? "/admin/dashboard"
     : isStaff ? "/admin/patients"
     : isDoctor ? "/doctor/dashboard"
-    : defaultRoute === "/dashboard" ? "/dashboard" : "/dashboard";
+    : defaultRoute === "/patient/dashboard" ? "/patient/dashboard" : "/patient/dashboard";
 
   return (
     <div className="min-h-screen bg-background">

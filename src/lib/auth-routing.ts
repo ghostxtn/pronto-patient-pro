@@ -12,6 +12,6 @@ export function getDefaultRouteByRole(role?: string) {
       return "/doctor/dashboard";
     case "patient":
     default:
-      return "/dashboard";
+      return "/patient/dashboard";
   }
 }

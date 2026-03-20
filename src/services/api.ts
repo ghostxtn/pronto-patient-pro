@@ -376,20 +376,36 @@ const api = {
   },
   availability: {
     listByDoctor: (doctorId: string) => request<any[]>(`/availability/${doctorId}`),
-    create: (data: unknown) =>
+    create: (data: {
+      doctorId: string;
+      dayOfWeek: number;
+      startTime: string;
+      endTime: string;
+      slotDuration: number;
+    }) =>
       request<any>("/availability", {
         method: "POST",
         body: JSON.stringify(data),
       }),
-    update: (id: string, data: unknown) =>
+    update: (id: string, data: object) =>
       request<any>(`/availability/${id}`, {
         method: "PATCH",
         body: JSON.stringify(data),
+      }),
+    remove: (id: string) =>
+      request<any>(`/availability/${id}`, {
+        method: "DELETE",
       }),
     delete: (id: string) =>
       request<any>(`/availability/${id}`, {
         method: "DELETE",
       }),
+  },
+  availabilityOverrides: {
+    listByDoctor: (doctorId: string, dateFrom: string, dateTo: string) =>
+      request<any[]>(
+        `/availability-overrides?doctor_id=${encodeURIComponent(doctorId)}&date_from=${encodeURIComponent(dateFrom)}&date_to=${encodeURIComponent(dateTo)}`,
+      ),
   },
   patients: {
     list: (params?: { search?: string; page?: number; limit?: number }) => {
@@ -501,6 +517,32 @@ const api = {
           method: "DELETE",
         }),
     },
+  },
+  clinicalNotes: {
+    listByPatient: (patientId: string) =>
+      request<any[]>(`/clinical-notes?patient_id=${encodeURIComponent(patientId)}`),
+    create: (data: {
+      patient_id: string;
+      doctor_id: string;
+      appointment_id?: string;
+      diagnosis?: string;
+      treatment?: string;
+      prescription?: string;
+      notes?: string;
+    }) =>
+      request<any>("/clinical-notes", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    update: (id: string, data: object) =>
+      request<any>(`/clinical-notes/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
+    remove: (id: string) =>
+      request<any>(`/clinical-notes/${id}`, {
+        method: "DELETE",
+      }),
   },
   storage: {
     uploadAvatar: (file: File) => {

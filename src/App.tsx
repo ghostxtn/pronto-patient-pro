@@ -7,7 +7,9 @@ import RequireAuth from "@/components/auth/RequireAuth";
 import RequireDoctorAccess from "@/components/auth/RequireDoctorAccess";
 import RequireRole from "@/components/auth/RequireRole";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { LanguageProvider } from "@/contexts/LanguageContext";
+import { getDefaultRouteByRole } from "@/lib/auth-routing";
 import Landing from "./pages/Landing";
 import Auth from "./pages/Auth";
 import AuthCallback from "./pages/AuthCallback";
@@ -48,6 +50,16 @@ import LegalTermsOfUse from "./pages/public/LegalTermsOfUse";
 
 const queryClient = new QueryClient();
 
+function LegacyAppointmentsRedirect() {
+  const { user } = useAuth();
+
+  if (user?.role === "patient") {
+    return <Navigate to="/patient/appointments" replace />;
+  }
+
+  return <Navigate to={getDefaultRouteByRole(user?.role)} replace />;
+}
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -83,12 +95,15 @@ const App = () => (
               <Route path="/legal/terms-of-use" element={<LegalTermsOfUse />} />
 
               <Route element={<RequireAuth />}>
+                <Route path="/appointments" element={<LegacyAppointmentsRedirect />} />
                 <Route path="/profile" element={<Profile />} />
 
                 <Route element={<RequireRole allowedRoles={["patient"]} />}>
-                  <Route path="/dashboard" element={<Dashboard />} />
-                  <Route path="/doctors/:id" element={<DoctorProfile />} />
-                  <Route path="/appointments" element={<MyAppointments />} />
+                  <Route path="/patient/dashboard" element={<Dashboard />} />
+                  <Route path="/patient/profile" element={<Profile />} />
+                  <Route path="/patient/doctors" element={<FindDoctors />} />
+                  <Route path="/patient/doctors/:id" element={<DoctorProfile />} />
+                  <Route path="/patient/appointments" element={<MyAppointments />} />
                 </Route>
 
                 <Route element={<RequireDoctorAccess />}>

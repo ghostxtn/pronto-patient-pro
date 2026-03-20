@@ -80,7 +80,7 @@ export default function Dashboard() {
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-display font-semibold text-lg">{t.upcomingAppointments}</h3>
               <Button variant="ghost" size="sm" asChild>
-                <Link to="/appointments">{t.viewAll} <ArrowRight className="ml-1 h-3 w-3" /></Link>
+                <Link to="/patient/appointments">{t.viewAll} <ArrowRight className="ml-1 h-3 w-3" /></Link>
               </Button>
             </div>
             <div className="space-y-3">
@@ -108,7 +108,7 @@ export default function Dashboard() {
             <h3 className="font-display font-semibold text-lg mb-2">{t.noAppointmentsYet}</h3>
             <p className="text-muted-foreground text-sm mb-4">{t.noAppointmentsDesc}</p>
             <Button className="rounded-full px-6 shadow-soft" asChild>
-              <Link to="/doctors">{t.findDoctor}</Link>
+              <Link to="/patient/doctors">{t.findDoctor}</Link>
             </Button>
           </motion.div>
         )}

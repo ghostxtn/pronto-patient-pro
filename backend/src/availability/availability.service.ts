@@ -32,7 +32,6 @@ export class AvailabilityService {
         and(
           eq(doctorAvailability.doctor_id, doctorId),
           eq(doctorAvailability.clinic_id, clinicId),
-          eq(doctorAvailability.is_active, true),
         ),
       );
   }
@@ -79,6 +78,10 @@ export class AvailabilityService {
       updateData.slot_duration = dto.slotDuration;
     }
 
+    if (dto.isActive !== undefined) {
+      updateData.is_active = dto.isActive;
+    }
+
     const [availability] = await this.db
       .update(doctorAvailability)
       .set(updateData)
@@ -88,18 +91,18 @@ export class AvailabilityService {
     return availability;
   }
 
-  async softDelete(id: string, clinicId: string) {
+  async remove(id: string, clinicId: string) {
     await this.findById(id, clinicId);
 
-    const [availability] = await this.db
-      .update(doctorAvailability)
-      .set({
-        is_active: false,
-        updated_at: new Date(),
-      })
-      .where(eq(doctorAvailability.id, id))
-      .returning();
+    await this.db
+      .delete(doctorAvailability)
+      .where(
+        and(
+          eq(doctorAvailability.id, id),
+          eq(doctorAvailability.clinic_id, clinicId),
+        ),
+      );
 
-    return availability;
+    return { success: true };
   }
 }

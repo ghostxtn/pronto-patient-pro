@@ -8,6 +8,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { AppointmentsModule } from './appointments/appointments.module';
 import { AvailabilityModule } from './availability/availability.module';
+import { AvailabilityOverridesModule } from './availability-overrides/availability-overrides.module';
 import { AuthModule } from './auth/auth.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { ClinicsModule } from './clinics/clinics.module';
@@ -19,6 +20,7 @@ import { DatabaseModule } from './database/database.module';
 import { DoctorsModule } from './doctors/doctors.module';
 import { HealthModule } from './health/health.module';
 import { HomepagePreviewModule } from './homepage-preview/homepage-preview.module';
+import { PatientClinicalNotesModule } from './patient-clinical-notes/patient-clinical-notes.module';
 import { PatientsModule } from './patients/patients.module';
 import { ProfilesModule } from './profiles/profiles.module';
 import { RedisModule } from './redis/redis.module';
@@ -43,7 +45,9 @@ import { StorageModule } from './storage/storage.module';
     StaffModule,
     DoctorsModule,
     AvailabilityModule,
+    AvailabilityOverridesModule,
     PatientsModule,
+    PatientClinicalNotesModule,
     AppointmentsModule,
     StorageModule,
   ],

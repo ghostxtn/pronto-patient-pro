@@ -133,7 +133,7 @@ export default function MyAppointments() {
             <CalendarDays className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" />
             <h3 className="font-display font-semibold text-lg mb-2">{t.noAppointmentsYet}</h3>
             <p className="text-muted-foreground text-sm mb-4">{t.noAppointmentsDesc}</p>
-            <Button className="rounded-full px-6 shadow-soft" onClick={() => window.location.href = "/doctors"}>{t.findDoctor}</Button>
+            <Button className="rounded-full px-6 shadow-soft" onClick={() => window.location.href = "/patient/doctors"}>{t.findDoctor}</Button>
           </motion.div>
         )}
       </motion.div>

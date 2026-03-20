@@ -46,10 +46,10 @@ export class AvailabilityController {
 
   @Delete(':id')
   @Roles('owner', 'admin', 'doctor')
-  softDelete(
+  remove(
     @Param('id') id: string,
     @CurrentUser() user: { clinicId: string },
   ) {
-    return this.availabilityService.softDelete(id, user.clinicId);
+    return this.availabilityService.remove(id, user.clinicId);
   }
 }
