@@ -1,6 +1,12 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
 import { doctorAvailability } from '../database/schema';
+import type { DoctorAvailability } from '../database/schema/doctor-availability.schema';
 import { CreateAvailabilityDto } from './dto/create-availability.dto';
 import { UpdateAvailabilityDto } from './dto/update-availability.dto';
 
@@ -9,6 +15,33 @@ export class AvailabilityService {
   constructor(@Inject('DRIZZLE') private readonly db: any) {}
 
   async create(dto: CreateAvailabilityDto, clinicId: string) {
+    const existing = await this.db
+      .select()
+      .from(doctorAvailability)
+      .where(
+        and(
+          eq(doctorAvailability.doctor_id, dto.doctorId),
+          eq(doctorAvailability.clinic_id, clinicId),
+          eq(doctorAvailability.day_of_week, dto.dayOfWeek),
+          eq(doctorAvailability.is_active, true),
+        ),
+      );
+
+    const newStart = dto.startTime;
+    const newEnd = dto.endTime;
+
+    const hasOverlap = existing.some((slot: DoctorAvailability) => {
+      const existStart = slot.start_time.slice(0, 5);
+      const existEnd = slot.end_time.slice(0, 5);
+      return newStart < existEnd && newEnd > existStart;
+    });
+
+    if (hasOverlap) {
+      throw new ConflictException(
+        'Bu gün ve saat aralığında zaten aktif bir müsaitlik slotu mevcut.',
+      );
+    }
+
     const [availability] = await this.db
       .insert(doctorAvailability)
       .values({
@@ -56,7 +89,40 @@ export class AvailabilityService {
   }
 
   async update(id: string, dto: UpdateAvailabilityDto, clinicId: string) {
-    await this.findById(id, clinicId);
+    const currentAvailability = await this.findById(id, clinicId);
+
+    const nextDayOfWeek = dto.dayOfWeek ?? currentAvailability.day_of_week;
+    const nextStartTime = dto.startTime ?? currentAvailability.start_time.slice(0, 5);
+    const nextEndTime = dto.endTime ?? currentAvailability.end_time.slice(0, 5);
+    const nextIsActive = dto.isActive ?? currentAvailability.is_active;
+
+    if (nextIsActive) {
+      const existing = await this.db
+        .select()
+        .from(doctorAvailability)
+        .where(
+          and(
+            eq(doctorAvailability.doctor_id, currentAvailability.doctor_id),
+            eq(doctorAvailability.clinic_id, clinicId),
+            eq(doctorAvailability.day_of_week, nextDayOfWeek),
+            eq(doctorAvailability.is_active, true),
+          ),
+        );
+
+      const hasOverlap = existing
+        .filter((slot: DoctorAvailability) => slot.id !== id)
+        .some((slot: DoctorAvailability) => {
+          const existStart = slot.start_time.slice(0, 5);
+          const existEnd = slot.end_time.slice(0, 5);
+          return nextStartTime < existEnd && nextEndTime > existStart;
+        });
+
+      if (hasOverlap) {
+        throw new ConflictException(
+          'Bu gün ve saat aralığında zaten aktif bir müsaitlik slotu mevcut.',
+        );
+      }
+    }
 
     const updateData: Record<string, unknown> = {
       updated_at: new Date(),

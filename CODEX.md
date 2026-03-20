@@ -1,67 +1,350 @@
-# Production And Local Routing Findings
+# pronto-patient-pro — CODEX Context
 
-## Production model
+## Project Overview
+Multi-tenant clinic management SaaS. Target market: small clinics (1-2 doctors) in Antalya, Turkey.
+Single codebase, multiple clinic tenants. KVKK (Turkish data protection law) compliance is a hard requirement.
 
-In real production, this app should not be accessed through Vite on port `5173` and should not rely on any `localhost` fallback behavior.
+**AI Workflow:** Arda (product owner) → Claude (architect/reviewer) → Codex (code generation) → Claude (review)
+Codex quota is limited — keep prompts minimal and targeted.
 
-The intended production shape is:
+---
 
-1. Build the frontend with `vite build`.
-2. Serve the generated static frontend from a web server or CDN.
-3. Route clinic domains such as `clinic-a.example.com` and `clinic-b.example.com` to that frontend.
-4. Proxy `/api` and `/uploads` to the backend.
-5. Let the backend resolve the tenant from the incoming request host.
+## Environment
+- **OS:** Mac/zsh
+- **Backend:** NestJS + Drizzle ORM + PostgreSQL + Redis
+- **Frontend:** React + Vite + TypeScript + Tailwind CSS + shadcn/ui + react-big-calendar
+- **Auth:** JWT (15min access + 7day refresh, Redis-backed) + Google OAuth
+- **Infrastructure:** Docker Compose + Nginx, Turkish VPS
+- **Testing:** `curl` on Mac/zsh
 
-That means production tenant resolution is host-based:
+---
 
-- `clinic-a.example.com` -> frontend served for that domain
-- browser calls `/api/...`
-- backend reads the request host
-- backend looks up `clinics.domain`
-- backend scopes auth and data to that clinic
+## Production & Local Routing
 
-## Current local behavior
+### Production model
+1. `vite build` → static frontend served from web server/CDN
+2. Clinic domains: `clinic-a.example.com`, `clinic-b.example.com` → frontend
+3. `/api` and `/uploads` proxied to backend
+4. Backend resolves tenant from request `Host` header → looks up `clinics.domain`
 
-This repository currently behaves differently in local development:
+### Local development
+- Working URL: `http://test-klinik.localhost:5173/`
+- `http://test-klinik.localhost` (no port) → goes to nginx port 80 → returns 502 (frontend not deployed there)
+- `http://localhost:5173/` works via fallback: frontend sends `test-klinik.localhost`, backend maps `localhost` → `test-klinik.localhost`
+- Local tenant isolation is relaxed by design
 
-- The README expects tenant access through `http://test-klinik.localhost:5173/`.
-- Bare `http://test-klinik.localhost` goes to Docker nginx on port `80`, not to the Vite frontend.
-- The nginx config returns `502` for `/` on purpose because the frontend is not deployed there yet.
-- `http://localhost:5173/` still works because the frontend sends `X-Clinic-Domain: test-klinik.localhost` when the browser hostname is `localhost`.
-- The backend also maps `localhost` to `test-klinik.localhost` in development.
+---
 
-So local tenant isolation is currently relaxed by design.
+## Multi-Tenancy
+- Every table has `clinic_id` column, enforced via global `TenantGuard`
+- Tenant resolved from `X-Forwarded-Host` / `Host` headers
+- `clinics.domain`: VARCHAR 255, NOT NULL, UNIQUE
+- User uniqueness: `UNIQUE(email, clinic_id)`
 
-## Why the user saw 502
+---
 
-The user opened:
+## Role System (single role per user)
 
-- `http://test-klinik.localhost`
+| Role | Access |
+|------|--------|
+| `owner` | Admin view + context switcher to own doctor profile |
+| `admin` | User management |
+| `doctor` | Calendar, appointments, patient notes |
+| `staff` | View doctor calendar + approve appointments |
+| `patient` | Book appointments |
 
-But the working local frontend URL in this repo is:
+- Doctor profile is a **separate table** — a user can have a doctor profile regardless of role
+- Owner with a doctor profile can switch to doctor view via context switcher UI
 
-- `http://test-klinik.localhost:5173/`
+---
 
-Without `:5173`, the request goes to nginx on port `80`, where `/` is configured to return `502`.
+## Database Schema (11 tables)
 
-## Why login on localhost is possible
+| Table | Description |
+|-------|-------------|
+| `clinics` | Tenant info, domain column |
+| `users` | Auth users, role-based |
+| `specializations` | Doctor specializations |
+| `doctors` | Doctor profiles |
+| `doctor_availability` | Weekly recurring availability slots |
+| `doctor_availability_overrides` | Date-specific overrides (blackout/custom_hours) |
+| `patients` | Patient records |
+| `appointments` | Appointments |
+| `appointment_notes` | Legacy appointment notes |
+| `appointment_files` | Appointment file uploads |
+| `patient_clinical_notes` | Patient-scoped clinical notes (new system) |
 
-Logging in from `http://localhost:5173/` is currently expected, even though it weakens the domain-based development model.
+### Migration History
+- `0000–0006`: Base schema, auth, multi-tenancy, staff phone, patient user_id
+- `0007`: `doctor_availability_overrides` table + domain/email unique constraints
+- `0008`: `patient_clinical_notes` table
 
-Reason:
+### Migration Flow
+```bash
+# Fresh local database
+cp .env.example .env
+npm install
+npm run backend:install
+docker compose up -d
+npm run db:migrate
+npm run db:seed
+```
 
-- frontend fallback: `localhost` -> `test-klinik.localhost`
-- backend fallback: `localhost` -> `test-klinik.localhost`
+### Useful DB Commands
+- `npm run db:generate` — generate a new Drizzle migration from schema changes
+- `npm run db:migrate` — apply committed SQL migrations to the database
+- `npm run db:push` — push current schema directly without generating a migration
+- `npm run db:seed` — seed default clinics/users/specializations for local development
+- `npm run db:up` — start postgres and redis only
 
-Because of those fallbacks, `localhost:5173` effectively behaves like the `test-klinik` tenant in development.
+### Recommended Workflow
+- Fresh DB: `docker compose up -d` -> `npm run db:migrate` -> `npm run db:seed`
+- Schema change: `npm run db:generate` -> commit migration -> `npm run db:migrate`
+- Avoid treating `db:push` as the default team flow; prefer committed migrations
 
-## Production recommendation
+### Existing DB Repair Flow
+Use this only if the local database already has clinic tables and `npm run db:migrate` fails with errors like `relation "users" already exists`.
 
-For production, use real clinic domains and remove any `localhost` fallback behavior from the deployed environment.
+```bash
+docker compose up -d
+Get-Content .\backend\drizzle\baseline_existing_db.sql -Raw | docker compose exec -T postgres psql -U clinic_user -d clinic_db
+npm run db:migrate
+npm run db:seed
+docker compose restart api
+```
 
-For stricter local development, consider:
+- `baseline_existing_db.sql` is a repair script for existing local databases
+- It is not a replacement for `npm run db:migrate`
+- It currently covers baseline repair / migration marking through `0008`
 
-- requiring access only through `*.localhost:5173`
-- removing the frontend `localhost` fallback
-- removing the backend `localhost` fallback
-- or serving the frontend behind local domain-based nginx so `http://test-klinik.localhost` works without the Vite port
+### drizzle.config.ts
+Requires `dotenv.config({ path: resolve(__dirname, '../.env') })` to read root `.env`.
+
+---
+
+## API Endpoints
+
+### Auth
+```
+POST /api/auth/login
+POST /api/auth/refresh
+GET  /api/auth/me
+```
+
+### Availability
+```
+GET    /api/availability/:doctorId     — Returns ALL slots (no is_active filter)
+POST   /api/availability               — camelCase DTO (see below)
+PATCH  /api/availability/:id           — isActive supported
+DELETE /api/availability/:id           — Hard delete (NOT soft delete)
+```
+
+### Availability Overrides
+```
+GET    /api/availability-overrides?doctor_id=&date_from=&date_to=
+POST   /api/availability-overrides
+PATCH  /api/availability-overrides/:id
+DELETE /api/availability-overrides/:id
+```
+
+### Clinical Notes
+```
+GET    /api/clinical-notes?patient_id=   — All notes for patient, created_at DESC
+POST   /api/clinical-notes               — snake_case DTO
+PATCH  /api/clinical-notes/:id
+DELETE /api/clinical-notes/:id
+```
+
+### Other
+```
+GET/POST/PATCH/DELETE /api/doctors
+GET/POST/PATCH/DELETE /api/patients
+GET/POST/PATCH/DELETE /api/appointments
+PATCH /api/appointments/:id/status
+GET/POST/PATCH/DELETE /api/appointment-notes
+POST /api/storage/avatar
+POST/GET /api/storage/appointments/:id/files
+```
+
+---
+
+## Homepage File Map
+
+### Route Entry
+- Route: `src/App.tsx` içinde `path="/" element={<Landing />}`
+- Page entry: `src/pages/Landing.tsx`
+- Bootstrap chain: `index.html` -> `src/main.tsx` -> `src/App.tsx` -> `src/pages/Landing.tsx`
+
+### Landing Composition
+`src/pages/Landing.tsx` şu sırayla render eder:
+- `src/components/landing/LandingNav.tsx`
+- `src/components/landing/HeroSection.tsx`
+- `src/components/landing/SplitFeatureSection.tsx`
+- `src/components/landing/SpecializationsSection.tsx`
+- `src/components/landing/TestimonialsSection.tsx`
+- `src/components/landing/ContactBandSection.tsx`
+- `src/components/landing/CTASection.tsx`
+- `src/components/landing/LandingFooter.tsx`
+
+### Content And Data Sources
+- Static homepage copy: `src/components/landing/content.ts`
+- Dynamic homepage preview data: `src/hooks/useHomepagePreviewData.ts`
+- Language state: `src/contexts/LanguageContext.tsx`
+
+### Shared Homepage Dependencies
+- `src/components/landing/SmartLink.tsx`
+- `src/components/LanguageSwitcher.tsx`
+- `src/components/ui/button.tsx`
+- `src/components/ui/input.tsx`
+- `src/components/ui/sonner.tsx`
+- `src/components/ui/toaster.tsx`
+- `src/components/ui/tooltip.tsx`
+- `src/index.css`
+- `tailwind.config.ts`
+
+### Notes
+- `src/components/landing/AnimatedCounter.tsx` aktif landing zincirinde kullanılmıyor.
+- `src/components/landing/HowItWorksSection.tsx` aktif landing zincirinde kullanılmıyor.
+- Homepage'ten çıkan ana route'lar: `/request-appointment`, `/doctors`, `/specialties`, `/appointment-process`, `/contact`
+
+---
+
+## DTO Naming Rules (IMPORTANT)
+
+| Module | Convention | Example |
+|--------|-----------|---------|
+| Availability | camelCase | `doctorId`, `dayOfWeek`, `startTime`, `endTime`, `slotDuration`, `isActive` |
+| Clinical Notes | snake_case | `patient_id`, `doctor_id`, `appointment_id` |
+| Update DTOs | No `doctorId` | Never send `doctorId` in PATCH requests |
+
+---
+
+## Availability System
+
+### doctor_availability (weekly recurring)
+- `day_of_week`: 0=Sunday, 1=Monday ... 6=Saturday
+- `start_time`, `end_time`: stored as `HH:MM:SS` in DB
+- `is_active`: toggleable
+- Overlap validation: same doctor + same day + active slots cannot overlap
+- DELETE is hard delete
+
+### doctor_availability_overrides (date-specific)
+- `type`: `blackout` | `custom_hours`
+- `blackout`: `start_time` and `end_time` must be null
+- `custom_hours`: `start_time` and `end_time` required
+- Unique constraint: `(doctor_id, date, type)`
+
+---
+
+## Doctor Calendar System (react-big-calendar)
+
+### Key Files
+- `src/components/calendar/DoctorCalendar.tsx` — Main calendar component
+- `src/components/calendar/AvailabilityModal.tsx` — Add/edit/delete availability slots
+- `src/components/calendar/OverrideModal.tsx` — Add/edit/delete overrides
+- `src/components/appointments/AppointmentDetailSheet.tsx` — Shared appointment detail (used in calendar + appointments page)
+- `src/utils/calendarUtils.ts` — Event conversion helpers
+- `src/types/calendar.ts` — Types: AvailabilitySlot, AvailabilityOverride, Appointment, ClinicalNote, CalendarEvent
+
+### Calendar Behaviors
+- Default view: `week`
+- "Gün" button: always navigates to today
+- Month view day click → drill down to day view
+- Empty slot click (week/day) → AvailabilityModal create mode
+- Green slot click → AvailabilityModal edit mode
+- Appointment click → AppointmentDetailSheet
+- Blackout click → Toast with reason
+- Day header right-click → context menu (blackout / custom hours)
+- Agenda view: fetches 30-day range
+
+### Date Range by View
+```
+month  → startOfMonth → endOfMonth
+week   → startOfWeek → endOfWeek (Monday start)
+day    → same day
+agenda → date → +30 days
+```
+
+### Color System (via slotPropGetter)
+- Available hours: `#dcfce7` green background
+- Blackout days: no green shown
+- Appointments: blue event
+- Blackout: red all-day banner
+- Custom hours: yellow event
+
+### Availability Sheet (in calendar toolbar)
+- "Müsaitliği Yönet" button opens right-side Sheet
+- Two sections: Haftalık Slotlar + İstisnalar
+- Override list: last 30 days + next 365 days
+
+---
+
+## Patient Clinical Notes System
+
+### patient_clinical_notes table
+- Patient-scoped (NOT appointment-scoped)
+- `appointment_id`: optional — which appointment it was written in
+- `expires_at`: null for now — KVKK retention period pending legal consultation
+- Fields: `diagnosis`, `treatment`, `prescription`, `notes` (all optional, at least one required)
+
+### Frontend
+- `AppointmentDetailSheet` has "Geçmiş Notlar" + "Yeni Not Ekle" sections
+- `DoctorPatientDetail` page also shows full clinical note history
+- `doctor_id` always taken from appointment object or auth context — never hardcoded
+
+---
+
+## Shared Components
+
+| Component | Location | Used By |
+|-----------|----------|---------|
+| `AppointmentDetailSheet` | `src/components/appointments/` | DoctorCalendar, DoctorAppointments |
+| `AvailabilityModal` | `src/components/calendar/` | DoctorCalendar |
+| `OverrideModal` | `src/components/calendar/` | DoctorCalendar |
+| `DoctorCalendar` | `src/components/calendar/` | DoctorSchedule |
+
+---
+
+## Completed Screens
+
+### Doctor
+- `/doctor/dashboard` — Stats cards (navigate to appointments/schedule)
+- `/doctor/schedule` — Weekly calendar (react-big-calendar)
+- `/doctor/appointments` — Appointment list with detail sheet
+- `/doctor/patients` — Patient list with search
+- `/doctor/patients/:id` — Patient detail: clinical notes + appointment history
+
+### Admin/Owner
+- Admin panel exists (user management)
+- Owner has context switcher to doctor profile view
+
+### Staff
+- Staff screens exist (doctor calendar view + appointment approval)
+
+### Patient
+- Patient booking flow exists
+- **Next: patient screens need review/improvement**
+
+---
+
+## Known Issues
+
+### Firefox cursor issue
+- `cursor: pointer` on react-big-calendar time slots doesn't work in Firefox
+- `rbc-*` CSS selectors added but not effective
+- To fix later: custom time slot wrapper component
+
+### Firefox AM/PM display
+- `<input type="time">` shows 12h format in Firefox based on system locale
+- Values sent correctly as `HH:MM` — visual only
+- To fix later: custom time picker component
+
+---
+
+## Production Gaps (TODO)
+
+- [ ] Email notifications (critical) — appointment confirmation/cancellation/reminders
+- [ ] Rate limiting (critical) — brute force protection on API
+- [ ] Patient screens — review and improve
+- [ ] UI polish — overall design improvements
+- [ ] KVKK data retention cron job — pending legal consultation

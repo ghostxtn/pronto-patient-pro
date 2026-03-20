@@ -19,11 +19,13 @@ import {
   setMinutes,
   startOfMonth,
   startOfWeek,
+  subDays,
 } from "date-fns";
 import { tr } from "date-fns/locale";
 import { Pencil, Settings2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { AvailabilityModal } from "@/components/calendar/AvailabilityModal";
+import { OverrideModal } from "@/components/calendar/OverrideModal";
 import { AppointmentDetailSheet } from "@/components/appointments/AppointmentDetailSheet";
 import api from "@/services/api";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -36,7 +38,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Sheet,
   SheetContent,
@@ -52,10 +61,7 @@ import {
   AvailabilityOverride,
   CalendarEvent,
 } from "@/types/calendar";
-import {
-  appointmentsToEvents,
-  overridesToEvents,
-} from "@/utils/calendarUtils";
+import { appointmentsToEvents, overridesToEvents } from "@/utils/calendarUtils";
 
 const locales = { tr };
 
@@ -102,6 +108,16 @@ interface CalendarAppointmentResponse {
   };
 }
 
+interface CustomToolbarProps extends ToolbarProps<CalendarEvent, object> {
+  onManageAvailability: () => void;
+}
+
+interface CalendarHeaderProps {
+  date: Date;
+  label: string;
+  onContextMenu: (event: React.MouseEvent<HTMLElement>, date: Date) => void;
+}
+
 const toolbarViewLabels = {
   [Views.MONTH]: "Ay",
   [Views.WEEK]: "Hafta",
@@ -130,8 +146,10 @@ function getAvailabilitySortValue(slot: AvailabilitySlot) {
   return normalizedDay * 10000 + Number(slot.start_time.slice(0, 2)) * 100 + Number(slot.start_time.slice(3, 5));
 }
 
-interface CustomToolbarProps extends ToolbarProps<CalendarEvent, object> {
-  onManageAvailability: () => void;
+function getOverrideBadge(type: AvailabilityOverride["type"]) {
+  return type === "blackout"
+    ? { label: "Blackout", className: "border-red-200 bg-red-50 text-red-700" }
+    : { label: "Özel Saat", className: "border-yellow-200 bg-yellow-50 text-yellow-700" };
 }
 
 const CustomToolbar = ({
@@ -196,6 +214,16 @@ const CustomToolbar = ({
   </div>
 );
 
+const CalendarHeader = ({ date, label, onContextMenu }: CalendarHeaderProps) => (
+  <div
+    onContextMenu={(event) => onContextMenu(event, date)}
+    className="cursor-context-menu rounded-md px-1 py-0.5"
+    title="Sağ tıklayarak istisna ekleyin"
+  >
+    {label}
+  </div>
+);
+
 function toApiDate(date: Date) {
   return format(date, "yyyy-MM-dd");
 }
@@ -243,13 +271,29 @@ export function DoctorCalendar({ doctorId }: DoctorCalendarProps) {
     endTime?: string;
     slot?: AvailabilitySlot;
   }>({ open: false, mode: "create" });
+  const [overrideModal, setOverrideModal] = useState<{
+    open: boolean;
+    mode: "create" | "edit";
+    initialDate?: string;
+    initialType?: "blackout" | "custom_hours";
+    override?: AvailabilityOverride;
+  }>({ open: false, mode: "create" });
   const [isAvailabilitySheetOpen, setIsAvailabilitySheetOpen] = useState(false);
   const [slotToDelete, setSlotToDelete] = useState<AvailabilitySlot | null>(null);
+  const [overrideToDelete, setOverrideToDelete] = useState<AvailabilityOverride | null>(null);
+  const [contextMenuState, setContextMenuState] = useState<{
+    open: boolean;
+    x: number;
+    y: number;
+    date?: Date;
+  }>({ open: false, x: 0, y: 0 });
 
   const { rangeStart, rangeEnd } = useMemo(
     () => getDateRange(currentDate, view),
     [currentDate, view],
   );
+  const overrideRangeStart = useMemo(() => format(subDays(new Date(), 30), "yyyy-MM-dd"), []);
+  const overrideRangeEnd = useMemo(() => format(addDays(new Date(), 365), "yyyy-MM-dd"), []);
 
   const {
     data: availabilitySlots = [],
@@ -307,6 +351,20 @@ export function DoctorCalendar({ doctorId }: DoctorCalendarProps) {
     enabled: Boolean(doctorId),
   });
 
+  const {
+    data: overrideList = [],
+    isLoading: isOverrideListLoading,
+  } = useQuery({
+    queryKey: ["availability-overrides", doctorId, overrideRangeStart, overrideRangeEnd],
+    queryFn: async () =>
+      api.availabilityOverrides.listByDoctor(
+        doctorId,
+        overrideRangeStart,
+        overrideRangeEnd,
+      ) as Promise<AvailabilityOverride[]>,
+    enabled: Boolean(doctorId),
+  });
+
   const removeAvailability = useMutation({
     mutationFn: async (slotId: string) => api.availability.remove(slotId),
     onSuccess: async () => {
@@ -321,6 +379,19 @@ export function DoctorCalendar({ doctorId }: DoctorCalendarProps) {
     },
   });
 
+  const removeOverride = useMutation({
+    mutationFn: async (overrideId: string) => api.availabilityOverrides.remove(overrideId),
+    onSuccess: async () => {
+      toast.success("İstisna silindi");
+      setOverrideToDelete(null);
+      await queryClient.invalidateQueries({ queryKey: ["availability-overrides", doctorId] });
+      await queryClient.invalidateQueries({ queryKey: ["doctor-calendar", doctorId] });
+    },
+    onError: (error: unknown) => {
+      toast.error(error instanceof Error ? error.message : "İstisna silinemedi");
+    },
+  });
+
   const events = useMemo(() => {
     if (!data) {
       return [];
@@ -331,14 +402,15 @@ export function DoctorCalendar({ doctorId }: DoctorCalendarProps) {
     return [...overrideEvents, ...appointmentEvents];
   }, [data]);
 
-  const foregroundEvents = useMemo(
-    () => events,
-    [events],
-  );
+  const foregroundEvents = useMemo(() => events, [events]);
 
   const sortedAvailabilitySlots = useMemo(
     () => [...availabilitySlots].sort((left, right) => getAvailabilitySortValue(left) - getAvailabilitySortValue(right)),
     [availabilitySlots],
+  );
+  const sortedOverrides = useMemo(
+    () => [...overrideList].sort((left, right) => new Date(left.date).getTime() - new Date(right.date).getTime()),
+    [overrideList],
   );
 
   const eventPropGetter: EventPropGetter<CalendarEvent> = (event) => {
@@ -392,7 +464,33 @@ export function DoctorCalendar({ doctorId }: DoctorCalendarProps) {
     if (event.type === "blackout") {
       const override = event.resource as AvailabilityOverride;
       toast.info(override.reason ?? "Kapali");
+      return;
     }
+
+    if (event.type === "custom_hours") {
+      const override = event.resource as AvailabilityOverride;
+      toast.info(override.reason ?? "Özel saat tanımlı");
+    }
+  };
+
+  const handleHeaderContextMenu = (event: React.MouseEvent<HTMLElement>, date: Date) => {
+    event.preventDefault();
+    setContextMenuState({
+      open: true,
+      x: event.clientX,
+      y: event.clientY,
+      date,
+    });
+  };
+
+  const handleOpenOverrideCreate = (date: Date, type: "blackout" | "custom_hours") => {
+    setContextMenuState({ open: false, x: 0, y: 0 });
+    setOverrideModal({
+      open: true,
+      mode: "create",
+      initialDate: format(date, "yyyy-MM-dd"),
+      initialType: type,
+    });
   };
 
   const isLoading = isAvailabilityLoading || isCalendarLoading;
@@ -433,6 +531,12 @@ export function DoctorCalendar({ doctorId }: DoctorCalendarProps) {
       <div className="glass rounded-2xl p-4 shadow-card">
         <BigCalendar
           components={{
+            header: ({ date, label }) => (
+              <CalendarHeader date={date} label={label} onContextMenu={handleHeaderContextMenu} />
+            ),
+            dateHeader: ({ date, label }) => (
+              <CalendarHeader date={date} label={String(label)} onContextMenu={handleHeaderContextMenu} />
+            ),
             toolbar: (toolbarProps) => (
               <CustomToolbar
                 {...toolbarProps}
@@ -472,8 +576,8 @@ export function DoctorCalendar({ doctorId }: DoctorCalendarProps) {
           }}
           onNavigate={setCurrentDate}
           onView={setView}
-          onDrillDown={(date, view) => {
-            void view;
+          onDrillDown={(date, nextView) => {
+            void nextView;
             setCurrentDate(date);
             setView(Views.DAY);
           }}
@@ -525,8 +629,41 @@ export function DoctorCalendar({ doctorId }: DoctorCalendarProps) {
           dayLayoutAlgorithm="no-overlap"
         />
       </div>
+
+      <DropdownMenu
+        open={contextMenuState.open}
+        onOpenChange={(open) => setContextMenuState((current) => ({ ...current, open }))}
+      >
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            aria-hidden="true"
+            tabIndex={-1}
+            className="fixed h-0 w-0 opacity-0"
+            style={{ left: contextMenuState.x, top: contextMenuState.y }}
+          />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          align="start"
+          sideOffset={4}
+          className="w-52"
+          style={{ position: "fixed", left: contextMenuState.x, top: contextMenuState.y }}
+        >
+          <DropdownMenuItem
+            onClick={() => contextMenuState.date && handleOpenOverrideCreate(contextMenuState.date, "blackout")}
+          >
+            Bu günü kapat
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            onClick={() => contextMenuState.date && handleOpenOverrideCreate(contextMenuState.date, "custom_hours")}
+          >
+            Özel saat belirle
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
       <Sheet open={isAvailabilitySheetOpen} onOpenChange={setIsAvailabilitySheetOpen}>
-        <SheetContent side="right" className="w-full sm:max-w-lg">
+        <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-lg">
           <SheetHeader>
             <SheetTitle>Musaitligi Yonet</SheetTitle>
             <SheetDescription>
@@ -535,92 +672,201 @@ export function DoctorCalendar({ doctorId }: DoctorCalendarProps) {
           </SheetHeader>
 
           <div className="mt-6 space-y-4">
-            <Button
-              type="button"
-              className="w-full rounded-xl"
-              onClick={() =>
-                setAvailabilityModal({
-                  open: true,
-                  mode: "create",
-                })
-              }
-            >
-              ＋ Yeni Slot Ekle
-            </Button>
+            <div className="space-y-4 rounded-2xl border border-border/70 bg-background p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="font-semibold">Haftalık Slotlar</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Düzenli çalışma saatlerinizi yönetin.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  className="rounded-xl"
+                  onClick={() =>
+                    setAvailabilityModal({
+                      open: true,
+                      mode: "create",
+                    })
+                  }
+                >
+                  ＋ Yeni Slot Ekle
+                </Button>
+              </div>
 
-            {sortedAvailabilitySlots.length > 0 ? (
-              <div className="space-y-3">
-                {sortedAvailabilitySlots.map((slot) => (
-                  <div
-                    key={slot.id}
-                    className="rounded-2xl border border-border/70 bg-background p-4"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <div className="font-semibold">{dayLabels[slot.day_of_week]}</div>
-                        <div className="text-sm text-muted-foreground">
-                          {formatTimeRange(slot.start_time, slot.end_time)}
+              {sortedAvailabilitySlots.length > 0 ? (
+                <div className="space-y-3">
+                  {sortedAvailabilitySlots.map((slot) => (
+                    <div
+                      key={slot.id}
+                      className="rounded-2xl border border-border/70 bg-background p-4"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="font-semibold">{dayLabels[slot.day_of_week]}</div>
+                          <div className="text-sm text-muted-foreground">
+                            {formatTimeRange(slot.start_time, slot.end_time)}
+                          </div>
+                          <div className="text-sm text-muted-foreground">
+                            {slot.slot_duration} dakika
+                          </div>
                         </div>
-                        <div className="text-sm text-muted-foreground">
-                          {slot.slot_duration} dakika
+                        <Switch
+                          checked={slot.is_active}
+                          onCheckedChange={(checked) => {
+                            api.availability
+                              .update(slot.id, { isActive: checked })
+                              .then(() => {
+                                toast.success("Musaitlik durumu guncellendi");
+                                return queryClient.invalidateQueries({ queryKey: ["availability", doctorId] });
+                              })
+                              .then(() => queryClient.invalidateQueries({ queryKey: ["doctor-calendar", doctorId] }))
+                              .catch((error: unknown) => {
+                                toast.error(
+                                  error instanceof Error
+                                    ? error.message
+                                    : "Musaitlik durumu guncellenemedi",
+                                );
+                              });
+                          }}
+                          aria-label={`${dayLabels[slot.day_of_week]} musaitlik durumu`}
+                        />
+                      </div>
+
+                      <div className="mt-4 flex items-center gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="rounded-xl"
+                          onClick={() =>
+                            setAvailabilityModal({
+                              open: true,
+                              mode: "edit",
+                              slot,
+                            })
+                          }
+                        >
+                          <Pencil className="h-4 w-4" />
+                          Duzenle
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          className="rounded-xl"
+                          onClick={() => setSlotToDelete(slot)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          Sil
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-2xl border border-dashed p-4 text-sm text-muted-foreground">
+                  Henuz tanimli musaitlik slotu bulunmuyor.
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-4 rounded-2xl border border-border/70 bg-background p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="font-semibold">İstisnalar</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Son 30 gün ve gelecek için planlanan özel kapanış veya mesai istisnaları.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="rounded-xl"
+                  onClick={() =>
+                    setOverrideModal({
+                      open: true,
+                      mode: "create",
+                      initialDate: format(new Date(), "yyyy-MM-dd"),
+                      initialType: "blackout",
+                    })
+                  }
+                >
+                  ＋ İstisna Ekle
+                </Button>
+              </div>
+
+              {isOverrideListLoading ? (
+                <div className="space-y-3">
+                  {[1, 2, 3].map((item) => (
+                    <Skeleton key={item} className="h-24 rounded-2xl" />
+                  ))}
+                </div>
+              ) : sortedOverrides.length > 0 ? (
+                <div className="space-y-3">
+                  {sortedOverrides.map((override) => {
+                    const badge = getOverrideBadge(override.type);
+
+                    return (
+                      <div
+                        key={override.id}
+                        className="rounded-2xl border border-border/70 bg-background p-4"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="space-y-2">
+                            <div className="font-semibold">
+                              {format(new Date(override.date), "d MMMM yyyy", { locale: tr })}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline" className={badge.className}>
+                                {badge.label}
+                              </Badge>
+                              {override.type === "custom_hours" && override.start_time && override.end_time ? (
+                                <span className="text-sm text-muted-foreground">
+                                  {formatTimeRange(override.start_time, override.end_time)}
+                                </span>
+                              ) : null}
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              {override.reason || "Sebep belirtilmedi"}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="rounded-xl"
+                              onClick={() =>
+                                setOverrideModal({
+                                  open: true,
+                                  mode: "edit",
+                                  override,
+                                })
+                              }
+                            >
+                              <Pencil className="h-4 w-4" />
+                              Düzenle
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="destructive"
+                              className="rounded-xl"
+                              onClick={() => setOverrideToDelete(override)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                              Sil
+                            </Button>
+                          </div>
                         </div>
                       </div>
-                      <Switch
-                        checked={slot.is_active}
-                        onCheckedChange={(checked) => {
-                          api.availability
-                            .update(slot.id, { isActive: checked })
-                            .then(() => {
-                              toast.success("Musaitlik durumu guncellendi");
-                              return queryClient.invalidateQueries({ queryKey: ["availability", doctorId] });
-                            })
-                            .then(() => queryClient.invalidateQueries({ queryKey: ["doctor-calendar", doctorId] }))
-                            .catch((error: unknown) => {
-                              toast.error(
-                                error instanceof Error
-                                  ? error.message
-                                  : "Musaitlik durumu guncellenemedi",
-                              );
-                            });
-                        }}
-                        aria-label={`${dayLabels[slot.day_of_week]} musaitlik durumu`}
-                      />
-                    </div>
-
-                    <div className="mt-4 flex items-center gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="rounded-xl"
-                        onClick={() =>
-                          setAvailabilityModal({
-                            open: true,
-                            mode: "edit",
-                            slot,
-                          })
-                        }
-                      >
-                        <Pencil className="h-4 w-4" />
-                        Duzenle
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="destructive"
-                        className="rounded-xl"
-                        onClick={() => setSlotToDelete(slot)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                        Sil
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="rounded-2xl border border-dashed p-4 text-sm text-muted-foreground">
-                Henuz tanimli musaitlik slotu bulunmuyor.
-              </div>
-            )}
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="rounded-2xl border border-dashed p-4 text-sm text-muted-foreground">
+                  Tanımlı istisna bulunmuyor.
+                </div>
+              )}
+            </div>
 
             <AlertDialog open={Boolean(slotToDelete)} onOpenChange={() => {}}>
               <AlertDialogContent>
@@ -648,9 +894,37 @@ export function DoctorCalendar({ doctorId }: DoctorCalendarProps) {
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
+
+            <AlertDialog open={Boolean(overrideToDelete)} onOpenChange={() => {}}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>İstisna silinsin mi?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    {overrideToDelete
+                      ? `${format(new Date(overrideToDelete.date), "d MMMM yyyy", { locale: tr })} tarihli istisna kaldırılacak.`
+                      : "Bu istisna kaldırılacak."}
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel onClick={() => setOverrideToDelete(null)}>İptal</AlertDialogCancel>
+                  <Button
+                    variant="destructive"
+                    disabled={removeOverride.isPending}
+                    onClick={() => {
+                      if (overrideToDelete) {
+                        removeOverride.mutate(overrideToDelete.id);
+                      }
+                    }}
+                  >
+                    {removeOverride.isPending ? "Siliniyor..." : "Sil"}
+                  </Button>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         </SheetContent>
       </Sheet>
+
       <AvailabilityModal
         open={availabilityModal.open}
         onClose={() => setAvailabilityModal({ open: false, mode: "create" })}
@@ -666,6 +940,22 @@ export function DoctorCalendar({ doctorId }: DoctorCalendarProps) {
           void queryClient.invalidateQueries({ queryKey: ["doctor-calendar", doctorId] });
         }}
       />
+
+      <OverrideModal
+        open={overrideModal.open}
+        onClose={() => setOverrideModal({ open: false, mode: "create" })}
+        mode={overrideModal.mode}
+        doctorId={doctorId}
+        initialDate={overrideModal.initialDate}
+        initialType={overrideModal.initialType}
+        override={overrideModal.override}
+        onSaved={() => {
+          setOverrideModal({ open: false, mode: "create" });
+          void queryClient.invalidateQueries({ queryKey: ["availability-overrides", doctorId] });
+          void queryClient.invalidateQueries({ queryKey: ["doctor-calendar", doctorId] });
+        }}
+      />
+
       <AppointmentDetailSheet
         appointment={selectedAppointment}
         open={Boolean(selectedAppointment)}

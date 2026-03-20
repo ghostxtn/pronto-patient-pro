@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import api from "@/services/api";
+import api, { ApiError } from "@/services/api";
 import type { AvailabilitySlot } from "@/types/calendar";
 import {
   AlertDialog,
@@ -137,7 +137,11 @@ export function AvailabilityModal({
       onSaved();
     },
     onError: (error: unknown) => {
-      toast.error(error instanceof Error ? error.message : "Musaitlik kaydedilemedi");
+      if (error instanceof ApiError && error.status === 409) {
+        toast.error("Bu gün ve saat aralığında zaten aktif bir müsaitlik slotu mevcut.");
+      } else {
+        toast.error("Müsaitlik kaydedilemedi.");
+      }
     },
   });
 

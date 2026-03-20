@@ -31,6 +31,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     { to: "/doctor/dashboard", label: t.dashboard, icon: LayoutDashboard },
     { to: "/doctor/schedule", label: t.myScheduleNav, icon: Clock },
     { to: "/doctor/appointments", label: t.appointmentsNav, icon: ClipboardList },
+    { to: "/doctor/patients", label: "Hastalarım", icon: Users },
     { to: "/profile", label: t.profile, icon: User },
   ];
 
@@ -70,6 +71,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     : isDoctor ? "/doctor/dashboard"
     : defaultRoute === "/patient/dashboard" ? "/patient/dashboard" : "/patient/dashboard";
 
+  const isActiveLink = (path: string) =>
+    location.pathname === path || location.pathname.startsWith(`${path}/`);
+
   return (
     <div className="min-h-screen bg-background">
       <header className="glass-strong border-b sticky top-0 z-50">
@@ -93,7 +97,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 to={link.to}
                 className={cn(
                   "flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
-                  location.pathname === link.to
+                  isActiveLink(link.to)
                     ? "bg-accent text-accent-foreground"
                     : "text-muted-foreground hover:text-foreground hover:bg-muted"
                 )}
@@ -118,11 +122,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <div className="flex justify-around py-2">
           {links.map((link) => (
             <Link
-              key={link.to}
-              to={link.to}
-              className={cn(
-                "flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors",
-                location.pathname === link.to
+                key={link.to}
+                to={link.to}
+                className={cn(
+                  "flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors",
+                  isActiveLink(link.to)
                   ? "text-primary"
                   : "text-muted-foreground"
               )}

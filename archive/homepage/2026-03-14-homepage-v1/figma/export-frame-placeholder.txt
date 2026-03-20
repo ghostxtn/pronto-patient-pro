@@ -1,3 +1,0 @@
-Repo icinde homepage'e ait Figma frame export veya tasarim export gorseli bulunmadi.
-
-Bu dosya, ileride eklenecek frame/export aciklamalari icin placeholder olarak birakildi.
