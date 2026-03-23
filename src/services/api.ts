@@ -406,6 +406,27 @@ const api = {
       request<any[]>(
         `/availability-overrides?doctor_id=${encodeURIComponent(doctorId)}&date_from=${encodeURIComponent(dateFrom)}&date_to=${encodeURIComponent(dateTo)}`,
       ),
+    create: (data: {
+      doctor_id: string;
+      date: string;
+      type: "blackout" | "custom_hours";
+      start_time?: string;
+      end_time?: string;
+      reason?: string;
+    }) =>
+      request<any>("/availability-overrides", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    update: (id: string, data: object) =>
+      request<any>(`/availability-overrides/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
+    remove: (id: string) =>
+      request<any>(`/availability-overrides/${id}`, {
+        method: "DELETE",
+      }),
   },
   patients: {
     list: (params?: { search?: string; page?: number; limit?: number }) => {

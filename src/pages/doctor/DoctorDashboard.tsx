@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/services/api";
 import { useAuth } from "@/contexts/AuthContext";
@@ -26,6 +26,7 @@ const statusColors: Record<string, string> = {
 export default function DoctorDashboard() {
   const { user } = useAuth();
   const { t } = useLanguage();
+  const navigate = useNavigate();
 
   const { data: doctorRecord } = useQuery({
     queryKey: ["my-doctor-record", user?.id],
@@ -59,10 +60,34 @@ export default function DoctorDashboard() {
   const total = appointments?.length || 0;
 
   const stats = [
-    { icon: CalendarCheck, label: t.today, value: String(todayAppts.length), color: "from-primary to-info" },
-    { icon: AlertCircle, label: t.pending, value: String(pending.length), color: "from-warning to-destructive" },
-    { icon: CheckCircle2, label: t.confirmed, value: String(confirmed.length), color: "from-secondary to-success" },
-    { icon: Activity, label: t.total, value: String(total), color: "from-accent-foreground to-primary" },
+    {
+      icon: CalendarCheck,
+      label: t.today,
+      value: String(todayAppts.length),
+      color: "from-primary to-info",
+      onClick: () => navigate("/doctor/schedule", { state: { view: "day" } }),
+    },
+    {
+      icon: AlertCircle,
+      label: t.pending,
+      value: String(pending.length),
+      color: "from-warning to-destructive",
+      onClick: () => navigate("/doctor/appointments?status=pending"),
+    },
+    {
+      icon: CheckCircle2,
+      label: t.confirmed,
+      value: String(confirmed.length),
+      color: "from-secondary to-success",
+      onClick: () => navigate("/doctor/appointments?status=confirmed"),
+    },
+    {
+      icon: Activity,
+      label: t.total,
+      value: String(total),
+      color: "from-accent-foreground to-primary",
+      onClick: () => navigate("/doctor/appointments"),
+    },
   ];
 
   return (
@@ -73,7 +98,13 @@ export default function DoctorDashboard() {
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           {stats.map((stat, i) => (
-            <motion.div key={stat.label} className="glass rounded-2xl p-5 shadow-card" custom={i + 2} variants={fadeUp}>
+            <motion.div
+              key={stat.label}
+              className="glass rounded-2xl p-5 shadow-card cursor-pointer transition-shadow hover:shadow-md"
+              custom={i + 2}
+              variants={fadeUp}
+              onClick={stat.onClick}
+            >
               <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${stat.color} flex items-center justify-center mb-3`}><stat.icon className="h-5 w-5 text-primary-foreground" /></div>
               <div className="text-2xl font-display font-bold">{stat.value}</div>
               <div className="text-sm text-muted-foreground">{stat.label}</div>
