@@ -261,7 +261,7 @@ WHERE NOT EXISTS (
 );
 
 INSERT INTO drizzle.__drizzle_migrations (hash, created_at)
-SELECT '0007_hesitant_vargas', 1774895069409
+SELECT '0007_hesitant_vargas', 1773963391640
 WHERE NOT EXISTS (
   SELECT 1
   FROM drizzle.__drizzle_migrations
@@ -269,7 +269,7 @@ WHERE NOT EXISTS (
 );
 
 INSERT INTO drizzle.__drizzle_migrations (hash, created_at)
-SELECT '0008_bent_wrecking_crew', 1774895299082
+SELECT '0008_bent_wrecking_crew', 1774023756134
 WHERE NOT EXISTS (
   SELECT 1
   FROM drizzle.__drizzle_migrations

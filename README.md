@@ -88,15 +88,15 @@ Repair steps
 What the repair script does
 
 - Creates `drizzle.__drizzle_migrations` if it does not exist.
-- Applies the idempotent schema repairs needed for the older existing local database, including the `patients.user_id` column and foreign key added by `0006`.
-- Marks migrations `0000` through `0006` as already applied, only if they are missing.
+- Applies the idempotent schema repairs needed for the older existing local database, including the schema changes covered by `0007` and `0008`.
+- Marks migrations `0000` through `0008` as already applied, only if they are missing.
 
 Important
 
 - Use the repair script only for an existing local database that already contains the clinic tables.
 - Do not use it as the default setup for a brand new empty database.
 - The baseline repair script is not a substitute for `npm run db:migrate`.
-- The baseline repair script includes the equivalent of migration `0006`, but `npm run db:migrate` is still required for any remaining or future migrations.
+- The baseline repair script includes the equivalent of migrations `0000` through `0008`, but `npm run db:migrate` is still required for any remaining future migrations.
 - For a fresh database, keep using:
   - `npm run db:migrate`
   - `npm run db:seed`
