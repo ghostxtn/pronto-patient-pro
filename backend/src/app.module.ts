@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AppointmentsModule } from './appointments/appointments.module';
 import { AvailabilityModule } from './availability/availability.module';
 import { AvailabilityOverridesModule } from './availability-overrides/availability-overrides.module';
@@ -34,6 +35,9 @@ import { StorageModule } from './storage/storage.module';
       isGlobal: true,
       envFilePath: ['.env', '../.env'],
     }),
+    ThrottlerModule.forRoot([
+      { name: 'global', ttl: 60000, limit: 100 },
+    ]),
     HealthModule,
     HomepagePreviewModule,
     DatabaseModule,
@@ -54,6 +58,7 @@ import { StorageModule } from './storage/storage.module';
   providers: [
     TenantResolverService,
     TenantMiddleware,
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
     { provide: APP_GUARD, useClass: TenantGuard },
