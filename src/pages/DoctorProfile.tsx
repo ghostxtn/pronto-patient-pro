@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/services/api";
@@ -31,14 +31,6 @@ const fadeUp = {
   }),
 };
 
-function generateTimeSlots(startTime: string, endTime: string, intervalMin = 30): string[] {
-  const slots: string[] = [];
-  let current = parse(startTime, "HH:mm:ss", new Date());
-  const end = parse(endTime, "HH:mm:ss", new Date());
-  while (isBefore(current, end)) { slots.push(format(current, "HH:mm")); current = addMinutes(current, intervalMin); }
-  return slots;
-}
-
 export default function DoctorProfile() {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
@@ -51,6 +43,7 @@ export default function DoctorProfile() {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [notes, setNotes] = useState("");
+  const [slots, setSlots] = useState<string[]>([]);
 
   const { data: doctor, isLoading } = useQuery({
     queryKey: ["doctor", id],
@@ -67,28 +60,19 @@ export default function DoctorProfile() {
     enabled: !!id,
   });
 
-  const { data: existingAppointments } = useQuery({
-    queryKey: ["doctor-appointments", id, selectedDate],
-    queryFn: async () => {
-      if (!selectedDate) return [];
-      const dateStr = format(selectedDate, "yyyy-MM-dd");
-      const data = await api.appointments.list({
-        doctor_id: id!,
-        date_from: dateStr,
-        date_to: dateStr,
-      });
-      return data
-        .filter((appointment: any) =>
-          appointment.appointment_date === dateStr &&
-          (appointment.status === "pending" || appointment.status === "confirmed"),
-        )
-        .map((appointment: any) => ({
-          start_time: appointment.start_time,
-          end_time: appointment.end_time,
-        }));
-    },
-    enabled: !!id && !!selectedDate,
-  });
+  useEffect(() => {
+    if (!id || !selectedDate) {
+      setSlots([]);
+      return;
+    }
+
+    const dateStr = format(selectedDate, "yyyy-MM-dd");
+
+    void api.availability
+      .getDoctorSlots(id, dateStr)
+      .then((data) => setSlots(data))
+      .catch(() => setSlots([]));
+  }, [id, selectedDate]);
 
   const bookMutation = useMutation({
     mutationFn: async () => {
@@ -111,10 +95,7 @@ export default function DoctorProfile() {
 
   const availableDays = availability?.map((a) => a.day_of_week) || [];
   const isDateDisabled = (date: Date) => { if (isBefore(date, new Date()) && !isToday(date)) return true; return !availableDays.includes(date.getDay()); };
-  const selectedDayAvailability = selectedDate ? availability?.filter((a) => a.day_of_week === selectedDate.getDay()) : [];
-  const allSlots = selectedDayAvailability?.flatMap((a) => generateTimeSlots(a.start_time, a.end_time)) || [];
-  const bookedSlots = existingAppointments?.map((a) => a.start_time.slice(0, 5)) || [];
-  const availableSlots = allSlots.filter((s) => !bookedSlots.includes(s));
+  const availableSlots = slots;
 
   if (isLoading) return <AppLayout><div className="flex items-center justify-center py-20"><div className="h-8 w-8 rounded-full border-2 border-primary border-t-transparent animate-spin" /></div></AppLayout>;
   if (!doctor) return <AppLayout><div className="text-center py-20"><h2 className="font-display font-bold text-xl mb-2">{t.doctorNotFound}</h2><Button variant="outline" onClick={() => navigate("/patient/doctors")}>{t.backToDoctors}</Button></div></AppLayout>;

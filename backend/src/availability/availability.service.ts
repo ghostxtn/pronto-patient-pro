@@ -4,8 +4,12 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { and, eq } from 'drizzle-orm';
-import { doctorAvailability } from '../database/schema';
+import { and, eq, ne } from 'drizzle-orm';
+import {
+  appointments,
+  doctorAvailability,
+  doctorAvailabilityOverrides,
+} from '../database/schema';
 import type { DoctorAvailability } from '../database/schema/doctor-availability.schema';
 import { CreateAvailabilityDto } from './dto/create-availability.dto';
 import { UpdateAvailabilityDto } from './dto/update-availability.dto';
@@ -13,6 +17,115 @@ import { UpdateAvailabilityDto } from './dto/update-availability.dto';
 @Injectable()
 export class AvailabilityService {
   constructor(@Inject('DRIZZLE') private readonly db: any) {}
+
+  async getBookableSlots(
+    clinicId: string,
+    doctorId: string,
+    date: string,
+  ): Promise<string[]> {
+    const dayOfWeek = new Date(`${date}T00:00:00`).getDay();
+    const availabilityBlocks = await this.db
+      .select()
+      .from(doctorAvailability)
+      .where(
+        and(
+          eq(doctorAvailability.doctor_id, doctorId),
+          eq(doctorAvailability.clinic_id, clinicId),
+          eq(doctorAvailability.day_of_week, dayOfWeek),
+          eq(doctorAvailability.is_active, true),
+        ),
+      );
+
+    if (availabilityBlocks.length === 0) {
+      return [];
+    }
+
+    const [override] = await this.db
+      .select()
+      .from(doctorAvailabilityOverrides)
+      .where(
+        and(
+          eq(doctorAvailabilityOverrides.doctor_id, doctorId),
+          eq(doctorAvailabilityOverrides.clinic_id, clinicId),
+          eq(doctorAvailabilityOverrides.date, date),
+        ),
+      )
+      .limit(1);
+
+    if (override?.type === 'blackout') {
+      return [];
+    }
+
+    const slotDuration = availabilityBlocks[0].slot_duration ?? 30;
+    const rawSlots =
+      override?.type === 'custom_hours'
+        ? availabilityBlocks.flatMap((block: DoctorAvailability) => {
+            const slots: string[] = [];
+
+            if (
+              override.start_time &&
+              this.timeToMinutes(override.start_time) >
+                this.timeToMinutes(block.start_time)
+            ) {
+              slots.push(
+                ...this.generateSlots(
+                  block.start_time,
+                  override.start_time,
+                  block.slot_duration ?? 30,
+                ),
+              );
+            }
+
+            if (
+              override.end_time &&
+              this.timeToMinutes(override.end_time) <
+                this.timeToMinutes(block.end_time)
+            ) {
+              slots.push(
+                ...this.generateSlots(
+                  override.end_time,
+                  block.end_time,
+                  block.slot_duration ?? 30,
+                ),
+              );
+            }
+
+            return slots;
+          })
+        : availabilityBlocks.flatMap((block: DoctorAvailability) =>
+            this.generateSlots(
+              block.start_time,
+              block.end_time,
+              block.slot_duration ?? 30,
+            ),
+          );
+
+    if (rawSlots.length === 0) {
+      return [];
+    }
+
+    const existingAppointments = await this.db
+      .select({
+        start_time: appointments.start_time,
+      })
+      .from(appointments)
+      .where(
+        and(
+          eq(appointments.doctor_id, doctorId),
+          eq(appointments.clinic_id, clinicId),
+          eq(appointments.appointment_date, date),
+          ne(appointments.status, 'cancelled'),
+        ),
+      );
+
+    const bookedStarts = new Set(
+      existingAppointments.map((appointment: { start_time: string }) =>
+        appointment.start_time.slice(0, 5),
+      ),
+    );
+
+    return rawSlots.filter((slot: string) => !bookedStarts.has(slot));
+  }
 
   async create(dto: CreateAvailabilityDto, clinicId: string) {
     const existing = await this.db
@@ -170,5 +283,33 @@ export class AvailabilityService {
       );
 
     return { success: true };
+  }
+
+  private generateSlots(
+    startTime: string,
+    endTime: string,
+    slotDuration: number,
+  ): string[] {
+    const slots: string[] = [];
+    let currentMinutes = this.timeToMinutes(startTime);
+    const endMinutes = this.timeToMinutes(endTime);
+
+    while (currentMinutes < endMinutes) {
+      slots.push(this.minutesToTime(currentMinutes));
+      currentMinutes += slotDuration;
+    }
+
+    return slots;
+  }
+
+  private timeToMinutes(time: string): number {
+    const [hours, minutes] = time.slice(0, 5).split(':').map(Number);
+    return hours * 60 + minutes;
+  }
+
+  private minutesToTime(totalMinutes: number): string {
+    const hours = String(Math.floor(totalMinutes / 60)).padStart(2, '0');
+    const minutes = String(totalMinutes % 60).padStart(2, '0');
+    return `${hours}:${minutes}`;
   }
 }

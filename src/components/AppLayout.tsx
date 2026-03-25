@@ -1,9 +1,13 @@
+import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Button } from "@/components/ui/button";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
+import api from "@/services/api";
 import { getDefaultRouteByRole } from "@/lib/auth-routing";
+import { hasActiveDoctorProfile } from "@/lib/doctor-access";
 import {
   Stethoscope, LogOut, LayoutDashboard, Search, CalendarDays, User, Clock, ClipboardList,
   Users, Settings,
@@ -20,6 +24,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const isDoctor = user?.role === "doctor";
   const isPatient = user?.role === "patient";
 
+  const { data: doctorProfile } = useQuery({
+    queryKey: ["layout-doctor-profile", user?.id],
+    queryFn: () => api.doctors.me(),
+    enabled: isOwner || isAdmin,
+    retry: false,
+  });
+
   const patientLinks = [
     { to: "/patient/dashboard", label: t.dashboard, icon: LayoutDashboard },
     { to: "/patient/doctors", label: t.findDoctorsNav, icon: Search },
@@ -35,19 +46,28 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     { to: "/profile", label: t.profile, icon: User },
   ];
 
-  const adminLinks = [
-    { to: "/admin/dashboard", label: t.dashboard, icon: LayoutDashboard },
-    { to: "/admin/doctors", label: t.doctorsNav, icon: Stethoscope },
-    { to: "/admin/staff", label: t.staffNav, icon: Users },
-    { to: "/admin/patients", label: t.patientsNav, icon: Users },
-    { to: "/admin/appointments", label: t.appointmentsNav, icon: CalendarDays },
-    { to: "/admin/settings", label: t.settingsNav, icon: Settings },
-  ];
+  const adminLinks = useMemo(() => {
+    const links = [
+      { to: "/admin/dashboard", label: t.dashboard, icon: LayoutDashboard },
+      { to: "/admin/doctors", label: t.doctorsNav, icon: Stethoscope },
+      { to: "/admin/staff", label: t.staffNav, icon: Users },
+      { to: "/admin/patients", label: t.patientsNav, icon: Users },
+      { to: "/admin/appointments", label: t.appointmentsNav, icon: CalendarDays },
+      { to: "/admin/settings", label: t.settingsNav, icon: Settings },
+    ];
+
+    if ((isOwner || isAdmin) && hasActiveDoctorProfile(doctorProfile)) {
+      links.splice(1, 0, { to: "/doctor/schedule", label: "🩺 Doktor Panelim", icon: Stethoscope });
+    }
+
+    return links;
+  }, [isOwner, isAdmin, doctorProfile, t]);
 
   const staffLinks = [
+    { to: "/staff/dashboard", label: t.dashboard, icon: LayoutDashboard },
+    { to: "/staff/doctors", label: "Doktorlar", icon: Stethoscope },
     { to: "/admin/patients", label: t.patientsNav, icon: Users },
     { to: "/admin/appointments", label: t.appointmentsNav, icon: CalendarDays },
-    { to: "/profile", label: t.profile, icon: User },
   ];
 
   const links =
@@ -67,7 +87,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const defaultRoute = getDefaultRouteByRole(user?.role);
   const homePath =
     isOwner || isAdmin ? "/admin/dashboard"
-    : isStaff ? "/admin/patients"
+    : isStaff ? "/staff/dashboard"
     : isDoctor ? "/doctor/dashboard"
     : defaultRoute === "/patient/dashboard" ? "/patient/dashboard" : "/patient/dashboard";
 
