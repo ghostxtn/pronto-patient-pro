@@ -27,11 +27,13 @@ export class PatientsController {
   }
 
   @Get()
+  @Roles('owner', 'admin', 'doctor', 'staff')
   findAll(@CurrentUser() user: { clinicId: string }) {
     return this.patientsService.findAllByClinic(user.clinicId);
   }
 
   @Get(':id')
+  @Roles('owner', 'admin', 'doctor', 'staff')
   findById(@Param('id') id: string, @CurrentUser() user: { clinicId: string }) {
     return this.patientsService.findById(id, user.clinicId);
   }

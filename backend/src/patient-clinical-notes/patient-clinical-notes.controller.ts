@@ -10,6 +10,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { Roles } from '../common/decorators/roles.decorator';
 import { TenantGuard } from '../common/guards/tenant.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CreateClinicalNoteDto } from './dto/create-clinical-note.dto';
@@ -24,6 +25,7 @@ export class PatientClinicalNotesController {
   ) {}
 
   @Get()
+  @Roles('owner', 'admin', 'doctor', 'staff')
   listByPatient(
     @Query('patient_id') patientId: string,
     @CurrentUser() user: { clinicId: string },
@@ -35,6 +37,7 @@ export class PatientClinicalNotesController {
   }
 
   @Post()
+  @Roles('owner', 'admin', 'doctor')
   create(
     @Body() dto: CreateClinicalNoteDto,
     @CurrentUser() user: { clinicId: string },
@@ -43,6 +46,7 @@ export class PatientClinicalNotesController {
   }
 
   @Patch(':id')
+  @Roles('owner', 'admin', 'doctor')
   update(
     @Param('id') id: string,
     @Body() dto: UpdateClinicalNoteDto,
@@ -52,6 +56,7 @@ export class PatientClinicalNotesController {
   }
 
   @Delete(':id')
+  @Roles('owner', 'admin', 'doctor')
   remove(
     @Param('id') id: string,
     @CurrentUser() user: { clinicId: string },
