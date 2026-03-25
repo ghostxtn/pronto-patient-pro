@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Inject,
   Injectable,
@@ -6,10 +7,11 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import * as bcrypt from 'bcrypt';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import { AuditService } from '../audit/audit.service';
 import { users, patients } from '../database/schema';
 import { RedisService } from '../redis/redis.service';
 
@@ -20,6 +22,7 @@ export class AuthService {
     private readonly redisService: RedisService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly auditService: AuditService,
   ) {}
 
   async register(dto: RegisterDto, clinicId: string) {
@@ -33,6 +36,10 @@ export class AuthService {
       throw new ConflictException('Email already registered');
     }
 
+    if (!dto.kvkkConsent) {
+      throw new BadRequestException('KVKK consent is required');
+    }
+
     const passwordHash = await bcrypt.hash(dto.password, 12);
 
     const [user] = await this.db
@@ -44,6 +51,9 @@ export class AuthService {
         last_name: dto.lastName,
         clinic_id: clinicId,
         role: 'patient',
+        kvkk_consent_at: new Date(),
+        kvkk_consent_version: '1.0',
+        kvkk_consent_ip: null,
       })
       .returning();
 
@@ -61,10 +71,18 @@ export class AuthService {
 
     const { accessToken, refreshToken } = await this.generateTokens(
       user.id,
-      user.email,
       user.role,
       user.clinic_id,
     );
+
+    this.auditService.log({
+      clinicId,
+      userId: user.id,
+      userRole: user.role,
+      action: 'REGISTER',
+      entity: 'auth',
+      entityId: user.id,
+    });
 
     return {
       accessToken,
@@ -92,21 +110,68 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
+    if (user.locked_until && user.locked_until > new Date()) {
+      this.auditService.log({
+        clinicId,
+        userId: user.id,
+        action: 'LOGIN_FAILED',
+        entity: 'auth',
+        metadata: { email: dto.email, reason: 'account_locked' },
+      });
+
+      throw new UnauthorizedException(
+        'Account is temporarily locked. Try again later.',
+      );
+    }
+
     if (!user.password_hash) {
       throw new UnauthorizedException('Use Google login');
     }
 
     const isPasswordValid = await bcrypt.compare(dto.password, user.password_hash);
     if (!isPasswordValid) {
+      const newAttempts = user.failed_login_attempts + 1;
+
+      await this.db
+        .update(users)
+        .set({
+          failed_login_attempts: sql`${users.failed_login_attempts} + 1`,
+          locked_until:
+            newAttempts >= 5 ? new Date(Date.now() + 15 * 60 * 1000) : undefined,
+        })
+        .where(eq(users.id, user.id));
+
+      this.auditService.log({
+        clinicId,
+        action: 'LOGIN_FAILED',
+        entity: 'auth',
+        metadata: { email: dto.email, reason: 'invalid_password' },
+      });
+
       throw new UnauthorizedException('Invalid credentials');
+    }
+
+    if (user.failed_login_attempts > 0) {
+      await this.db
+        .update(users)
+        .set({ failed_login_attempts: 0, locked_until: null })
+        .where(eq(users.id, user.id));
     }
 
     const { accessToken, refreshToken } = await this.generateTokens(
       user.id,
-      user.email,
       user.role,
       user.clinic_id,
     );
+
+    this.auditService.log({
+      clinicId,
+      userId: user.id,
+      userRole: user.role,
+      action: 'LOGIN_SUCCESS',
+      entity: 'auth',
+      entityId: user.id,
+    });
 
     return {
       accessToken,
@@ -153,10 +218,18 @@ export class AuthService {
 
     const { accessToken, refreshToken } = await this.generateTokens(
       user.id,
-      user.email,
       user.role,
       user.clinic_id,
     );
+
+    this.auditService.log({
+      clinicId: user.clinic_id,
+      userId: user.id,
+      userRole: user.role,
+      action: 'TOKEN_REFRESH',
+      entity: 'auth',
+      entityId: user.id,
+    });
 
     return { accessToken, refreshToken };
   }
@@ -197,8 +270,6 @@ export class AuthService {
   }, clinicId: string) {
     console.log('[auth][googleLogin] start', {
       clinicId,
-      email: googleUser.email,
-      googleId: googleUser.googleId,
     });
 
     const [googleUserRecord] = await this.db
@@ -215,7 +286,6 @@ export class AuthService {
     if (googleUserRecord) {
       console.log('[auth][googleLogin] found existing google user', {
         userId: googleUserRecord.id,
-        email: googleUserRecord.email,
         role: googleUserRecord.role,
       });
       const normalizedGoogleUser = await this.ensureGooglePatientUser(
@@ -226,10 +296,18 @@ export class AuthService {
 
       const { accessToken, refreshToken } = await this.generateTokens(
         normalizedGoogleUser.id,
-        normalizedGoogleUser.email,
         normalizedGoogleUser.role,
         normalizedGoogleUser.clinic_id,
       );
+
+      this.auditService.log({
+        clinicId,
+        userId: normalizedGoogleUser.id,
+        userRole: normalizedGoogleUser.role,
+        action: 'LOGIN_SUCCESS',
+        entity: 'auth',
+        metadata: { provider: 'google' },
+      });
 
       return {
         accessToken,
@@ -255,7 +333,6 @@ export class AuthService {
     if (emailUser) {
       console.log('[auth][googleLogin] found existing user by email', {
         userId: emailUser.id,
-        email: emailUser.email,
         role: emailUser.role,
         hasPassword: Boolean(emailUser.password_hash),
       });
@@ -282,10 +359,18 @@ export class AuthService {
 
       const { accessToken, refreshToken } = await this.generateTokens(
         updatedUser.id,
-        updatedUser.email,
         updatedUser.role,
         updatedUser.clinic_id,
       );
+
+      this.auditService.log({
+        clinicId,
+        userId: updatedUser.id,
+        userRole: updatedUser.role,
+        action: 'LOGIN_SUCCESS',
+        entity: 'auth',
+        metadata: { provider: 'google' },
+      });
 
       return {
         accessToken,
@@ -318,17 +403,24 @@ export class AuthService {
 
     console.log('[auth][googleLogin] created new google user', {
       userId: newUser.id,
-      email: newUser.email,
       role: newUser.role,
     });
     await this.ensurePatientProfile(newUser, clinicId);
 
     const { accessToken, refreshToken } = await this.generateTokens(
       newUser.id,
-      newUser.email,
       newUser.role,
       newUser.clinic_id,
     );
+
+    this.auditService.log({
+      clinicId,
+      userId: newUser.id,
+      userRole: newUser.role,
+      action: 'LOGIN_SUCCESS',
+      entity: 'auth',
+      metadata: { provider: 'google' },
+    });
 
     return {
       accessToken,
@@ -347,13 +439,11 @@ export class AuthService {
 
   private async generateTokens(
     userId: string,
-    email: string,
     role: string,
     clinicId: string,
   ) {
     const accessToken = this.jwtService.sign({
       sub: userId,
-      email,
       role,
       clinicId,
     });
@@ -381,7 +471,6 @@ export class AuthService {
     if (user.role === 'staff' && !user.password_hash) {
       console.log('[auth][googleLogin] converting social-only staff user to patient', {
         userId: user.id,
-        email: user.email,
       });
       const [updatedUser] = await this.db
         .update(users)
@@ -411,7 +500,6 @@ export class AuthService {
     if (nextUser.role === 'patient') {
       console.log('[auth][googleLogin] ensuring patient profile for google user', {
         userId: nextUser.id,
-        email: nextUser.email,
       });
       await this.ensurePatientProfile(nextUser, clinicId);
     }
@@ -437,7 +525,6 @@ export class AuthService {
   ) {
     console.log('[auth][googleLogin] ensurePatientProfile start', {
       userId: user.id,
-      email: user.email,
       clinicId,
     });
 
@@ -475,9 +562,8 @@ export class AuthService {
     } catch (error) {
       console.error('[auth][googleLogin] ensurePatientProfile failed', {
         userId: user.id,
-        email: user.email,
         clinicId,
-        error,
+        error: error instanceof Error ? error.message : String(error),
       });
       throw error;
     }

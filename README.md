@@ -104,10 +104,11 @@ Important
 Local seed accounts
 
 - `test-klinik.localhost`
-- Owner: `owner@testklinik.local` / `Owner123!`
-- Admin: `admin@testklinik.local` / `Admin123!`
-- Doctor: `doctor@testklinik.local` / `Doctor123!`
-- Patient: `patient@testklinik.local` / `Patient123!`
+- Owner: `owner@testklinik.local` / `Password123!`
+- Admin: `admin@testklinik.local` / `Password123!`
+- Doctor: `doctor@testklinik.local` / `Password123!
+- Patient: `patient@testklinik.local` / `Password123!`
+- Staff; `staff@testklinik.local` / `Password123!`
 
 - `yeni-klinik.localhost`
 - Owner: `owner@yeniklinik.local` / `Owner123!`

@@ -8,6 +8,7 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
+import { Audit } from '../common/decorators/audit.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
 import { AppointmentsService } from './appointments.service';
@@ -21,6 +22,7 @@ export class AppointmentsController {
   constructor(private readonly appointmentsService: AppointmentsService) {}
 
   @Post()
+  @Audit('CREATE_APPOINTMENT', 'appointment')
   @Roles('owner', 'admin', 'doctor', 'staff', 'patient')
   create(
     @Body() dto: CreateAppointmentDto,
@@ -30,6 +32,7 @@ export class AppointmentsController {
   }
 
   @Get()
+  @Audit('LIST_APPOINTMENTS', 'appointment')
   findAll(
     @CurrentUser() user: { clinicId: string; userId: string; role: string },
     @Query()
@@ -62,11 +65,13 @@ export class AppointmentsController {
   }
 
   @Get(':id')
+  @Audit('VIEW_APPOINTMENT', 'appointment')
   findById(@Param('id') id: string, @CurrentUser() user: { clinicId: string }) {
     return this.appointmentsService.findById(id, user.clinicId);
   }
 
   @Patch(':id')
+  @Audit('UPDATE_APPOINTMENT', 'appointment')
   @Roles('owner', 'admin', 'doctor', 'staff')
   update(
     @Param('id') id: string,
@@ -77,6 +82,7 @@ export class AppointmentsController {
   }
 
   @Patch(':id/status')
+  @Audit('UPDATE_APPOINTMENT_STATUS', 'appointment')
   @Roles('owner', 'admin', 'doctor', 'staff')
   updateStatus(
     @Param('id') id: string,
@@ -87,6 +93,7 @@ export class AppointmentsController {
   }
 
   @Delete(':id')
+  @Audit('DELETE_APPOINTMENT', 'appointment')
   @Roles('owner', 'admin')
   softDelete(
     @Param('id') id: string,
@@ -96,6 +103,7 @@ export class AppointmentsController {
   }
 
   @Post(':appointmentId/notes')
+  @Audit('CREATE_APPOINTMENT_NOTE', 'appointment_note')
   @Roles('doctor')
   createNote(
     @Param('appointmentId') appointmentId: string,
@@ -111,6 +119,7 @@ export class AppointmentsController {
   }
 
   @Get(':appointmentId/notes')
+  @Audit('LIST_APPOINTMENT_NOTES', 'appointment_note')
   @Roles('owner', 'admin', 'doctor')
   findNotesByAppointment(
     @Param('appointmentId') appointmentId: string,
@@ -123,6 +132,7 @@ export class AppointmentsController {
   }
 
   @Patch('notes/:noteId')
+  @Audit('UPDATE_APPOINTMENT_NOTE', 'appointment_note')
   @Roles('doctor')
   updateNote(
     @Param('noteId') noteId: string,
@@ -133,6 +143,7 @@ export class AppointmentsController {
   }
 
   @Delete('notes/:noteId')
+  @Audit('DELETE_APPOINTMENT_NOTE', 'appointment_note')
   @Roles('owner', 'doctor')
   deleteNote(
     @Param('noteId') noteId: string,

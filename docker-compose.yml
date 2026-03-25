@@ -46,6 +46,7 @@ services:
       NODE_ENV: ${NODE_ENV:-development}
       API_PORT: "3000"
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173}
+      ENCRYPTION_MASTER_KEY: ${ENCRYPTION_MASTER_KEY}
     volumes:
       - uploads_data:/app/uploads
     depends_on:

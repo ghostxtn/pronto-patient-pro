@@ -7,6 +7,7 @@ import {
   Patch,
   Post,
 } from '@nestjs/common';
+import { Audit } from '../common/decorators/audit.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CreatePatientDto } from './dto/create-patient.dto';
@@ -18,6 +19,7 @@ export class PatientsController {
   constructor(private readonly patientsService: PatientsService) {}
 
   @Post()
+  @Audit('CREATE_PATIENT', 'patient')
   @Roles('owner', 'admin', 'doctor', 'staff')
   create(
     @Body() dto: CreatePatientDto,
@@ -27,18 +29,21 @@ export class PatientsController {
   }
 
   @Get()
+  @Audit('LIST_PATIENTS', 'patient')
   @Roles('owner', 'admin', 'doctor', 'staff')
   findAll(@CurrentUser() user: { clinicId: string }) {
     return this.patientsService.findAllByClinic(user.clinicId);
   }
 
   @Get(':id')
+  @Audit('VIEW_PATIENT', 'patient')
   @Roles('owner', 'admin', 'doctor', 'staff')
   findById(@Param('id') id: string, @CurrentUser() user: { clinicId: string }) {
     return this.patientsService.findById(id, user.clinicId);
   }
 
   @Patch(':id')
+  @Audit('UPDATE_PATIENT', 'patient')
   @Roles('owner', 'admin', 'doctor', 'staff')
   update(
     @Param('id') id: string,
@@ -49,6 +54,7 @@ export class PatientsController {
   }
 
   @Delete(':id')
+  @Audit('DELETE_PATIENT', 'patient')
   @Roles('owner', 'admin')
   softDelete(
     @Param('id') id: string,

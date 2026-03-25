@@ -1,5 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { mkdirSync } from 'fs';
+import { extname } from 'path';
 import { diskStorage } from 'multer';
 import { randomUUID } from 'crypto';
 
@@ -7,8 +8,15 @@ function ensureDirectory(path: string) {
   mkdirSync(path, { recursive: true });
 }
 
-function createFilename(originalname: string) {
-  return `${randomUUID()}-${Date.now()}-${originalname}`;
+function sanitizeExtension(originalname: string): string {
+  const ext = extname(originalname).toLowerCase().replace(/[^a-z0-9.]/g, '');
+  const allowedExtensions = ['.jpg', '.jpeg', '.png', '.webp', '.pdf'];
+  return allowedExtensions.includes(ext) ? ext : '';
+}
+
+function createFilename(originalname: string): string {
+  const ext = sanitizeExtension(originalname);
+  return `${randomUUID()}${ext}`;
 }
 
 export const avatarMulterOptions = {

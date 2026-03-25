@@ -1,6 +1,7 @@
 import { InferInsertModel, InferSelectModel } from 'drizzle-orm';
 import {
   boolean,
+  integer,
   pgTable,
   timestamp,
   unique,
@@ -27,6 +28,11 @@ export const users = pgTable(
     avatar_url: varchar('avatar_url', { length: 500 }),
     created_at: timestamp('created_at').defaultNow().notNull(),
     updated_at: timestamp('updated_at').defaultNow().notNull(),
+    kvkk_consent_at: timestamp('kvkk_consent_at'),
+    kvkk_consent_version: varchar('kvkk_consent_version', { length: 20 }),
+    kvkk_consent_ip: varchar('kvkk_consent_ip', { length: 45 }),
+    failed_login_attempts: integer('failed_login_attempts').default(0).notNull(),
+    locked_until: timestamp('locked_until'),
   },
   (table) => ({
     usersEmailClinicUnique: unique('users_email_clinic_id_unique').on(
