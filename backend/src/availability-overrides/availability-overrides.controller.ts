@@ -26,7 +26,7 @@ export class AvailabilityOverridesController {
   ) {}
 
   @Get()
-  @Roles('owner', 'admin', 'doctor')
+  @Roles('owner', 'admin', 'doctor', 'staff')
   findAll(
     @CurrentUser() user: { clinicId: string },
     @Query('doctor_id') doctorId?: string,
@@ -59,7 +59,7 @@ export class AvailabilityOverridesController {
   }
 
   @Post()
-  @Roles('owner', 'admin', 'doctor')
+  @Roles('owner', 'admin', 'doctor', 'staff')
   create(
     @Body() dto: CreateAvailabilityOverrideDto,
     @CurrentUser() user: { clinicId: string },
@@ -68,7 +68,7 @@ export class AvailabilityOverridesController {
   }
 
   @Patch(':id')
-  @Roles('owner', 'admin', 'doctor')
+  @Roles('owner', 'admin', 'doctor', 'staff')
   update(
     @Param('id') id: string,
     @Body() dto: UpdateAvailabilityOverrideDto,
@@ -78,7 +78,7 @@ export class AvailabilityOverridesController {
   }
 
   @Delete(':id')
-  @Roles('owner', 'admin', 'doctor')
+  @Roles('owner', 'admin', 'doctor', 'staff')
   remove(
     @Param('id') id: string,
     @CurrentUser() user: { clinicId: string },

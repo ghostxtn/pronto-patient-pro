@@ -6,8 +6,8 @@ import {
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { and, desc, eq, ilike, or } from 'drizzle-orm';
-import { users } from '../database/schema';
-import { CreateStaffDto } from './dto/create-staff.dto';
+import { doctors, users } from '../database/schema';
+import { CreateAdminUserDto } from './dto/create-admin-user.dto';
 import { SetStaffStatusDto } from './dto/set-staff-status.dto';
 import { UpdateStaffDto } from './dto/update-staff.dto';
 
@@ -19,6 +19,51 @@ type StaffListParams = {
 @Injectable()
 export class StaffService {
   constructor(@Inject('DRIZZLE') private readonly db: any) {}
+
+  async createUser(dto: CreateAdminUserDto, clinicId: string) {
+    await this.ensureUniqueEmail(dto.email, clinicId);
+
+    const passwordHash = await bcrypt.hash(dto.password, 12);
+
+    const [createdUser] = await this.db
+      .insert(users)
+      .values({
+        first_name: dto.firstName,
+        last_name: dto.lastName,
+        email: dto.email,
+        phone: dto.phone,
+        password_hash: passwordHash,
+        role: dto.role,
+        clinic_id: clinicId,
+        is_active: true,
+      })
+      .returning({
+        id: users.id,
+        firstName: users.first_name,
+        lastName: users.last_name,
+        email: users.email,
+        phone: users.phone,
+        role: users.role,
+        clinicId: users.clinic_id,
+        isActive: users.is_active,
+        createdAt: users.created_at,
+        updatedAt: users.updated_at,
+      });
+
+    if (dto.doctorProfile) {
+      await this.db.insert(doctors).values({
+        user_id: createdUser.id,
+        specialization_id: dto.doctorProfile.specializationId,
+        clinic_id: clinicId,
+        title: dto.doctorProfile.title,
+        bio: dto.doctorProfile.bio,
+        phone: dto.phone,
+        is_active: true,
+      });
+    }
+
+    return createdUser;
+  }
 
   async findAllByClinic(clinicId: string, params: StaffListParams = {}) {
     const conditions = [
@@ -63,13 +108,12 @@ export class StaffService {
       .orderBy(desc(users.created_at));
   }
 
-  async create(dto: CreateStaffDto, clinicId: string) {
+  async create(dto: CreateAdminUserDto, clinicId: string) {
     await this.ensureUniqueEmail(dto.email, clinicId);
 
-    const temporaryPassword = this.generateTemporaryPassword();
-    const passwordHash = await bcrypt.hash(temporaryPassword, 12);
+    const passwordHash = await bcrypt.hash(dto.password, 12);
 
-    const [staffUser] = await this.db
+    const [createdUser] = await this.db
       .insert(users)
       .values({
         first_name: dto.firstName,
@@ -77,9 +121,9 @@ export class StaffService {
         email: dto.email,
         phone: dto.phone,
         password_hash: passwordHash,
-        role: 'staff',
+        role: dto.role,
         clinic_id: clinicId,
-        is_active: dto.isActive ?? true,
+        is_active: true,
       })
       .returning({
         id: users.id,
@@ -94,10 +138,19 @@ export class StaffService {
         updatedAt: users.updated_at,
       });
 
-    return {
-      ...staffUser,
-      temporaryPassword,
-    };
+    if (dto.doctorProfile) {
+      await this.db.insert(doctors).values({
+        user_id: createdUser.id,
+        specialization_id: dto.doctorProfile.specializationId,
+        clinic_id: clinicId,
+        title: dto.doctorProfile.title,
+        bio: dto.doctorProfile.bio,
+        phone: dto.phone,
+        is_active: true,
+      });
+    }
+
+    return createdUser;
   }
 
   async update(id: string, dto: UpdateStaffDto, clinicId: string) {
@@ -214,10 +267,5 @@ export class StaffService {
     if (existingUser && existingUser.id !== excludeUserId) {
       throw new BadRequestException('Email already in use');
     }
-  }
-
-  private generateTemporaryPassword() {
-    const randomChunk = Math.random().toString(36).slice(-8);
-    return `Tmp${randomChunk}9!`;
   }
 }

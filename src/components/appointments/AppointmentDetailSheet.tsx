@@ -10,6 +10,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { cn } from "@/lib/utils";
 import api from "@/services/api";
@@ -40,8 +41,10 @@ export function AppointmentDetailSheet({
   onClose,
   onStatusUpdate,
 }: AppointmentDetailSheetProps) {
+  const { user } = useAuth();
   const { t } = useLanguage();
   const queryClient = useQueryClient();
+  const isStaff = user?.role === "staff";
   const [isNoteFormOpen, setIsNoteFormOpen] = useState(false);
   const [diagnosis, setDiagnosis] = useState("");
   const [treatment, setTreatment] = useState("");
@@ -68,7 +71,7 @@ export function AppointmentDetailSheet({
   const { data: clinicalNotes, isLoading: isClinicalNotesLoading } = useQuery<ClinicalNote[]>({
     queryKey: ["clinical-notes", appointment?.patient.id],
     queryFn: async () => api.clinicalNotes.listByPatient(appointment!.patient.id),
-    enabled: open && Boolean(appointment?.patient.id),
+    enabled: !isStaff && open && Boolean(appointment?.patient.id),
   });
 
   const hasAtLeastOneField = [diagnosis, treatment, prescription, notes].some(
@@ -189,133 +192,135 @@ export function AppointmentDetailSheet({
                 </Button>
               ) : null}
 
-              <div className="border-t pt-4">
-                <div className="space-y-4">
-                  <div>
-                    <h4 className="font-display font-semibold">Geçmiş Notlar</h4>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      Hastaya ait önceki klinik notlar burada listelenir.
-                    </p>
-                  </div>
-
-                  {isClinicalNotesLoading ? (
-                    <div className="flex items-center gap-2 rounded-xl bg-muted p-3 text-sm text-muted-foreground">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Klinik notlar yükleniyor...
+              {!isStaff && (
+                <div className="border-t pt-4">
+                  <div className="space-y-4">
+                    <div>
+                      <h4 className="font-display font-semibold">Geçmiş Notlar</h4>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        Hastaya ait önceki klinik notlar burada listelenir.
+                      </p>
                     </div>
-                  ) : clinicalNotes && clinicalNotes.length > 0 ? (
-                    <div className="space-y-3">
-                      {clinicalNotes.map((note) => (
-                        <Card key={note.id} className="rounded-2xl border-border/60 shadow-none">
-                          <CardHeader className="space-y-2 pb-3">
-                            <div className="flex items-start justify-between gap-3">
-                              <CardTitle className="text-base font-semibold">
-                                {[note.doctor.title, note.doctor.firstName, note.doctor.lastName]
-                                  .filter(Boolean)
-                                  .join(" ")}
-                              </CardTitle>
-                              <span className="text-xs text-muted-foreground">
-                                {format(new Date(note.created_at), "d MMMM yyyy, HH:mm", {
-                                  locale: tr,
-                                })}
-                              </span>
-                            </div>
-                          </CardHeader>
-                          <CardContent className="space-y-2 text-sm">
-                            {note.diagnosis ? <p><span className="font-medium">Tanı:</span> {note.diagnosis}</p> : null}
-                            {note.treatment ? <p><span className="font-medium">Tedavi:</span> {note.treatment}</p> : null}
-                            {note.prescription ? <p><span className="font-medium">Reçete:</span> {note.prescription}</p> : null}
-                            {note.notes ? <p><span className="font-medium">Not:</span> {note.notes}</p> : null}
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">
-                      Henüz klinik not eklenmemiş.
-                    </p>
-                  )}
 
-                  <div className="space-y-3 rounded-2xl bg-muted/40 p-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <h4 className="font-display font-semibold">Yeni Not Ekle</h4>
-                        <p className="mt-1 text-sm text-muted-foreground">
-                          Tanı, tedavi, reçete veya genel not bilgisi ekleyin.
-                        </p>
+                    {isClinicalNotesLoading ? (
+                      <div className="flex items-center gap-2 rounded-xl bg-muted p-3 text-sm text-muted-foreground">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Klinik notlar yükleniyor...
                       </div>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="rounded-xl"
-                        onClick={() => setIsNoteFormOpen((current) => !current)}
-                      >
-                        ＋ Yeni Klinik Not Ekle
-                      </Button>
-                    </div>
+                    ) : clinicalNotes && clinicalNotes.length > 0 ? (
+                      <div className="space-y-3">
+                        {clinicalNotes.map((note) => (
+                          <Card key={note.id} className="rounded-2xl border-border/60 shadow-none">
+                            <CardHeader className="space-y-2 pb-3">
+                              <div className="flex items-start justify-between gap-3">
+                                <CardTitle className="text-base font-semibold">
+                                  {[note.doctor.title, note.doctor.firstName, note.doctor.lastName]
+                                    .filter(Boolean)
+                                    .join(" ")}
+                                </CardTitle>
+                                <span className="text-xs text-muted-foreground">
+                                  {format(new Date(note.created_at), "d MMMM yyyy, HH:mm", {
+                                    locale: tr,
+                                  })}
+                                </span>
+                              </div>
+                            </CardHeader>
+                            <CardContent className="space-y-2 text-sm">
+                              {note.diagnosis ? <p><span className="font-medium">Tanı:</span> {note.diagnosis}</p> : null}
+                              {note.treatment ? <p><span className="font-medium">Tedavi:</span> {note.treatment}</p> : null}
+                              {note.prescription ? <p><span className="font-medium">Reçete:</span> {note.prescription}</p> : null}
+                              {note.notes ? <p><span className="font-medium">Not:</span> {note.notes}</p> : null}
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        Henüz klinik not eklenmemiş.
+                      </p>
+                    )}
 
-                    {isNoteFormOpen ? (
-                      <div className="space-y-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="clinical-note-diagnosis">Tanı</Label>
-                          <Textarea
-                            id="clinical-note-diagnosis"
-                            value={diagnosis}
-                            onChange={(e) => setDiagnosis(e.target.value)}
-                            className="rounded-xl text-sm"
-                            rows={3}
-                          />
+                    <div className="space-y-3 rounded-2xl bg-muted/40 p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <h4 className="font-display font-semibold">Yeni Not Ekle</h4>
+                          <p className="mt-1 text-sm text-muted-foreground">
+                            Tanı, tedavi, reçete veya genel not bilgisi ekleyin.
+                          </p>
                         </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="clinical-note-treatment">Tedavi</Label>
-                          <Textarea
-                            id="clinical-note-treatment"
-                            value={treatment}
-                            onChange={(e) => setTreatment(e.target.value)}
-                            className="rounded-xl text-sm"
-                            rows={3}
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="clinical-note-prescription">Reçete</Label>
-                          <Textarea
-                            id="clinical-note-prescription"
-                            value={prescription}
-                            onChange={(e) => setPrescription(e.target.value)}
-                            className="rounded-xl text-sm"
-                            rows={3}
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="clinical-note-notes">Genel Not</Label>
-                          <Textarea
-                            id="clinical-note-notes"
-                            value={notes}
-                            onChange={(e) => setNotes(e.target.value)}
-                            className="rounded-xl text-sm"
-                            rows={4}
-                          />
-                        </div>
-
                         <Button
                           type="button"
-                          className="w-full rounded-xl"
-                          onClick={() => createClinicalNote.mutate()}
-                          disabled={!hasAtLeastOneField || createClinicalNote.isPending}
+                          variant="outline"
+                          className="rounded-xl"
+                          onClick={() => setIsNoteFormOpen((current) => !current)}
                         >
-                          {createClinicalNote.isPending ? (
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          ) : null}
-                          Kaydet
+                          ＋ Yeni Klinik Not Ekle
                         </Button>
                       </div>
-                    ) : null}
+
+                      {isNoteFormOpen ? (
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="clinical-note-diagnosis">Tanı</Label>
+                            <Textarea
+                              id="clinical-note-diagnosis"
+                              value={diagnosis}
+                              onChange={(e) => setDiagnosis(e.target.value)}
+                              className="rounded-xl text-sm"
+                              rows={3}
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="clinical-note-treatment">Tedavi</Label>
+                            <Textarea
+                              id="clinical-note-treatment"
+                              value={treatment}
+                              onChange={(e) => setTreatment(e.target.value)}
+                              className="rounded-xl text-sm"
+                              rows={3}
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="clinical-note-prescription">Reçete</Label>
+                            <Textarea
+                              id="clinical-note-prescription"
+                              value={prescription}
+                              onChange={(e) => setPrescription(e.target.value)}
+                              className="rounded-xl text-sm"
+                              rows={3}
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="clinical-note-notes">Genel Not</Label>
+                            <Textarea
+                              id="clinical-note-notes"
+                              value={notes}
+                              onChange={(e) => setNotes(e.target.value)}
+                              className="rounded-xl text-sm"
+                              rows={4}
+                            />
+                          </div>
+
+                          <Button
+                            type="button"
+                            className="w-full rounded-xl"
+                            onClick={() => createClinicalNote.mutate()}
+                            disabled={!hasAtLeastOneField || createClinicalNote.isPending}
+                          >
+                            {createClinicalNote.isPending ? (
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            ) : null}
+                            Kaydet
+                          </Button>
+                        </div>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
             </div>
           </>
         ) : null}

@@ -51,6 +51,10 @@ function getRefreshToken() {
   return localStorage.getItem(REFRESH_TOKEN_KEY);
 }
 
+type ApiRequestOptions = RequestInit & {
+  omitAuth?: boolean;
+};
+
 function getClinicDomainHeader() {
   if (typeof window === "undefined") {
     return null;
@@ -125,7 +129,7 @@ async function refreshAccessToken() {
 
 export async function request<T>(
   endpoint: string,
-  options: RequestInit = {},
+  options: ApiRequestOptions = {},
   retry = true,
 ): Promise<T> {
   const headers = new Headers(options.headers || {});
@@ -133,7 +137,7 @@ export async function request<T>(
   const isFormData = typeof FormData !== "undefined" && options.body instanceof FormData;
   const clinicDomain = getClinicDomainHeader();
 
-  if (accessToken) {
+  if (!options.omitAuth && accessToken) {
     headers.set("Authorization", `Bearer ${accessToken}`);
   }
 
@@ -152,7 +156,7 @@ export async function request<T>(
 
   const body = await parseResponse(response);
 
-  if (response.status === 401 && retry && endpoint !== "/auth/refresh") {
+  if (response.status === 401 && retry && !options.omitAuth && endpoint !== "/auth/refresh") {
     debugAuthLog("request received 401, attempting refresh", { endpoint });
 
     let nextAccessToken: string;
@@ -174,6 +178,9 @@ export async function request<T>(
     const retryHeaders = new Headers(options.headers || {});
 
     retryHeaders.set("Authorization", `Bearer ${nextAccessToken}`);
+    if (clinicDomain && !retryHeaders.has("X-Clinic-Domain")) {
+      retryHeaders.set("X-Clinic-Domain", clinicDomain);
+    }
     if (!isFormData && options.body && !retryHeaders.has("Content-Type")) {
       retryHeaders.set("Content-Type", "application/json");
     }
@@ -359,6 +366,7 @@ const api = {
         }>
       >("/doctors/public-discovery"),
     get: (id: string) => request<any>(`/doctors/${id}`),
+    me: () => request<any>("/doctors/me"),
     create: (data: unknown) =>
       request<any>("/doctors", {
         method: "POST",
@@ -376,6 +384,11 @@ const api = {
   },
   availability: {
     listByDoctor: (doctorId: string) => request<any[]>(`/availability/${doctorId}`),
+    getDoctorSlots: (doctorId: string, date: string) =>
+      request<string[]>(
+        `/availability/slots?doctor_id=${encodeURIComponent(doctorId)}&date=${encodeURIComponent(date)}`,
+        { omitAuth: true },
+      ),
     create: (data: {
       doctorId: string;
       dayOfWeek: number;

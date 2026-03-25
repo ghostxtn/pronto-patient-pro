@@ -32,6 +32,7 @@ import ClinicSettings from "./pages/admin/ClinicSettings";
 import OwnerDashboard from "./pages/owner/OwnerDashboard";
 import Profile from "./pages/Profile";
 import StaffDashboard from "./pages/staff/StaffDashboard";
+import StaffDoctors from "./pages/staff/StaffDoctors";
 import NotFound from "./pages/NotFound";
 
 // Public pages
@@ -124,6 +125,7 @@ const App = () => (
 
                 <Route element={<RequireRole allowedRoles={["owner", "admin", "staff"]} />}>
                   <Route path="/staff/dashboard" element={<StaffDashboard />} />
+                  <Route path="/staff/doctors" element={<StaffDoctors />} />
                   <Route path="/admin/patients" element={<ManagePatients />} />
                   <Route path="/admin/appointments" element={<ManageAppointments />} />
                 </Route>

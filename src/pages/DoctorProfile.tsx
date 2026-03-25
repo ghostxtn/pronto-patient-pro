@@ -31,14 +31,6 @@ const fadeUp = {
   }),
 };
 
-function generateTimeSlots(startTime: string, endTime: string, intervalMin = 30): string[] {
-  const slots: string[] = [];
-  let current = parse(startTime, "HH:mm:ss", new Date());
-  const end = parse(endTime, "HH:mm:ss", new Date());
-  while (isBefore(current, end)) { slots.push(format(current, "HH:mm")); current = addMinutes(current, intervalMin); }
-  return slots;
-}
-
 export default function DoctorProfile() {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
@@ -51,7 +43,7 @@ export default function DoctorProfile() {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [notes, setNotes] = useState("");
-  const [overrides, setOverrides] = useState<any[]>([]);
+  const [slots, setSlots] = useState<string[]>([]);
 
   const { data: doctor, isLoading } = useQuery({
     queryKey: ["doctor", id],
@@ -68,41 +60,18 @@ export default function DoctorProfile() {
     enabled: !!id,
   });
 
-  const { data: existingAppointments } = useQuery({
-    queryKey: ["doctor-appointments", id, selectedDate],
-    queryFn: async () => {
-      if (!selectedDate) return [];
-      const dateStr = format(selectedDate, "yyyy-MM-dd");
-      const data = await api.appointments.list({
-        doctor_id: id!,
-        date_from: dateStr,
-        date_to: dateStr,
-      });
-      return data
-        .filter((appointment: any) =>
-          appointment.appointment_date === dateStr &&
-          (appointment.status === "pending" || appointment.status === "confirmed"),
-        )
-        .map((appointment: any) => ({
-          start_time: appointment.start_time,
-          end_time: appointment.end_time,
-        }));
-    },
-    enabled: !!id && !!selectedDate,
-  });
-
   useEffect(() => {
     if (!id || !selectedDate) {
-      setOverrides([]);
+      setSlots([]);
       return;
     }
 
     const dateStr = format(selectedDate, "yyyy-MM-dd");
 
-    void api.availabilityOverrides
-      .listByDoctor(id, dateStr, dateStr)
-      .then((data) => setOverrides(data))
-      .catch(() => setOverrides([]));
+    void api.availability
+      .getDoctorSlots(id, dateStr)
+      .then((data) => setSlots(data))
+      .catch(() => setSlots([]));
   }, [id, selectedDate]);
 
   const bookMutation = useMutation({
@@ -126,18 +95,7 @@ export default function DoctorProfile() {
 
   const availableDays = availability?.map((a) => a.day_of_week) || [];
   const isDateDisabled = (date: Date) => { if (isBefore(date, new Date()) && !isToday(date)) return true; return !availableDays.includes(date.getDay()); };
-  const selectedDayAvailability = selectedDate ? availability?.filter((a) => a.day_of_week === selectedDate.getDay()) : [];
-  const selectedDateStr = selectedDate ? format(selectedDate, "yyyy-MM-dd") : null;
-  const override = selectedDateStr ? overrides.find((o) => o.date === selectedDateStr) : undefined;
-  const allSlots = override?.override_type === "blackout"
-    ? []
-    : selectedDayAvailability?.flatMap((a) => {
-        const startTime = override?.override_type === "custom_hours" ? override.start_time : a.start_time;
-        const endTime = override?.override_type === "custom_hours" ? override.end_time : a.end_time;
-        return generateTimeSlots(startTime, endTime, a.slot_duration ?? 30);
-      }) || [];
-  const bookedSlots = existingAppointments?.map((a) => a.start_time.slice(0, 5)) || [];
-  const availableSlots = allSlots.filter((s) => !bookedSlots.includes(s));
+  const availableSlots = slots;
 
   if (isLoading) return <AppLayout><div className="flex items-center justify-center py-20"><div className="h-8 w-8 rounded-full border-2 border-primary border-t-transparent animate-spin" /></div></AppLayout>;
   if (!doctor) return <AppLayout><div className="text-center py-20"><h2 className="font-display font-bold text-xl mb-2">{t.doctorNotFound}</h2><Button variant="outline" onClick={() => navigate("/patient/doctors")}>{t.backToDoctors}</Button></div></AppLayout>;
