@@ -15,6 +15,11 @@ import { AuditService } from '../audit/audit.service';
 import { users, patients } from '../database/schema';
 import { RedisService } from '../redis/redis.service';
 
+interface RequestContext {
+  ipAddress?: string;
+  requestId?: string;
+}
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -25,7 +30,7 @@ export class AuthService {
     private readonly auditService: AuditService,
   ) {}
 
-  async register(dto: RegisterDto, clinicId: string) {
+  async register(dto: RegisterDto, clinicId: string, ctx?: RequestContext) {
     const [existingUser] = await this.db
       .select()
       .from(users)
@@ -82,6 +87,8 @@ export class AuthService {
       action: 'REGISTER',
       entity: 'auth',
       entityId: user.id,
+      ipAddress: ctx?.ipAddress,
+      requestId: ctx?.requestId,
     });
 
     return {
@@ -99,7 +106,7 @@ export class AuthService {
     };
   }
 
-  async login(dto: LoginDto, clinicId: string) {
+  async login(dto: LoginDto, clinicId: string, ctx?: RequestContext) {
     const [user] = await this.db
       .select()
       .from(users)
@@ -116,6 +123,8 @@ export class AuthService {
         userId: user.id,
         action: 'LOGIN_FAILED',
         entity: 'auth',
+        ipAddress: ctx?.ipAddress,
+        requestId: ctx?.requestId,
         metadata: { email: dto.email, reason: 'account_locked' },
       });
 
@@ -145,6 +154,8 @@ export class AuthService {
         clinicId,
         action: 'LOGIN_FAILED',
         entity: 'auth',
+        ipAddress: ctx?.ipAddress,
+        requestId: ctx?.requestId,
         metadata: { email: dto.email, reason: 'invalid_password' },
       });
 
@@ -171,6 +182,8 @@ export class AuthService {
       action: 'LOGIN_SUCCESS',
       entity: 'auth',
       entityId: user.id,
+      ipAddress: ctx?.ipAddress,
+      requestId: ctx?.requestId,
     });
 
     return {

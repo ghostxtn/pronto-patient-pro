@@ -22,6 +22,10 @@ async function bootstrap() {
   app.use(helmet({
     contentSecurityPolicy: false,
     hsts: false,
+    xContentTypeOptions: false,
+    xFrameOptions: false,
+    referrerPolicy: false,
+    xXssProtection: false,
   }));
   app.enableCors({
     origin: (
