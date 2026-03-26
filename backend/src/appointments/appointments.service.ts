@@ -9,6 +9,7 @@ import { UpdateAppointmentDto } from './dto/update-appointment.dto';
 @Injectable()
 export class AppointmentsService {
   private readonly NOTE_ENCRYPTED_FIELDS = ['diagnosis', 'treatment', 'prescription', 'notes'];
+  private readonly PATIENT_ENCRYPTED_FIELDS = ['firstName', 'lastName', 'email'];
 
   constructor(
     @Inject('DRIZZLE') private readonly db: any,
@@ -104,7 +105,7 @@ export class AppointmentsService {
       conditions.push(eq(appointments.status, filters.status));
     }
 
-    return this.db
+    const results = await this.db
       .select({
         id: appointments.id,
         clinic_id: appointments.clinic_id,
@@ -138,6 +139,19 @@ export class AppointmentsService {
       .innerJoin(doctors, eq(appointments.doctor_id, doctors.id))
       .innerJoin(users, eq(doctors.user_id, users.id))
       .where(and(...conditions));
+
+    return Promise.all(
+      results.map(async (row: any) => ({
+        ...row,
+        patient: row.patient
+          ? await this.encryptionService.decryptFields(
+              row.patient,
+              this.PATIENT_ENCRYPTED_FIELDS,
+              clinicId,
+            )
+          : row.patient,
+      })),
+    );
   }
 
   async findById(id: string, clinicId: string) {
