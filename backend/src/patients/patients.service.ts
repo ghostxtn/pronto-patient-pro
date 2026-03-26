@@ -1,38 +1,70 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
 import { patients } from '../database/schema';
+import { EncryptionService } from '../encryption/encryption.service';
 import { CreatePatientDto } from './dto/create-patient.dto';
 import { UpdatePatientDto } from './dto/update-patient.dto';
 
 @Injectable()
 export class PatientsService {
-  constructor(@Inject('DRIZZLE') private readonly db: any) {}
+  private readonly ENCRYPTED_FIELDS = [
+    'first_name',
+    'last_name',
+    'tc_no',
+    'phone',
+    'email',
+    'address',
+  ];
+
+  constructor(
+    @Inject('DRIZZLE') private readonly db: any,
+    private readonly encryptionService: EncryptionService,
+  ) {}
 
   async create(dto: CreatePatientDto, clinicId: string) {
-    const [patient] = await this.db
-      .insert(patients)
-      .values({
-        clinic_id: clinicId,
-        first_name: dto.firstName,
-        last_name: dto.lastName,
-        tc_no: dto.tcNo,
-        birth_date: dto.birthDate,
-        gender: dto.gender,
-        phone: dto.phone,
-        email: dto.email,
-        address: dto.address,
-        notes: dto.notes,
-      })
-      .returning();
+    const rawData: Record<string, any> = {
+      clinic_id: clinicId,
+      first_name: dto.firstName,
+      last_name: dto.lastName,
+      tc_no: dto.tcNo,
+      birth_date: dto.birthDate,
+      gender: dto.gender,
+      phone: dto.phone,
+      email: dto.email,
+      address: dto.address,
+      notes: dto.notes,
+    };
 
-    return patient;
+    if (rawData.tc_no) {
+      rawData.tc_no_hash = await this.encryptionService.hmac(rawData.tc_no, clinicId);
+    }
+
+    const encryptedData = await this.encryptionService.encryptFields(
+      rawData,
+      this.ENCRYPTED_FIELDS,
+      clinicId,
+    );
+
+    const [patient] = await this.db.insert(patients).values(encryptedData).returning();
+
+    return this.encryptionService.decryptFields(
+      patient,
+      this.ENCRYPTED_FIELDS,
+      clinicId,
+    );
   }
 
   async findAllByClinic(clinicId: string) {
-    return this.db
+    const results = await this.db
       .select()
       .from(patients)
       .where(and(eq(patients.clinic_id, clinicId), eq(patients.is_active, true)));
+
+    return Promise.all(
+      results.map((p: any) =>
+        this.encryptionService.decryptFields(p, this.ENCRYPTED_FIELDS, clinicId),
+      ),
+    );
   }
 
   async findById(id: string, clinicId: string) {
@@ -46,7 +78,11 @@ export class PatientsService {
       throw new NotFoundException('Patient not found');
     }
 
-    return patient;
+    return this.encryptionService.decryptFields(
+      patient,
+      this.ENCRYPTED_FIELDS,
+      clinicId,
+    );
   }
 
   async update(id: string, dto: UpdatePatientDto, clinicId: string) {
@@ -84,13 +120,33 @@ export class PatientsService {
       updateData.notes = dto.notes;
     }
 
+    if (updateData.tc_no) {
+      updateData.tc_no_hash = await this.encryptionService.hmac(
+        updateData.tc_no as string,
+        clinicId,
+      );
+    }
+
+    const fieldsToEncrypt = this.ENCRYPTED_FIELDS.filter(
+      (f) => updateData[f] !== undefined,
+    );
+    const encryptedUpdate = await this.encryptionService.encryptFields(
+      updateData,
+      fieldsToEncrypt,
+      clinicId,
+    );
+
     const [patient] = await this.db
       .update(patients)
-      .set(updateData)
+      .set(encryptedUpdate)
       .where(eq(patients.id, id))
       .returning();
 
-    return patient;
+    return this.encryptionService.decryptFields(
+      patient,
+      this.ENCRYPTED_FIELDS,
+      clinicId,
+    );
   }
 
   async softDelete(id: string, clinicId: string) {
@@ -105,6 +161,25 @@ export class PatientsService {
       .where(eq(patients.id, id))
       .returning();
 
-    return patient;
+    return this.encryptionService.decryptFields(
+      patient,
+      this.ENCRYPTED_FIELDS,
+      clinicId,
+    );
+  }
+
+  async findByTcNo(tcNo: string, clinicId: string) {
+    const hash = await this.encryptionService.hmac(tcNo, clinicId);
+    const results = await this.db
+      .select()
+      .from(patients)
+      .where(and(eq(patients.tc_no_hash, hash), eq(patients.clinic_id, clinicId)))
+      .limit(1);
+    if (results.length === 0) return null;
+    return this.encryptionService.decryptFields(
+      results[0],
+      this.ENCRYPTED_FIELDS,
+      clinicId,
+    );
   }
 }

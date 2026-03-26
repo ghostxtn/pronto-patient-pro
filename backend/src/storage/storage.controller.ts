@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Response } from 'express';
+import { Audit } from '../common/decorators/audit.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
 import {
@@ -24,6 +25,7 @@ export class StorageController {
   constructor(private readonly storageService: StorageService) {}
 
   @Post('avatar')
+  @Audit('UPLOAD_AVATAR', 'file')
   @UseInterceptors(FileInterceptor('file', avatarMulterOptions))
   async uploadAvatar(
     @CurrentUser() user: { userId: string },
@@ -37,6 +39,7 @@ export class StorageController {
   }
 
   @Post('appointments/:appointmentId/files')
+  @Audit('UPLOAD_FILE', 'file')
   @Roles('owner', 'admin', 'doctor')
   @UseInterceptors(FileInterceptor('file', appointmentFileMulterOptions))
   async uploadAppointmentFile(
@@ -69,6 +72,7 @@ export class StorageController {
   }
 
   @Get('files/:fileId/download')
+  @Audit('DOWNLOAD_FILE', 'file')
   async downloadFile(
     @Param('fileId') fileId: string,
     @CurrentUser() user: { clinicId: string },
@@ -79,6 +83,7 @@ export class StorageController {
   }
 
   @Delete('files/:fileId')
+  @Audit('DELETE_FILE', 'file')
   @Roles('owner', 'admin', 'doctor')
   deleteFile(
     @Param('fileId') fileId: string,

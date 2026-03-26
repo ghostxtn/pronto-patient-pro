@@ -1,13 +1,20 @@
 import { ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { and, eq, gte, lte } from 'drizzle-orm';
 import { appointmentNotes, appointments, doctors, patients, users } from '../database/schema';
+import { EncryptionService } from '../encryption/encryption.service';
 import { CreateAppointmentNoteDto } from './dto/create-appointment-note.dto';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
 import { UpdateAppointmentDto } from './dto/update-appointment.dto';
 
 @Injectable()
 export class AppointmentsService {
-  constructor(@Inject('DRIZZLE') private readonly db: any) {}
+  private readonly NOTE_ENCRYPTED_FIELDS = ['diagnosis', 'treatment', 'prescription', 'notes'];
+  private readonly PATIENT_ENCRYPTED_FIELDS = ['firstName', 'lastName', 'email'];
+
+  constructor(
+    @Inject('DRIZZLE') private readonly db: any,
+    private readonly encryptionService: EncryptionService,
+  ) {}
 
   async create(dto: CreateAppointmentDto, clinicId: string, userRole: string, userId: string) {
     if (userRole === 'patient') {
@@ -98,7 +105,7 @@ export class AppointmentsService {
       conditions.push(eq(appointments.status, filters.status));
     }
 
-    return this.db
+    const results = await this.db
       .select({
         id: appointments.id,
         clinic_id: appointments.clinic_id,
@@ -132,6 +139,19 @@ export class AppointmentsService {
       .innerJoin(doctors, eq(appointments.doctor_id, doctors.id))
       .innerJoin(users, eq(doctors.user_id, users.id))
       .where(and(...conditions));
+
+    return Promise.all(
+      results.map(async (row: any) => ({
+        ...row,
+        patient: row.patient
+          ? await this.encryptionService.decryptFields(
+              row.patient,
+              this.PATIENT_ENCRYPTED_FIELDS,
+              clinicId,
+            )
+          : row.patient,
+      })),
+    );
   }
 
   async findById(id: string, clinicId: string) {
@@ -218,24 +238,34 @@ export class AppointmentsService {
   ) {
     await this.findById(appointmentId, clinicId);
 
+    const rawValues = {
+      appointment_id: appointmentId,
+      clinic_id: clinicId,
+      doctor_id: doctorId,
+      diagnosis: dto.diagnosis,
+      treatment: dto.treatment,
+      prescription: dto.prescription,
+      notes: dto.notes,
+    };
+    const encrypted = await this.encryptionService.encryptFields(
+      rawValues,
+      this.NOTE_ENCRYPTED_FIELDS,
+      clinicId,
+    );
     const [note] = await this.db
       .insert(appointmentNotes)
-      .values({
-        appointment_id: appointmentId,
-        clinic_id: clinicId,
-        doctor_id: doctorId,
-        diagnosis: dto.diagnosis,
-        treatment: dto.treatment,
-        prescription: dto.prescription,
-        notes: dto.notes,
-      })
+      .values(encrypted)
       .returning();
 
-    return note;
+    return this.encryptionService.decryptFields(
+      note,
+      this.NOTE_ENCRYPTED_FIELDS,
+      clinicId,
+    );
   }
 
   async findNotesByAppointment(appointmentId: string, clinicId: string) {
-    return this.db
+    const results = await this.db
       .select()
       .from(appointmentNotes)
       .where(
@@ -244,6 +274,16 @@ export class AppointmentsService {
           eq(appointmentNotes.clinic_id, clinicId),
         ),
       );
+
+    return Promise.all(
+      results.map((n: any) =>
+        this.encryptionService.decryptFields(
+          n,
+          this.NOTE_ENCRYPTED_FIELDS,
+          clinicId,
+        ),
+      ),
+    );
   }
 
   async updateNote(
@@ -266,16 +306,28 @@ export class AppointmentsService {
       throw new NotFoundException('Appointment note not found');
     }
 
+    const fieldsToEncrypt = this.NOTE_ENCRYPTED_FIELDS.filter(
+      (f) => (dto as any)[f] !== undefined,
+    );
+    const encryptedDto = await this.encryptionService.encryptFields(
+      { ...dto },
+      fieldsToEncrypt,
+      clinicId,
+    );
     const [note] = await this.db
       .update(appointmentNotes)
       .set({
-        ...dto,
+        ...encryptedDto,
         updated_at: new Date(),
       })
       .where(eq(appointmentNotes.id, noteId))
       .returning();
 
-    return note;
+    return this.encryptionService.decryptFields(
+      note,
+      this.NOTE_ENCRYPTED_FIELDS,
+      clinicId,
+    );
   }
 
   async deleteNote(noteId: string, clinicId: string) {
@@ -299,6 +351,10 @@ export class AppointmentsService {
       .where(eq(appointmentNotes.id, noteId))
       .returning();
 
-    return deletedNote;
+    return this.encryptionService.decryptFields(
+      deletedNote,
+      this.NOTE_ENCRYPTED_FIELDS,
+      clinicId,
+    );
   }
 }

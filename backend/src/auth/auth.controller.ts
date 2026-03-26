@@ -9,7 +9,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import { ConfigService } from '@nestjs/config';
 import { Throttle } from '@nestjs/throttler';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -31,16 +31,28 @@ export class AuthController {
   @Public()
   @Throttle({ global: { ttl: 3600000, limit: 10 } })
   @HttpCode(201)
-  register(@Body() dto: RegisterDto, @Req() req: TenantRequest) {
-    return this.authService.register(dto, req.tenant!.clinicId);
+  register(@Body() dto: RegisterDto, @Req() req: TenantRequest & Request) {
+    return this.authService.register(dto, req.tenant!.clinicId, {
+      ipAddress:
+        req.headers['x-forwarded-for']?.toString().split(',')[0]?.trim() ||
+        req.headers['x-real-ip']?.toString() ||
+        req.ip,
+      requestId: (req as any).requestId,
+    });
   }
 
   @Post('login')
   @Public()
   @Throttle({ global: { ttl: 900000, limit: 5 } })
   @HttpCode(200)
-  login(@Body() dto: LoginDto, @Req() req: TenantRequest) {
-    return this.authService.login(dto, req.tenant!.clinicId);
+  login(@Body() dto: LoginDto, @Req() req: TenantRequest & Request) {
+    return this.authService.login(dto, req.tenant!.clinicId, {
+      ipAddress:
+        req.headers['x-forwarded-for']?.toString().split(',')[0]?.trim() ||
+        req.headers['x-real-ip']?.toString() ||
+        req.ip,
+      requestId: (req as any).requestId,
+    });
   }
 
   @Post('refresh')
