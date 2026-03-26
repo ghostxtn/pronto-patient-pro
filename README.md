@@ -66,6 +66,12 @@ Useful commands
 
 If a teammate pulls new backend schema changes later, they should run `npm run db:migrate` again.
 
+Migration quick decision guide
+
+- Fresh empty database: run `npm run db:migrate`, then `npm run db:seed`.
+- Existing database with valid Drizzle history (for example already applied through `0007`): run `npm run db:migrate` only. Drizzle will apply the missing migrations such as `0008` and `0009`.
+- Existing database where tables already exist but migration history is missing or broken: use the repair flow with `baseline_existing_db.sql`, then run `npm run db:migrate`.
+
 Existing database repair flow
 
 Use this only if your local PostgreSQL already has the clinic tables but `npm run db:migrate` fails with errors like `relation "users" already exists`.
@@ -88,15 +94,15 @@ Repair steps
 What the repair script does
 
 - Creates `drizzle.__drizzle_migrations` if it does not exist.
-- Applies the idempotent schema repairs needed for the older existing local database, including the schema changes covered by `0007` and `0008`.
-- Marks migrations `0000` through `0008` as already applied, only if they are missing.
+- Applies the idempotent schema repairs needed for the older existing local database, including the schema changes covered by `0007`, `0008`, and `0009`.
+- Marks migrations `0000` through `0009` as already applied, only if they are missing.
 
 Important
 
 - Use the repair script only for an existing local database that already contains the clinic tables.
 - Do not use it as the default setup for a brand new empty database.
 - The baseline repair script is not a substitute for `npm run db:migrate`.
-- The baseline repair script includes the equivalent of migrations `0000` through `0008`, but `npm run db:migrate` is still required for any remaining future migrations.
+- The baseline repair script includes the equivalent of migrations `0000` through `0009`, but `npm run db:migrate` is still required for any remaining future migrations.
 - For a fresh database, keep using:
   - `npm run db:migrate`
   - `npm run db:seed`

@@ -64,6 +64,13 @@
       "when": 1774023756134,
       "tag": "0008_bent_wrecking_crew",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1774484664508,
+      "tag": "0009_chief_menace",
+      "breakpoints": true
     }
   ]
 }

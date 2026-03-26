@@ -275,3 +275,111 @@ WHERE NOT EXISTS (
   FROM drizzle.__drizzle_migrations
   WHERE hash = '0008_bent_wrecking_crew'
 );
+
+CREATE TABLE IF NOT EXISTS "clinic_encryption_keys" (
+  "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+  "clinic_id" uuid NOT NULL,
+  "encrypted_dek" text NOT NULL,
+  "dek_version" integer DEFAULT 1 NOT NULL,
+  "is_active" boolean DEFAULT true NOT NULL,
+  "created_at" timestamp DEFAULT now() NOT NULL,
+  "rotated_at" timestamp,
+  CONSTRAINT "clinic_encryption_keys_clinic_id_unique" UNIQUE("clinic_id")
+);
+
+CREATE TABLE IF NOT EXISTS "audit_logs" (
+  "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+  "clinic_id" uuid NOT NULL,
+  "user_id" uuid,
+  "user_role" varchar(20),
+  "action" varchar(50) NOT NULL,
+  "entity" varchar(50) NOT NULL,
+  "entity_id" uuid,
+  "metadata" jsonb,
+  "ip_address" varchar(45),
+  "request_id" uuid,
+  "created_at" timestamp DEFAULT now() NOT NULL
+);
+
+ALTER TABLE "patients"
+ALTER COLUMN "first_name" SET DATA TYPE text;
+
+ALTER TABLE "patients"
+ALTER COLUMN "last_name" SET DATA TYPE text;
+
+ALTER TABLE "patients"
+ALTER COLUMN "tc_no" SET DATA TYPE text;
+
+ALTER TABLE "patients"
+ALTER COLUMN "phone" SET DATA TYPE text;
+
+ALTER TABLE "patients"
+ALTER COLUMN "email" SET DATA TYPE text;
+
+ALTER TABLE "users"
+ADD COLUMN IF NOT EXISTS "kvkk_consent_at" timestamp;
+
+ALTER TABLE "users"
+ADD COLUMN IF NOT EXISTS "kvkk_consent_version" varchar(20);
+
+ALTER TABLE "users"
+ADD COLUMN IF NOT EXISTS "kvkk_consent_ip" varchar(45);
+
+ALTER TABLE "users"
+ADD COLUMN IF NOT EXISTS "failed_login_attempts" integer DEFAULT 0 NOT NULL;
+
+ALTER TABLE "users"
+ADD COLUMN IF NOT EXISTS "locked_until" timestamp;
+
+ALTER TABLE "patients"
+ADD COLUMN IF NOT EXISTS "tc_no_hash" text;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'clinic_encryption_keys_clinic_id_clinics_id_fk'
+  ) THEN
+    ALTER TABLE "clinic_encryption_keys"
+    ADD CONSTRAINT "clinic_encryption_keys_clinic_id_clinics_id_fk"
+    FOREIGN KEY ("clinic_id") REFERENCES "public"."clinics"("id")
+    ON DELETE no action ON UPDATE no action;
+  END IF;
+END $$;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'audit_logs_clinic_id_clinics_id_fk'
+  ) THEN
+    ALTER TABLE "audit_logs"
+    ADD CONSTRAINT "audit_logs_clinic_id_clinics_id_fk"
+    FOREIGN KEY ("clinic_id") REFERENCES "public"."clinics"("id")
+    ON DELETE no action ON UPDATE no action;
+  END IF;
+END $$;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'audit_logs_user_id_users_id_fk'
+  ) THEN
+    ALTER TABLE "audit_logs"
+    ADD CONSTRAINT "audit_logs_user_id_users_id_fk"
+    FOREIGN KEY ("user_id") REFERENCES "public"."users"("id")
+    ON DELETE no action ON UPDATE no action;
+  END IF;
+END $$;
+
+INSERT INTO drizzle.__drizzle_migrations (hash, created_at)
+SELECT '0009_chief_menace', 1774484664508
+WHERE NOT EXISTS (
+  SELECT 1
+  FROM drizzle.__drizzle_migrations
+  WHERE hash = '0009_chief_menace'
+);
