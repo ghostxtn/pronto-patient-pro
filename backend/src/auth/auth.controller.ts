@@ -43,7 +43,7 @@ export class AuthController {
 
   @Post('login')
   @Public()
-  @Throttle({ global: { ttl: 900000, limit: 5 } })
+  @Throttle({ global: { ttl: 60000, limit: 10 } })
   @HttpCode(200)
   login(@Body() dto: LoginDto, @Req() req: TenantRequest & Request) {
     return this.authService.login(dto, req.tenant!.clinicId, {

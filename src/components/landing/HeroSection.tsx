@@ -1,133 +1,312 @@
-import { CirclePlay, ArrowRight } from "lucide-react";
 import { motion } from "framer-motion";
-import { Button } from "@/components/ui/button";
-import { useLanguage } from "@/contexts/LanguageContext";
 import SmartLink from "./SmartLink";
-import { getLandingContent } from "./content";
 
-const fadeUp = {
-  hidden: { opacity: 0, y: 28 },
-  visible: (index: number) => ({
-    opacity: 1,
-    y: 0,
-    transition: {
-      delay: index * 0.12,
-      duration: 0.7,
-      ease: [0.22, 1, 0.36, 1] as const,
-    },
-  }),
+type HeroDoctor = {
+  id: string;
+  name: string;
+  title: string;
 };
 
-export default function HeroSection() {
-  const { lang } = useLanguage();
-  const content = getLandingContent(lang);
-  const { hero } = content;
+type HeroSectionProps = {
+  doctors: HeroDoctor[];
+};
 
+const sectionMotionProps = {
+  initial: { opacity: 0, y: 28 },
+  whileInView: { opacity: 1, y: 0 },
+  viewport: { once: true, margin: "-60px" },
+  transition: { duration: 0.55, ease: "easeOut" as const },
+};
+
+export function getInitials(name: string) {
+  return name
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("");
+}
+
+export default function HeroSection({ doctors }: HeroSectionProps) {
   return (
-    <section className="homepage-shell-gradient relative overflow-hidden border-b border-homepage-border pt-28">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(42,127,132,0.14),transparent_42%)]" />
-
-      <div className="container relative py-8 md:py-12">
-        <div className="homepage-shadow-hero relative overflow-hidden rounded-[2rem] border border-homepage-border/70 bg-homepage-brand-deep">
+    <motion.section
+      {...sectionMotionProps}
+      style={{ minHeight: "100vh", display: "flex", alignItems: "stretch", paddingTop: "68px" }}
+    >
+      <div style={{ flex: 1, display: "flex", alignItems: "center", padding: "48px 64px" }}>
+        <div style={{ maxWidth: 520 }}>
           <div
-            className="absolute inset-0 bg-cover bg-center"
-            style={{ backgroundImage: `url("${hero.image}")` }}
-            aria-hidden="true"
-          />
-          <div className="homepage-hero-overlay absolute inset-0" />
-          <div className="homepage-hero-overlay-bottom absolute inset-0" />
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              background: "#eaf5ff",
+              border: "0.5px solid #b5d1cc",
+              borderRadius: 999,
+              padding: "5px 14px 5px 8px",
+              fontSize: 11,
+              color: "#2f75ca",
+              fontWeight: 500,
+              marginBottom: 28,
+            }}
+          >
+            <span
+              style={{
+                width: 6,
+                height: 6,
+                borderRadius: "50%",
+                background: "#4f8fe6",
+                display: "inline-block",
+              }}
+            />
+            Modern klinik yönetimi
+          </div>
 
-          <div className="relative grid min-h-[78vh] items-end gap-8 px-6 pb-8 pt-8 sm:px-8 lg:grid-cols-[minmax(0,1.25fr)_360px] lg:px-12 lg:pb-12">
-            <div className="max-w-3xl">
-              <motion.span
-                custom={0}
-                variants={fadeUp}
-                initial="hidden"
-                animate="visible"
-                className="inline-flex rounded-full border border-white/[0.18] bg-white/[0.12] px-4 py-2 text-[0.7rem] font-semibold uppercase tracking-[0.24em] text-white/[0.88]"
-              >
-                {hero.eyebrow}
-              </motion.span>
+          <h1
+            style={{
+              fontFamily: "Manrope, sans-serif",
+              fontSize: 52,
+              fontWeight: 300,
+              lineHeight: 1.08,
+              letterSpacing: "-0.03em",
+              color: "#1a2e3b",
+              marginBottom: 20,
+            }}
+          >
+            Sağlığınız için <span style={{ fontWeight: 700, color: "#4f8fe6" }}>doğru adres.</span>
+          </h1>
 
-              <motion.h1
-                custom={1}
-                variants={fadeUp}
-                initial="hidden"
-                animate="visible"
-                className="mt-7 max-w-2xl font-display text-5xl leading-[0.95] tracking-tight text-white md:text-6xl lg:text-[5.1rem]"
-              >
-                {hero.title}
-              </motion.h1>
+          <p style={{ fontSize: 16, color: "#5a7a8a", lineHeight: 1.65, marginBottom: 36 }}>
+            Antalya&apos;nın merkezinde, uzman doktorlarımız ve kişiselleştirilmiş sağlık
+            hizmetlerimizle yanınızdayız. Randevu almak hiç bu kadar kolay olmamıştı.
+          </p>
 
-              <motion.p
-                custom={2}
-                variants={fadeUp}
-                initial="hidden"
-                animate="visible"
-                className="mt-6 max-w-xl text-base leading-7 text-white/[0.84] md:text-lg"
-              >
-                {hero.description}
-              </motion.p>
-
-              <motion.div
-                custom={3}
-                variants={fadeUp}
-                initial="hidden"
-                animate="visible"
-                className="mt-9 flex flex-col gap-3 sm:flex-row"
-              >
-                <Button
-                  asChild
-                  className="homepage-focus-inverse h-12 rounded-full border border-homepage-brand bg-homepage-brand px-6 text-sm font-semibold text-white hover:bg-homepage-brand-deep"
-                >
-                  <SmartLink href={hero.primaryAction.href}>
-                    {hero.primaryAction.label}
-                    <ArrowRight className="h-4 w-4" />
-                  </SmartLink>
-                </Button>
-
-                <Button
-                  variant="outline"
-                  asChild
-                  className="homepage-focus-inverse h-12 rounded-full border-white/30 bg-white/[0.08] px-6 text-sm font-medium text-white hover:bg-white/[0.14] hover:text-white"
-                >
-                  <SmartLink href={hero.secondaryAction.href}>{hero.secondaryAction.label}</SmartLink>
-                </Button>
-              </motion.div>
-            </div>
-
-            <motion.div
-              custom={4}
-              variants={fadeUp}
-              initial="hidden"
-              animate="visible"
-              className="justify-self-end rounded-[1.75rem] border border-white/[0.18] bg-homepage-ink/20 p-5 text-white backdrop-blur-md sm:p-6 lg:max-w-[360px]"
+          <div style={{ display: "flex", gap: 12 }}>
+            <SmartLink
+              href="/request-appointment"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                background: "#4f8fe6",
+                color: "white",
+                borderRadius: 999,
+                padding: "12px 24px",
+                fontSize: 14,
+                fontWeight: 500,
+                textDecoration: "none",
+                boxShadow: "0 4px 14px rgba(79,143,230,0.3)",
+              }}
             >
-              <SmartLink
-                href={hero.panelAction.href ?? "#appointment-process"}
-                className="homepage-focus-inverse mb-6 inline-flex items-center gap-3 rounded-full border border-white/[0.18] px-4 py-2 text-sm text-white/[0.92] transition-colors duration-200 hover:bg-white/[0.12]"
-              >
-                <CirclePlay className="h-4 w-4" />
-                {hero.panelAction.label}
-              </SmartLink>
-
-              <div className="rounded-[1.4rem] border border-white/[0.12] bg-homepage-ink/[0.28] p-5">
-                <p className="text-sm font-medium uppercase tracking-[0.18em] text-white/[0.72]">
-                  {hero.panelTitle}
-                </p>
-                <ul className="mt-5 space-y-4">
-                  {hero.panelItems.map((item) => (
-                    <li key={item} className="flex gap-3 text-sm leading-6 text-white/[0.88]">
-                      <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-homepage-support-tint/90" />
-                      <span>{item}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </motion.div>
+              Randevu Al →
+            </SmartLink>
+            <SmartLink
+              href="#doktorlarimiz"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                background: "white",
+                color: "#1a2e3b",
+                borderRadius: 999,
+                padding: "12px 24px",
+                fontSize: 14,
+                fontWeight: 500,
+                textDecoration: "none",
+                border: "0.5px solid #b5d1cc",
+              }}
+            >
+              Doktorlarımız
+            </SmartLink>
           </div>
         </div>
       </div>
-    </section>
+
+      <div
+        style={{
+          width: "44%",
+          margin: "12px 12px 12px 0",
+          borderRadius: 28,
+          overflow: "hidden",
+          position: "relative",
+          background: "linear-gradient(145deg, #c8e6f5 0%, #b5d1cc 40%, #9ecfbd 100%)",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <div
+          style={{
+            position: "absolute",
+            top: "-10%",
+            left: "-10%",
+            width: 400,
+            height: 400,
+            borderRadius: "50%",
+            background: "#4f8fe6",
+            opacity: 0.18,
+            filter: "blur(80px)",
+            pointerEvents: "none",
+          }}
+        />
+        <div
+          style={{
+            position: "absolute",
+            bottom: "-5%",
+            right: "-10%",
+            width: 350,
+            height: 350,
+            borderRadius: "50%",
+            background: "#236a53",
+            opacity: 0.15,
+            filter: "blur(90px)",
+            pointerEvents: "none",
+          }}
+        />
+
+        <div
+          style={{
+            position: "relative",
+            zIndex: 1,
+            width: "100%",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            padding: "40px 32px",
+          }}
+        >
+          <div style={{ textAlign: "center", marginBottom: 24 }}>
+            <p
+              style={{
+                fontSize: 10,
+                fontWeight: 600,
+                letterSpacing: "0.12em",
+                textTransform: "uppercase",
+                color: "rgba(26,46,59,0.45)",
+                marginBottom: 4,
+              }}
+            >
+              Canlı Takip
+            </p>
+            <h3
+              style={{
+                fontFamily: "Manrope, sans-serif",
+                fontSize: 20,
+                fontWeight: 600,
+                color: "rgba(26,46,59,0.8)",
+                letterSpacing: "-0.02em",
+              }}
+            >
+              Doktorlarımız
+            </h3>
+          </div>
+
+          <div
+            style={{
+              width: "90%",
+              maxWidth: 300,
+              background: "rgba(255,255,255,0.22)",
+              backdropFilter: "blur(20px)",
+              WebkitBackdropFilter: "blur(20px)",
+              border: "1px solid rgba(255,255,255,0.45)",
+              borderRadius: 20,
+              padding: "20px",
+              boxShadow: "0 8px 32px rgba(8,30,42,0.10)",
+            }}
+          >
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr 1fr",
+                gap: 8,
+                marginBottom: 16,
+              }}
+            >
+              {[["2.4k", "Hasta"], ["98%", "Memnuniyet"], ["7/24", "Destek"]].map(([val, lbl]) => (
+                <div
+                  key={lbl}
+                  style={{
+                    background: "rgba(255,255,255,0.30)",
+                    border: "1px solid rgba(255,255,255,0.4)",
+                    borderRadius: 12,
+                    padding: "10px 6px",
+                    textAlign: "center",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontFamily: "Manrope, sans-serif",
+                      fontSize: 16,
+                      fontWeight: 700,
+                      color: "#081e2a",
+                    }}
+                  >
+                    {val}
+                  </div>
+                  <div style={{ fontSize: 10, color: "#3a5a6a", marginTop: 2 }}>{lbl}</div>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {doctors.map((doctor) => (
+                <div
+                  key={doctor.id}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    padding: "8px",
+                    borderRadius: 12,
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: "50%",
+                      background: "rgba(255,255,255,0.40)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: 11,
+                      fontWeight: 600,
+                      color: "#1a2e3b",
+                      flexShrink: 0,
+                    }}
+                  >
+                    {getInitials(doctor.name)}
+                  </div>
+                  <div style={{ minWidth: 0 }}>
+                    <div
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 500,
+                        color: "#081e2a",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {doctor.name}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 10,
+                        color: "#3a5a6a",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {doctor.title}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </motion.section>
   );
 }

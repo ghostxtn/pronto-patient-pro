@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { AnimatePresence } from "framer-motion";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -63,6 +64,85 @@ function LegacyAppointmentsRedirect() {
   return <Navigate to={getDefaultRouteByRole(user?.role)} replace />;
 }
 
+function AppRoutes() {
+  const location = useLocation();
+
+  return (
+    <AnimatePresence mode="wait">
+      <Routes location={location} key={location.pathname}>
+        <Route path="/" element={<Landing />} />
+        <Route path="/request-appointment" element={<Navigate to="/auth?tab=signup" replace />} />
+        <Route path="/doctors" element={<FindDoctors />} />
+        <Route path="/specialties" element={<Specialties />} />
+        <Route path="/auth" element={<Auth />} />
+        <Route path="/auth/callback" element={<AuthCallback />} />
+
+        {/* Public information pages */}
+        <Route path="/why-medibook" element={<WhyMedibook />} />
+        <Route path="/appointment-process" element={<AppointmentProcess />} />
+        <Route path="/contact" element={<Contact />} />
+        <Route path="/location" element={<LocationPage />} />
+        <Route path="/about" element={<About />} />
+        <Route path="/faq" element={<Faq />} />
+        <Route path="/patient-rights" element={<PatientRights />} />
+        <Route path="/accessibility" element={<Accessibility />} />
+
+        {/* Legal pages */}
+        <Route path="/legal/kvkk" element={<LegalKvkk />} />
+        <Route path="/legal/privacy-policy" element={<LegalPrivacyPolicy />} />
+        <Route path="/legal/cookie-policy" element={<LegalCookiePolicy />} />
+        <Route path="/legal/data-subject-application" element={<LegalDataSubject />} />
+        <Route path="/legal/medical-disclaimer" element={<LegalMedicalDisclaimer />} />
+        <Route path="/legal/terms-of-use" element={<LegalTermsOfUse />} />
+
+        <Route element={<RequireAuth />}>
+          <Route path="/appointments" element={<LegacyAppointmentsRedirect />} />
+          <Route path="/profile" element={<Profile />} />
+
+          <Route element={<RequireRole allowedRoles={["patient"]} />}>
+            <Route path="/patient/dashboard" element={<Dashboard />} />
+            <Route path="/patient/profile" element={<Profile />} />
+            <Route path="/patient/doctors" element={<FindDoctors />} />
+            <Route path="/patient/doctors/:id" element={<DoctorProfile />} />
+            <Route path="/patient/appointments" element={<MyAppointments />} />
+          </Route>
+
+          <Route element={<RequireDoctorAccess />}>
+            <Route path="/doctor/dashboard" element={<DoctorDashboard />} />
+            <Route path="/doctor/schedule" element={<DoctorSchedule />} />
+            <Route path="/doctor/appointments" element={<DoctorAppointments />} />
+            <Route path="/doctor/patients" element={<DoctorPatients />} />
+            <Route path="/doctor/patients/:id" element={<DoctorPatientDetail />} />
+          </Route>
+
+          <Route element={<RequireRole allowedRoles={["owner", "admin"]} />}>
+            <Route path="/admin/dashboard" element={<AdminDashboard />} />
+            <Route path="/admin/doctors" element={<ManageDoctors />} />
+            <Route path="/admin/staff" element={<ManageStaff />} />
+          </Route>
+
+          <Route element={<RequireRole allowedRoles={["owner", "admin", "staff"]} />}>
+            <Route path="/staff/dashboard" element={<StaffDashboard />} />
+            <Route path="/staff/doctors" element={<StaffDoctors />} />
+            <Route path="/admin/patients" element={<ManagePatients />} />
+            <Route path="/admin/appointments" element={<ManageAppointments />} />
+          </Route>
+
+          <Route element={<RequireRole allowedRoles={["owner", "admin"]} />}>
+            <Route path="/admin/settings" element={<ClinicSettings />} />
+          </Route>
+
+          <Route element={<RequireRole allowedRoles={["owner"]} />}>
+            <Route path="/owner/dashboard" element={<OwnerDashboard />} />
+          </Route>
+        </Route>
+        {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </AnimatePresence>
+  );
+}
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -71,76 +151,7 @@ const App = () => (
       <BrowserRouter>
         <LanguageProvider>
           <AuthProvider>
-            <Routes>
-              <Route path="/" element={<Landing />} />
-              <Route path="/request-appointment" element={<Navigate to="/auth?tab=signup" replace />} />
-              <Route path="/doctors" element={<FindDoctors />} />
-              <Route path="/specialties" element={<Specialties />} />
-              <Route path="/auth" element={<Auth />} />
-              <Route path="/auth/callback" element={<AuthCallback />} />
-
-              {/* Public information pages */}
-              <Route path="/why-medibook" element={<WhyMedibook />} />
-              <Route path="/appointment-process" element={<AppointmentProcess />} />
-              <Route path="/contact" element={<Contact />} />
-              <Route path="/location" element={<LocationPage />} />
-              <Route path="/about" element={<About />} />
-              <Route path="/faq" element={<Faq />} />
-              <Route path="/patient-rights" element={<PatientRights />} />
-              <Route path="/accessibility" element={<Accessibility />} />
-
-              {/* Legal pages */}
-              <Route path="/legal/kvkk" element={<LegalKvkk />} />
-              <Route path="/legal/privacy-policy" element={<LegalPrivacyPolicy />} />
-              <Route path="/legal/cookie-policy" element={<LegalCookiePolicy />} />
-              <Route path="/legal/data-subject-application" element={<LegalDataSubject />} />
-              <Route path="/legal/medical-disclaimer" element={<LegalMedicalDisclaimer />} />
-              <Route path="/legal/terms-of-use" element={<LegalTermsOfUse />} />
-
-              <Route element={<RequireAuth />}>
-                <Route path="/appointments" element={<LegacyAppointmentsRedirect />} />
-                <Route path="/profile" element={<Profile />} />
-
-                <Route element={<RequireRole allowedRoles={["patient"]} />}>
-                  <Route path="/patient/dashboard" element={<Dashboard />} />
-                  <Route path="/patient/profile" element={<Profile />} />
-                  <Route path="/patient/doctors" element={<FindDoctors />} />
-                  <Route path="/patient/doctors/:id" element={<DoctorProfile />} />
-                  <Route path="/patient/appointments" element={<MyAppointments />} />
-                </Route>
-
-                <Route element={<RequireDoctorAccess />}>
-                  <Route path="/doctor/dashboard" element={<DoctorDashboard />} />
-                  <Route path="/doctor/schedule" element={<DoctorSchedule />} />
-                  <Route path="/doctor/appointments" element={<DoctorAppointments />} />
-                  <Route path="/doctor/patients" element={<DoctorPatients />} />
-                  <Route path="/doctor/patients/:id" element={<DoctorPatientDetail />} />
-                </Route>
-
-                <Route element={<RequireRole allowedRoles={["owner", "admin"]} />}>
-                  <Route path="/admin/dashboard" element={<AdminDashboard />} />
-                  <Route path="/admin/doctors" element={<ManageDoctors />} />
-                  <Route path="/admin/staff" element={<ManageStaff />} />
-                </Route>
-
-                <Route element={<RequireRole allowedRoles={["owner", "admin", "staff"]} />}>
-                  <Route path="/staff/dashboard" element={<StaffDashboard />} />
-                  <Route path="/staff/doctors" element={<StaffDoctors />} />
-                  <Route path="/admin/patients" element={<ManagePatients />} />
-                  <Route path="/admin/appointments" element={<ManageAppointments />} />
-                </Route>
-
-                <Route element={<RequireRole allowedRoles={["owner", "admin"]} />}>
-                  <Route path="/admin/settings" element={<ClinicSettings />} />
-                </Route>
-
-                <Route element={<RequireRole allowedRoles={["owner"]} />}>
-                  <Route path="/owner/dashboard" element={<OwnerDashboard />} />
-                </Route>
-              </Route>
-              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-              <Route path="*" element={<NotFound />} />
-            </Routes>
+            <AppRoutes />
           </AuthProvider>
         </LanguageProvider>
       </BrowserRouter>

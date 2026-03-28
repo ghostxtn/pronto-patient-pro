@@ -178,12 +178,9 @@ POST/GET /api/storage/appointments/:id/files
 ### Landing Composition
 `src/pages/Landing.tsx` şu sırayla render eder:
 - `src/components/landing/LandingNav.tsx`
-- `src/components/landing/HeroSection.tsx`
-- `src/components/landing/SplitFeatureSection.tsx`
-- `src/components/landing/SpecializationsSection.tsx`
-- `src/components/landing/TestimonialsSection.tsx`
-- `src/components/landing/ContactBandSection.tsx`
-- `src/components/landing/CTASection.tsx`
+- Custom split hero (page-local JSX, componentized değil)
+- Specialty preview grid (page-local JSX, `previewData.specialties`)
+- Doctor preview grid (page-local JSX, `previewData.doctors`)
 - `src/components/landing/LandingFooter.tsx`
 
 ### Content And Data Sources
@@ -204,8 +201,21 @@ POST/GET /api/storage/appointments/:id/files
 
 ### Notes
 - `src/components/landing/AnimatedCounter.tsx` aktif landing zincirinde kullanılmıyor.
+- `src/components/landing/HeroSection.tsx` aktif landing zincirinde kullanılmıyor.
 - `src/components/landing/HowItWorksSection.tsx` aktif landing zincirinde kullanılmıyor.
+- `src/components/landing/SplitFeatureSection.tsx` aktif landing zincirinde kullanılmıyor.
+- `src/components/landing/SpecializationsSection.tsx` aktif landing zincirinde kullanılmıyor.
+- `src/components/landing/TestimonialsSection.tsx` aktif landing zincirinde kullanılmıyor.
+- `src/components/landing/ContactBandSection.tsx` aktif landing zincirinde kullanılmıyor.
+- `src/components/landing/CTASection.tsx` aktif landing zincirinde kullanılmıyor.
 - Homepage'ten çıkan ana route'lar: `/request-appointment`, `/doctors`, `/specialties`, `/appointment-process`, `/contact`
+
+### Current Homepage UI Notes
+- Landing hero artık split-screen: sol panel açık zeminli metin + CTA, sağ panel gradient/glassmorphism doktor preview.
+- `src/components/landing/LandingNav.tsx` mobil hamburger menü içeriyor; mobil drawer linkleri `SmartLink` `onClick` desteğini kullanıyor.
+- `src/components/landing/SmartLink.tsx` artık `onClick` ve `style` prop'larını geçiriyor.
+- `src/components/landing/LandingFooter.tsx` koyu footer gradient yerine açık mavi-yeşil gradient ve koyu metin kullanıyor; logo custom SVG.
+- `src/App.tsx` içinde route transition için `AnimatePresence` kullanılıyor; landing/auth geçişleri motion wrapper ile animasyonlu.
 
 ---
 

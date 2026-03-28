@@ -146,7 +146,7 @@ export class AuthService {
         .set({
           failed_login_attempts: sql`${users.failed_login_attempts} + 1`,
           locked_until:
-            newAttempts >= 5 ? new Date(Date.now() + 15 * 60 * 1000) : undefined,
+            newAttempts >= 10 ? new Date(Date.now() + 15 * 60 * 1000) : undefined,
         })
         .where(eq(users.id, user.id));
 
