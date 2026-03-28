@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Stethoscope } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
+import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -10,6 +11,7 @@ export default function LandingNav() {
   const { lang } = useLanguage();
   const content = getLandingContent(lang);
   const [isScrolled, setIsScrolled] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     const onScroll = () => setIsScrolled(window.scrollY > 24);
@@ -31,10 +33,12 @@ export default function LandingNav() {
     >
       <div className="container flex h-20 items-center justify-between gap-4">
         <SmartLink href="/" className="flex min-w-0 items-center gap-3">
-          <span className="flex h-11 w-11 items-center justify-center rounded-full border border-homepage-border bg-homepage-brand-deep text-white">
-            <Stethoscope className="h-5 w-5" />
-          </span>
-          <span className="min-w-0">
+          <svg width="44" height="44" viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">
+            <rect x="0" y="13" width="44" height="18" rx="9" fill="#65a98f" />
+            <rect x="13" y="0" width="18" height="22" rx="9" fill="#4f8fe6" />
+            <rect x="13" y="22" width="18" height="22" rx="9" fill="#4f8fe6" />
+          </svg>
+          <span className="min-w-0 hidden sm:block">
             <span className="block truncate font-display text-[1.7rem] leading-none tracking-tight text-homepage-ink">
               {content.brand.name}
             </span>
@@ -59,6 +63,14 @@ export default function LandingNav() {
         <div className="flex items-center gap-2 sm:gap-3">
           <LanguageSwitcher className="h-11 w-11 rounded-full border border-homepage-border text-homepage-muted hover:border-homepage-border-strong hover:bg-homepage-shell" />
 
+          <button
+            className="lg:hidden flex items-center justify-center w-11 h-11 rounded-full border border-homepage-border text-homepage-muted hover:bg-homepage-shell transition-colors"
+            onClick={() => setMenuOpen(!menuOpen)}
+            aria-label="Menü"
+          >
+            {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </button>
+
           <Button
             variant="ghost"
             asChild
@@ -75,6 +87,40 @@ export default function LandingNav() {
           </Button>
         </div>
       </div>
+
+      <AnimatePresence>
+        {menuOpen && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
+            className="lg:hidden overflow-hidden border-t border-homepage-border bg-white/[0.98] backdrop-blur-md"
+          >
+            <div className="container flex flex-col gap-1 py-4">
+              {content.navigation.map((item) => (
+                <SmartLink
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => setMenuOpen(false)}
+                  className="px-4 py-3 rounded-xl text-sm font-medium text-homepage-muted hover:text-homepage-ink hover:bg-homepage-shell transition-colors"
+                >
+                  {item.label}
+                </SmartLink>
+              ))}
+              <div className="mt-3 flex flex-col gap-2 border-t border-homepage-border pt-3">
+                <SmartLink
+                  href="/auth"
+                  onClick={() => setMenuOpen(false)}
+                  className="px-4 py-3 rounded-xl text-sm font-medium text-homepage-muted hover:bg-homepage-shell text-center"
+                >
+                  {content.auth.signInLabel}
+                </SmartLink>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </header>
   );
 }
