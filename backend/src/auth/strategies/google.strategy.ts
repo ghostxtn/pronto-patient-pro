@@ -60,7 +60,7 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
 
       console.log('[auth][googleStrategy] validate success', {
         email,
-        role: result.user?.role,
+        requiresOtp: 'requiresOtp' in result ? result.requiresOtp : false,
       });
       done(null, result);
     } catch (error) {

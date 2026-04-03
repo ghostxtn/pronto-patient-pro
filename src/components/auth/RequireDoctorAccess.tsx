@@ -16,17 +16,37 @@ export default function RequireDoctorAccess() {
     retry: false,
   });
 
+  console.debug("[auth][guard] RequireDoctorAccess", {
+    loading,
+    isDoctorProfileLoading,
+    hasUser: Boolean(user),
+    userId: user?.id,
+    role: user?.role,
+    shouldCheckDoctorProfile,
+    hasDoctorProfile: Boolean(doctorProfile),
+    doctorProfileIsActive: hasActiveDoctorProfile(doctorProfile),
+  });
+
   if (loading || isDoctorProfileLoading) {
     return null;
   }
 
   if (!user) {
+    console.debug("[auth][guard] RequireDoctorAccess redirecting to /auth");
     return <Navigate to="/auth" replace />;
   }
 
   if (user.role === "doctor" || hasActiveDoctorProfile(doctorProfile)) {
+    console.debug("[auth][guard] RequireDoctorAccess allowing route", {
+      role: user.role,
+      userId: user.id,
+    });
     return <Outlet />;
   }
 
+  console.debug("[auth][guard] RequireDoctorAccess redirecting by role", {
+    role: user.role,
+    redirectTo: getDefaultRouteByRole(user.role),
+  });
   return <Navigate to={getDefaultRouteByRole(user.role)} replace />;
 }

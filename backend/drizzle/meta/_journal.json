@@ -71,6 +71,13 @@
       "when": 1774484664508,
       "tag": "0009_chief_menace",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1774874648921,
+      "tag": "0010_cooing_exiles",
+      "breakpoints": true
     }
   ]
 }
