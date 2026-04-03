@@ -14,6 +14,8 @@ import { getDefaultRouteByRole } from "@/lib/auth-routing";
 import Landing from "./pages/Landing";
 import Auth from "./pages/Auth";
 import AuthCallback from "./pages/AuthCallback";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 import Dashboard from "./pages/Dashboard";
 import FindDoctors from "./pages/FindDoctors";
 import Specialties from "./pages/Specialties";
@@ -76,6 +78,8 @@ function AppRoutes() {
         <Route path="/specialties" element={<Specialties />} />
         <Route path="/auth" element={<Auth />} />
         <Route path="/auth/callback" element={<AuthCallback />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
 
         {/* Public information pages */}
         <Route path="/why-medibook" element={<WhyMedibook />} />

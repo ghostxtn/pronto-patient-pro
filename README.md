@@ -46,6 +46,15 @@ After `git pull`, the missing step is applying those migrations to the local Pos
 Recommended flow for a fresh database
 
 1. Copy `.env.example` to `.env` and fill in the secrets.
+   Add SMTP settings for email OTP delivery and password reset emails:
+   - `SMTP_HOST`
+   - `SMTP_PORT`
+   - `SMTP_USER`
+   - `SMTP_PASS`
+   - `SMTP_FROM`
+   - Optional: `SMTP_SECURE=true` for SMTPS providers
+   - `FRONTEND_URL` for fallback auth email links when the request origin is unavailable
+   - Optional: `PASSWORD_RESET_TTL_MINUTES` to override the default reset-link lifetime of 60 minutes
 2. Install dependencies:
    - `npm install`
    - `npm run backend:install`
@@ -61,7 +70,7 @@ Useful commands
 - `npm run db:generate`: generate a new Drizzle migration from schema changes.
 - `npm run db:migrate`: apply committed SQL migrations to the database.
 - `npm run db:push`: push the current schema directly to the database without generating a migration.
-- `npm run db:seed`: create the default clinics, owner/admin/doctor/patient accounts, and specializations for local development.
+- `npm run db:seed`: create or update the default clinics, owner/admin/doctor/staff/patient accounts, and specializations for local development.
 - `docker compose up -d`: start the Docker services, including the backend container.
 
 If a teammate pulls new backend schema changes later, they should run `npm run db:migrate` again.
@@ -71,6 +80,7 @@ Migration quick decision guide
 - Fresh empty database: run `npm run db:migrate`, then `npm run db:seed`.
 - Existing database with valid Drizzle history (for example already applied through `0007`): run `npm run db:migrate` only. Drizzle will apply the missing migrations such as `0008` and `0009`.
 - Existing database where tables already exist but migration history is missing or broken: use the repair flow with `baseline_existing_db.sql`, then run `npm run db:migrate`.
+- Existing database where you want the local demo account passwords reset to the README values: run `npm run db:seed`.
 
 Existing database repair flow
 
@@ -109,12 +119,14 @@ Important
 
 Local seed accounts
 
+Running `npm run db:seed` also updates the existing demo users below to these passwords if they are already present in the local database.
+
 - `test-klinik.localhost`
 - Owner: `owner@testklinik.local` / `Password123!`
 - Admin: `admin@testklinik.local` / `Password123!`
-- Doctor: `doctor@testklinik.local` / `Password123!
+- Doctor: `doctor@testklinik.local` / `Password123!`
+- Staff: `staff@testklinik.local` / `Password123!`
 - Patient: `patient@testklinik.local` / `Password123!`
-- Staff; `staff@testklinik.local` / `Password123!`
 
 - `yeni-klinik.localhost`
 - Owner: `owner@yeniklinik.local` / `Owner123!`

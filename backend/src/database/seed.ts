@@ -18,7 +18,7 @@ type UserSeed = {
   password: string;
   firstName: string;
   lastName: string;
-  role: 'owner' | 'admin' | 'doctor' | 'patient';
+  role: 'owner' | 'admin' | 'doctor' | 'patient' | 'staff';
 };
 
 type ClinicSeed = {
@@ -36,6 +36,9 @@ type ClinicSeed = {
     title: string;
     bio: string;
     phone: string;
+  };
+  staff?: UserSeed & {
+    phone?: string;
   };
   patient: UserSeed & {
     phone: string;
@@ -58,21 +61,21 @@ const clinicSeeds: ClinicSeed[] = [
     },
     owner: {
       email: 'owner@testklinik.local',
-      password: 'Owner123!',
+      password: 'Password123!',
       firstName: 'Test',
       lastName: 'Owner',
       role: 'owner',
     },
     admin: {
       email: 'admin@testklinik.local',
-      password: 'Admin123!',
+      password: 'Password123!',
       firstName: 'Test',
       lastName: 'Admin',
       role: 'admin',
     },
     doctor: {
       email: 'doctor@testklinik.local',
-      password: 'Doctor123!',
+      password: 'Password123!',
       firstName: 'Deniz',
       lastName: 'Yilmaz',
       role: 'doctor',
@@ -80,9 +83,17 @@ const clinicSeeds: ClinicSeed[] = [
       bio: 'Kardiyoloji odakli demo doktor hesabi.',
       phone: '+90 555 000 00 01',
     },
+    staff: {
+      email: 'staff@testklinik.local',
+      password: 'Password123!',
+      firstName: 'Test',
+      lastName: 'Staff',
+      role: 'staff',
+      phone: '+90 555 000 00 21',
+    },
     patient: {
       email: 'patient@testklinik.local',
-      password: 'Patient123!',
+      password: 'Password123!',
       firstName: 'Ayse',
       lastName: 'Demir',
       role: 'patient',
@@ -188,6 +199,7 @@ async function ensureUser(
   clinic: ClinicRecord,
   userSeed: UserSeed,
 ) {
+  const passwordHash = await bcrypt.hash(userSeed.password, 12);
   const [existingUser] = await db
     .select()
     .from(users)
@@ -195,10 +207,22 @@ async function ensureUser(
     .limit(1);
 
   if (existingUser) {
-    return existingUser;
-  }
+    const [updatedUser] = await db
+      .update(users)
+      .set({
+        password_hash: passwordHash,
+        first_name: userSeed.firstName,
+        last_name: userSeed.lastName,
+        role: userSeed.role,
+        updated_at: new Date(),
+        failed_login_attempts: 0,
+        locked_until: null,
+      })
+      .where(eq(users.id, existingUser.id))
+      .returning();
 
-  const passwordHash = await bcrypt.hash(userSeed.password, 12);
+    return updatedUser;
+  }
 
   const [createdUser] = await db
     .insert(users)
@@ -331,6 +355,9 @@ async function main() {
       const owner = await ensureUser(db, clinic, clinicSeed.owner);
       const admin = await ensureUser(db, clinic, clinicSeed.admin);
       const doctorUser = await ensureUser(db, clinic, clinicSeed.doctor);
+      const staffUser = clinicSeed.staff
+        ? await ensureUser(db, clinic, clinicSeed.staff)
+        : null;
       const patientUser = await ensureUser(db, clinic, clinicSeed.patient);
 
       const seededSpecializations = [];
@@ -362,6 +389,9 @@ async function main() {
       console.log(`Owner: ${owner.email} / ${clinicSeed.owner.password}`);
       console.log(`Admin: ${admin.email} / ${clinicSeed.admin.password}`);
       console.log(`Doctor: ${doctorUser.email} / ${clinicSeed.doctor.password}`);
+      if (staffUser && clinicSeed.staff) {
+        console.log(`Staff: ${staffUser.email} / ${clinicSeed.staff.password}`);
+      }
       console.log(`Patient: ${patientUser.email} / ${clinicSeed.patient.password}`);
       console.log(`Doctor profile: ${doctor.id}`);
       console.log(`Patient profile: ${patient.id}`);

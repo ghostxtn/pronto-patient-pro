@@ -331,6 +331,12 @@ ADD COLUMN IF NOT EXISTS "failed_login_attempts" integer DEFAULT 0 NOT NULL;
 ALTER TABLE "users"
 ADD COLUMN IF NOT EXISTS "locked_until" timestamp;
 
+ALTER TABLE "users"
+ADD COLUMN IF NOT EXISTS "password_reset_token_hash" varchar(255);
+
+ALTER TABLE "users"
+ADD COLUMN IF NOT EXISTS "password_reset_expires_at" timestamp;
+
 ALTER TABLE "patients"
 ADD COLUMN IF NOT EXISTS "tc_no_hash" text;
 
@@ -382,4 +388,12 @@ WHERE NOT EXISTS (
   SELECT 1
   FROM drizzle.__drizzle_migrations
   WHERE hash = '0009_chief_menace'
+);
+
+INSERT INTO drizzle.__drizzle_migrations (hash, created_at)
+SELECT '0010_cooing_exiles', 1774874648921
+WHERE NOT EXISTS (
+  SELECT 1
+  FROM drizzle.__drizzle_migrations
+  WHERE hash = '0010_cooing_exiles'
 );

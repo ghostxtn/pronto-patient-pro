@@ -241,10 +241,22 @@ export async function request<T>(
   return body as T;
 }
 
-type AuthResponse = {
+export type AuthSuccessResponse = {
   accessToken?: string;
   refreshToken?: string;
   user?: unknown;
+};
+
+export type AuthOtpChallengeResponse = {
+  requiresOtp: true;
+  flowToken: string;
+  email: string;
+  expiresInSeconds: number;
+};
+
+export type AuthResponse = AuthSuccessResponse | AuthOtpChallengeResponse;
+export type MessageResponse = {
+  message: string;
 };
 
 const api = {
@@ -258,6 +270,28 @@ const api = {
       request<AuthResponse>("/auth/register", {
         method: "POST",
         body: JSON.stringify(data),
+      }),
+    verifyOtp: (flowToken: string, code: string) =>
+      request<AuthSuccessResponse>("/auth/verify-otp", {
+        method: "POST",
+        body: JSON.stringify({ flowToken, code }),
+      }),
+    resendOtp: (flowToken: string) =>
+      request<AuthOtpChallengeResponse>("/auth/resend-otp", {
+        method: "POST",
+        body: JSON.stringify({ flowToken }),
+      }),
+    forgotPassword: (email: string) =>
+      request<MessageResponse>("/auth/forgot-password", {
+        method: "POST",
+        body: JSON.stringify({ email }),
+        omitAuth: true,
+      }),
+    resetPassword: (token: string, password: string) =>
+      request<MessageResponse>("/auth/reset-password", {
+        method: "POST",
+        body: JSON.stringify({ token, password }),
+        omitAuth: true,
       }),
     googleLogin: (idToken: string) =>
       request<AuthResponse>("/auth/google", {
