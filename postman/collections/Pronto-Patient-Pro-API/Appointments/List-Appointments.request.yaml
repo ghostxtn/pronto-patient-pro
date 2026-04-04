@@ -1,0 +1,23 @@
+$kind: http-request
+name: List Appointments
+method: GET
+url: '{{baseUrl}}/appointments'
+order: 2000
+auth:
+  type: bearer
+  credentials:
+    - key: token
+      value: '{{accessToken}}'
+queryParams:
+  - key: doctorId
+    value: ''
+    disabled: true
+  - key: patientId
+    value: ''
+    disabled: true
+  - key: date
+    value: ''
+    disabled: true
+  - key: status
+    value: ''
+    disabled: true

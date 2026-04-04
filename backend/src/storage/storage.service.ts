@@ -8,21 +8,19 @@ import { existsSync, readFileSync, unlinkSync } from 'fs';
 import { unlink } from 'fs/promises';
 import { and, eq } from 'drizzle-orm';
 import { appointmentFiles, users } from '../database/schema';
+import { validateImageMagicBytes } from '../common/utils/magic-bytes.util';
 
 @Injectable()
 export class StorageService {
-  private readonly MAGIC_BYTES: Record<string, Buffer[]> = {
-    'image/jpeg': [Buffer.from([0xff, 0xd8, 0xff])],
-    'image/png': [Buffer.from([0x89, 0x50, 0x4e, 0x47])],
-    'image/webp': [Buffer.from([0x52, 0x49, 0x46, 0x46])],
-    'application/pdf': [Buffer.from([0x25, 0x50, 0x44, 0x46])],
-  };
+  private readonly PDF_MAGIC_BYTES = Buffer.from([0x25, 0x50, 0x44, 0x46]);
 
   constructor(@Inject('DRIZZLE') private readonly db: any) {}
 
   private validateFileContent(file: Express.Multer.File): void {
-    const signatures = this.MAGIC_BYTES[file.mimetype];
-    if (!signatures) {
+    const isImage = ['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype);
+    const isPdf = file.mimetype === 'application/pdf';
+
+    if (!isImage && !isPdf) {
       this.tryDeleteFile(file.path);
       throw new BadRequestException('Unsupported file type');
     }
@@ -31,21 +29,14 @@ export class StorageService {
       const fileBuffer = readFileSync(file.path);
       const header = fileBuffer.subarray(0, 12);
 
-      const isValid = signatures.some((sig) =>
-        header.subarray(0, sig.length).equals(sig),
-      );
-
-      if (!isValid) {
+      if (isImage && !validateImageMagicBytes(header)) {
         this.tryDeleteFile(file.path);
         throw new BadRequestException('File content does not match declared type');
       }
 
-      if (file.mimetype === 'image/webp') {
-        const webpSig = header.subarray(8, 12).toString('ascii');
-        if (webpSig !== 'WEBP') {
-          this.tryDeleteFile(file.path);
-          throw new BadRequestException('File content does not match declared type');
-        }
+      if (isPdf && !header.subarray(0, 4).equals(this.PDF_MAGIC_BYTES)) {
+        this.tryDeleteFile(file.path);
+        throw new BadRequestException('File content does not match declared type');
       }
     } catch (err) {
       if (err instanceof BadRequestException) throw err;

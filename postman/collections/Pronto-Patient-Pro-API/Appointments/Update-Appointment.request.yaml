@@ -1,0 +1,23 @@
+$kind: http-request
+name: Update Appointment
+method: PATCH
+url: '{{baseUrl}}/appointments/{{appointmentId}}'
+order: 4000
+auth:
+  type: bearer
+  credentials:
+    - key: token
+      value: '{{accessToken}}'
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "appointmentDate": "2025-01-16",
+      "startTime": "10:00",
+      "endTime": "10:30",
+      "type": "follow-up",
+      "notes": "Follow-up visit"
+    }

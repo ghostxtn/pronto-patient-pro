@@ -1,0 +1,28 @@
+$kind: collection
+name: Pronto Patient Pro API
+description: 'Medical clinic management API for Pronto Patient Pro. Base URL: {{baseUrl}} (default: http://localhost:3000/api). Authentication: Bearer token via {{accessToken}} variable.'
+variables:
+  - key: baseUrl
+    value: 'http://localhost:3000/api'
+  - key: accessToken
+    value: ''
+  - key: doctorId
+    value: ''
+  - key: patientId
+    value: ''
+  - key: appointmentId
+    value: ''
+  - key: noteId
+    value: ''
+  - key: userId
+    value: ''
+  - key: specializationId
+    value: ''
+  - key: availabilityId
+    value: ''
+  - key: overrideId
+    value: ''
+  - key: clinicId
+    value: ''
+  - key: fileId
+    value: ''

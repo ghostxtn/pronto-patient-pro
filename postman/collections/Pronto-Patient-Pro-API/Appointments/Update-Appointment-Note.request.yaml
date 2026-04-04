@@ -1,0 +1,22 @@
+$kind: http-request
+name: Update Appointment Note
+method: PATCH
+url: '{{baseUrl}}/appointments/notes/{{noteId}}'
+order: 9000
+auth:
+  type: bearer
+  credentials:
+    - key: token
+      value: '{{accessToken}}'
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "diagnosis": "Updated diagnosis",
+      "treatment": "Updated treatment",
+      "prescription": "Updated prescription",
+      "notes": "Updated notes"
+    }

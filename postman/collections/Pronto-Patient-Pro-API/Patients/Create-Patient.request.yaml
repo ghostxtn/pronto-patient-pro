@@ -1,0 +1,27 @@
+$kind: http-request
+name: Create Patient
+method: POST
+url: '{{baseUrl}}/patients'
+order: 1000
+auth:
+  type: bearer
+  credentials:
+    - key: token
+      value: '{{accessToken}}'
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "firstName": "Jane",
+      "lastName": "Smith",
+      "tcNo": "12345678901",
+      "birthDate": "1990-05-15",
+      "gender": "female",
+      "phone": "+905551234567",
+      "email": "jane.smith@example.com",
+      "address": "123 Main St, Istanbul",
+      "notes": "No known allergies"
+    }

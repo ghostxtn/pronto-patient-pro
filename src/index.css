@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&family=Space+Grotesk:wght@300..700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@300;600;700;800&family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&family=Space+Grotesk:wght@300..700&display=swap');
 @import 'react-big-calendar/lib/css/react-big-calendar.css';
 
 @tailwind base;
@@ -325,5 +325,189 @@
 
   .rbc-time-content .rbc-day-slot {
     cursor: pointer;
+  }
+
+  html.lenis {
+    height: auto;
+  }
+
+  .lenis.lenis-smooth {
+    scroll-behavior: auto !important;
+  }
+
+  .lenis.lenis-smooth [data-lenis-prevent] {
+    overscroll-behavior: contain;
+  }
+
+  .hero-section {
+    position: relative;
+    height: 280vh;
+  }
+
+  .hero-sticky-bg {
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    width: 100%;
+    overflow: hidden;
+    background: linear-gradient(145deg, #c8e6f5 0%, #b5d1cc 40%, #9ecfbd 100%);
+  }
+
+  .hero-blob {
+    position: absolute;
+    border-radius: 50%;
+    will-change: transform;
+  }
+
+  .hero-blob-1 {
+    width: 380px;
+    height: 380px;
+    background: radial-gradient(circle at 35% 30%, #eaf5ff, #4f8fe6);
+    top: 5%;
+    left: 2%;
+    filter: blur(2px);
+    animation: heroBreath 8s ease-in-out infinite;
+  }
+
+  .hero-blob-2 {
+    width: 280px;
+    height: 280px;
+    background: radial-gradient(circle at 40% 30%, #e8f7f1, #65a98f);
+    top: 3%;
+    right: 4%;
+    filter: blur(1px);
+    animation: heroBreath 11s ease-in-out infinite reverse;
+  }
+
+  .hero-blob-3 {
+    width: 210px;
+    height: 210px;
+    background: radial-gradient(circle at 35% 30%, #f0eeff, #b5d1cc);
+    bottom: 20%;
+    left: 6%;
+    filter: blur(2px);
+    animation: heroBreath 7s ease-in-out infinite 1s;
+  }
+
+  .hero-blob-4 {
+    width: 160px;
+    height: 160px;
+    background: radial-gradient(circle at 40% 40%, #fff4e6, #2f75ca);
+    bottom: 26%;
+    right: 8%;
+    filter: blur(1px);
+    animation: heroBreath 9s ease-in-out infinite 2s;
+  }
+
+  @keyframes heroBreath {
+    0%, 100% {
+      filter: blur(1px);
+    }
+
+    50% {
+      filter: blur(3px);
+    }
+  }
+
+  .hero-ring {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    border-radius: 50%;
+    border: 1px solid rgba(79, 143, 230, 0.12);
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+  }
+
+  .hero-content {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    min-height: 100vh;
+    padding: calc(100vh - 340px) 60px 0;
+    z-index: 2;
+    will-change: transform;
+  }
+
+  .hero-content-shell {
+    max-width: 720px;
+  }
+
+  .hero-tagline {
+    font-family: 'Manrope', sans-serif;
+    font-weight: 700;
+    font-size: clamp(40px, 5vw, 72px);
+    color: #1a2e3b;
+    line-height: 1.05;
+    margin-bottom: 20px;
+    animation: heroSlideUp 1s cubic-bezier(0.22, 1, 0.36, 1) 0.35s both;
+  }
+
+  .hero-sub {
+    font-size: 18px;
+    color: #5a7a8a;
+    margin-bottom: 36px;
+    animation: heroSlideUp 1s cubic-bezier(0.22, 1, 0.36, 1) 0.5s both;
+  }
+
+  .hero-logo-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+    animation: heroSlideUp 1s cubic-bezier(0.22, 1, 0.36, 1) 0.2s both;
+  }
+
+  .hero-cta-btn {
+    display: inline-block;
+    background: #4f8fe6;
+    color: #fff;
+    font-weight: 600;
+    font-size: 15px;
+    padding: 13px 32px;
+    border-radius: 999px;
+    text-decoration: none;
+    border: none;
+    cursor: pointer;
+    transition: background 0.2s;
+    animation: heroSlideUp 1s cubic-bezier(0.22, 1, 0.36, 1) 0.6s both;
+  }
+
+  .hero-cta-btn:hover {
+    background: #2f75ca;
+  }
+
+  .hero-cta-btn:focus-visible {
+    outline: 2px solid rgba(47, 117, 202, 0.35);
+    outline-offset: 4px;
+  }
+
+  @keyframes heroSlideUp {
+    from {
+      opacity: 0;
+      transform: translateY(40px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @media (max-width: 900px) {
+    .hero-content {
+      padding: calc(100vh - 280px) 24px 0;
+    }
+  }
+
+  @media (max-width: 600px) {
+    .hero-content {
+      padding-top: calc(100vh - 320px);
+    }
+
+    .hero-sub {
+      max-width: 26ch;
+    }
   }
 }

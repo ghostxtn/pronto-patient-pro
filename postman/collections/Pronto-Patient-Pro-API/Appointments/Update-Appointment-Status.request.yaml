@@ -1,0 +1,19 @@
+$kind: http-request
+name: Update Appointment Status
+method: PATCH
+url: '{{baseUrl}}/appointments/{{appointmentId}}/status'
+order: 5000
+auth:
+  type: bearer
+  credentials:
+    - key: token
+      value: '{{accessToken}}'
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "status": "confirmed"
+    }
