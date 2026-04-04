@@ -9,10 +9,19 @@ import {
   appointments,
   doctorAvailability,
   doctorAvailabilityOverrides,
+  doctors,
 } from '../database/schema';
 import type { DoctorAvailability } from '../database/schema/doctor-availability.schema';
 import { CreateAvailabilityDto } from './dto/create-availability.dto';
 import { UpdateAvailabilityDto } from './dto/update-availability.dto';
+
+export interface BookableSlot {
+  startTime: string;
+  endTime: string;
+  slotDuration: number;
+}
+
+const CLINIC_TIME_ZONE = 'Europe/Istanbul';
 
 @Injectable()
 export class AvailabilityService {
@@ -23,7 +32,40 @@ export class AvailabilityService {
     doctorId: string,
     date: string,
   ): Promise<string[]> {
-    const dayOfWeek = new Date(`${date}T00:00:00`).getDay();
+    const slotDetails = await this.getBookableSlotDetails(clinicId, doctorId, date);
+    return slotDetails.map((slot) => slot.startTime);
+  }
+
+  async getBookableSlotDetails(
+    clinicId: string,
+    doctorId: string,
+    date: string,
+  ): Promise<BookableSlot[]> {
+    const clinicNow = this.getClinicNowParts();
+
+    if (date < clinicNow.date) {
+      return [];
+    }
+
+    const [doctor] = await this.db
+      .select({
+        id: doctors.id,
+        is_active: doctors.is_active,
+      })
+      .from(doctors)
+      .where(
+        and(
+          eq(doctors.id, doctorId),
+          eq(doctors.clinic_id, clinicId),
+        ),
+      )
+      .limit(1);
+
+    if (!doctor?.is_active) {
+      return [];
+    }
+
+    const dayOfWeek = this.getDayOfWeek(date);
     const availabilityBlocks = await this.db
       .select()
       .from(doctorAvailability)
@@ -35,10 +77,6 @@ export class AvailabilityService {
           eq(doctorAvailability.is_active, true),
         ),
       );
-
-    if (availabilityBlocks.length === 0) {
-      return [];
-    }
 
     const [override] = await this.db
       .select()
@@ -53,56 +91,48 @@ export class AvailabilityService {
       .limit(1);
 
     if (override?.type === 'blackout') {
+      if (!override.start_time || !override.end_time) {
+        return [];
+      }
+    }
+
+    const fallbackSlotDuration =
+      availabilityBlocks[0]?.slot_duration ?? 30;
+
+    if (availabilityBlocks.length === 0 && override?.type !== 'custom_hours') {
       return [];
     }
 
-    const slotDuration = availabilityBlocks[0].slot_duration ?? 30;
     const rawSlots =
-      override?.type === 'custom_hours'
-        ? availabilityBlocks.flatMap((block: DoctorAvailability) => {
-            const slots: string[] = [];
-
-            if (
-              override.start_time &&
-              this.timeToMinutes(override.start_time) >
-                this.timeToMinutes(block.start_time)
-            ) {
-              slots.push(
-                ...this.generateSlots(
-                  block.start_time,
-                  override.start_time,
-                  block.slot_duration ?? 30,
-                ),
-              );
-            }
-
-            if (
-              override.end_time &&
-              this.timeToMinutes(override.end_time) <
-                this.timeToMinutes(block.end_time)
-            ) {
-              slots.push(
-                ...this.generateSlots(
-                  override.end_time,
-                  block.end_time,
-                  block.slot_duration ?? 30,
-                ),
-              );
-            }
-
-            return slots;
-          })
+      override?.type === 'custom_hours' && override.start_time && override.end_time
+        ? this.generateSlotsWithDetails(
+            override.start_time,
+            override.end_time,
+            fallbackSlotDuration,
+          )
         : availabilityBlocks.flatMap((block: DoctorAvailability) =>
-            this.generateSlots(
+            this.generateSlotsWithDetails(
               block.start_time,
               block.end_time,
-              block.slot_duration ?? 30,
+              block.slot_duration ?? fallbackSlotDuration,
             ),
           );
 
     if (rawSlots.length === 0) {
       return [];
     }
+
+    const filteredSlots =
+      override?.type === 'blackout' && override.start_time && override.end_time
+        ? rawSlots.filter((slot: BookableSlot) => {
+            return (
+              this.timeToMinutes(slot.endTime) <=
+                this.timeToMinutes(override.start_time) ||
+              this.timeToMinutes(slot.startTime) >=
+                this.timeToMinutes(override.end_time)
+            );
+          })
+        : rawSlots;
 
     const existingAppointments = await this.db
       .select({
@@ -124,7 +154,19 @@ export class AvailabilityService {
       ),
     );
 
-    return rawSlots.filter((slot: string) => !bookedStarts.has(slot));
+    return filteredSlots
+      .filter((slot: BookableSlot) => !bookedStarts.has(slot.startTime))
+      .filter((slot: BookableSlot) => {
+        if (date !== clinicNow.date) {
+          return true;
+        }
+
+        return this.timeToMinutes(slot.startTime) > clinicNow.minutes;
+      })
+      .sort(
+        (left: BookableSlot, right: BookableSlot) =>
+          this.timeToMinutes(left.startTime) - this.timeToMinutes(right.startTime),
+      );
   }
 
   async create(dto: CreateAvailabilityDto, clinicId: string) {
@@ -290,12 +332,33 @@ export class AvailabilityService {
     endTime: string,
     slotDuration: number,
   ): string[] {
-    const slots: string[] = [];
+    return this.generateSlotsWithDetails(startTime, endTime, slotDuration).map(
+      (slot) => slot.startTime,
+    );
+  }
+
+  private generateSlotsWithDetails(
+    startTime: string,
+    endTime: string,
+    slotDuration: number,
+  ): BookableSlot[] {
+    const slots: BookableSlot[] = [];
     let currentMinutes = this.timeToMinutes(startTime);
     const endMinutes = this.timeToMinutes(endTime);
 
     while (currentMinutes < endMinutes) {
-      slots.push(this.minutesToTime(currentMinutes));
+      const slotStart = this.minutesToTime(currentMinutes);
+      const slotEnd = this.minutesToTime(currentMinutes + slotDuration);
+
+      if (this.timeToMinutes(slotEnd) > endMinutes) {
+        break;
+      }
+
+      slots.push({
+        startTime: slotStart,
+        endTime: slotEnd,
+        slotDuration,
+      });
       currentMinutes += slotDuration;
     }
 
@@ -305,6 +368,32 @@ export class AvailabilityService {
   private timeToMinutes(time: string): number {
     const [hours, minutes] = time.slice(0, 5).split(':').map(Number);
     return hours * 60 + minutes;
+  }
+
+  private getDayOfWeek(date: string): number {
+    const [year, month, day] = date.split('-').map(Number);
+    return new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+  }
+
+  private getClinicNowParts(): { date: string; minutes: number } {
+    const formatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: CLINIC_TIME_ZONE,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
+
+    const parts = formatter.formatToParts(new Date());
+    const getPart = (type: string) =>
+      parts.find((part) => part.type === type)?.value ?? '00';
+
+    return {
+      date: `${getPart('year')}-${getPart('month')}-${getPart('day')}`,
+      minutes: Number(getPart('hour')) * 60 + Number(getPart('minute')),
+    };
   }
 
   private minutesToTime(totalMinutes: number): string {

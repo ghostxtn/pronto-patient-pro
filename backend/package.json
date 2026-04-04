@@ -7,9 +7,9 @@
     "db:migrate": "node --env-file=../.env ./node_modules/drizzle-kit/bin.cjs migrate --config=drizzle.config.ts",
     "db:push": "node --env-file=../.env ./node_modules/drizzle-kit/bin.cjs push --config=drizzle.config.ts",
     "db:seed": "node --env-file=../.env -r ts-node/register ./src/database/seed.ts",
-    "start": "node dist/main",
+    "start": "node scripts/start-with-db.js",
     "start:dev": "nest start --watch",
-    "start:prod": "node dist/main"
+    "start:prod": "node scripts/start-with-db.js"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.17",

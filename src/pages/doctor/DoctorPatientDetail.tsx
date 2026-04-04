@@ -23,7 +23,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
-import { useAuth } from "@/contexts/AuthContext";
+import { useMyDoctorProfile } from "@/hooks/useMyDoctorProfile";
 import { cn } from "@/lib/utils";
 import api from "@/services/api";
 import type { Appointment, ClinicalNote } from "@/types/calendar";
@@ -47,11 +47,6 @@ interface PatientRecord {
   fullName?: string;
   email?: string | null;
   phone?: string | null;
-}
-
-interface DoctorRecord {
-  id: string;
-  user_id: string;
 }
 
 interface AppointmentProfile {
@@ -137,6 +132,7 @@ function getStatusConfig(status: string) {
     confirmed: { color: "bg-success/10 text-success border-success/20", icon: CheckCircle2, label: "Onaylandı" },
     completed: { color: "bg-primary/10 text-primary border-primary/20", icon: CheckCircle2, label: "Tamamlandı" },
     cancelled: { color: "bg-destructive/10 text-destructive border-destructive/20", icon: XCircle, label: "İptal" },
+    no_show: { color: "bg-slate-200 text-slate-700 border-slate-300", icon: XCircle, label: "Gelmedi" },
   };
 
   return config[status] ?? config.pending;
@@ -146,7 +142,6 @@ export default function DoctorPatientDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { user } = useAuth();
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [diagnosis, setDiagnosis] = useState("");
   const [treatment, setTreatment] = useState("");
@@ -154,18 +149,7 @@ export default function DoctorPatientDetail() {
   const [notes, setNotes] = useState("");
   const [selectedAppointmentId, setSelectedAppointmentId] = useState<string | null>(null);
 
-  const { data: doctorRecord } = useQuery<DoctorRecord>({
-    queryKey: ["my-doctor-record", user?.id],
-    queryFn: async () => {
-      const doctors = await api.doctors.list() as DoctorRecord[];
-      const doctor = doctors.find((item) => item.user_id === user!.id);
-      if (!doctor) {
-        throw new Error("Doctor record not found");
-      }
-      return doctor;
-    },
-    enabled: !!user,
-  });
+  const { data: doctorRecord } = useMyDoctorProfile();
 
   const { data: patient, isLoading: isPatientLoading } = useQuery<PatientRecord>({
     queryKey: ["doctor-patient", id],

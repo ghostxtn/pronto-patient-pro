@@ -1,7 +1,7 @@
 import {
   addDays,
   format,
-  parseISO,
+  parse,
   setHours,
   setMinutes,
   startOfWeek,
@@ -13,6 +13,55 @@ import {
   AvailabilitySlot,
   CalendarEvent,
 } from "@/types/calendar";
+
+const CLINIC_TIME_ZONE = "Europe/Istanbul";
+
+export function parseCalendarDate(date: string) {
+  return parse(date, "yyyy-MM-dd", new Date());
+}
+
+export function getClinicNowParts() {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: CLINIC_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+
+  const parts = formatter.formatToParts(new Date());
+  const getPart = (type: string) => parts.find((part) => part.type === type)?.value ?? "00";
+
+  const year = getPart("year");
+  const month = getPart("month");
+  const day = getPart("day");
+  const hour = getPart("hour");
+  const minute = getPart("minute");
+
+  return {
+    date: `${year}-${month}-${day}`,
+    time: `${hour}:${minute}`,
+    minutes: Number(hour) * 60 + Number(minute),
+    dayOfWeek: new Date(Date.UTC(Number(year), Number(month) - 1, Number(day))).getUTCDay(),
+  };
+}
+
+export function isPastSchedulerSelection(date: string, startTime: string) {
+  const clinicNow = getClinicNowParts();
+
+  if (date < clinicNow.date) {
+    return true;
+  }
+
+  if (date > clinicNow.date) {
+    return false;
+  }
+
+  const [hours, minutes] = startTime.slice(0, 5).split(":").map(Number);
+  return hours * 60 + minutes <= clinicNow.minutes;
+}
 
 function parseTimeToDate(baseDate: Date, time: string) {
   const [hours, minutes] = time.slice(0, 5).split(":").map(Number);
@@ -42,7 +91,7 @@ export function appointmentsToEvents(
   appointments: Appointment[],
 ): CalendarEvent[] {
   return appointments.map((appointment) => {
-    const baseDate = parseISO(appointment.appointment_date);
+    const baseDate = parseCalendarDate(appointment.appointment_date);
     return {
       id: appointment.id,
       title: `${appointment.patient.firstName} ${appointment.patient.lastName}`.trim(),
@@ -58,13 +107,24 @@ export function overridesToEvents(
   overrides: AvailabilityOverride[],
 ): CalendarEvent[] {
   return overrides.map((override) => {
-    const baseDate = parseISO(override.date);
+    const baseDate = parseCalendarDate(override.date);
 
     if (override.type === "blackout") {
-      const blackoutDate = new Date(override.date);
+      if (override.start_time && override.end_time) {
+        return {
+          id: override.id,
+          title: override.reason ?? "Blok",
+          start: parseTimeToDate(baseDate, override.start_time),
+          end: parseTimeToDate(baseDate, override.end_time),
+          type: override.type,
+          resource: override,
+        };
+      }
+
+      const blackoutDate = parseCalendarDate(override.date);
       return {
         id: override.id,
-        title: override.reason ?? "Kapali",
+        title: override.reason ?? "Tum Gun Blok",
         start: blackoutDate,
         end: blackoutDate,
         allDay: true,

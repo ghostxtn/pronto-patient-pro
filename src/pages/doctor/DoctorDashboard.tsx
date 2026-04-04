@@ -1,8 +1,8 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/services/api";
-import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useMyDoctorProfile } from "@/hooks/useMyDoctorProfile";
 import AppLayout from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -21,23 +21,14 @@ const statusColors: Record<string, string> = {
   confirmed: "bg-success/10 text-success border-success/20",
   completed: "bg-primary/10 text-primary border-primary/20",
   cancelled: "bg-destructive/10 text-destructive border-destructive/20",
+  no_show: "bg-slate-200 text-slate-700 border-slate-300",
 };
 
 export default function DoctorDashboard() {
-  const { user } = useAuth();
   const { t } = useLanguage();
   const navigate = useNavigate();
 
-  const { data: doctorRecord } = useQuery({
-    queryKey: ["my-doctor-record", user?.id],
-    queryFn: async () => {
-      const doctors = await api.doctors.list();
-      const doctor = doctors.find((item: any) => item.user_id === user!.id);
-      if (!doctor) throw new Error("Doctor record not found");
-      return doctor;
-    },
-    enabled: !!user,
-  });
+  const { data: doctorRecord } = useMyDoctorProfile();
   const { data: appointments } = useQuery({
     queryKey: ["doctor-all-appointments", doctorRecord?.id],
     queryFn: async () => {
@@ -51,7 +42,7 @@ export default function DoctorDashboard() {
           null,
       }));
     },
-    enabled: !!doctorRecord,
+    enabled: !!doctorRecord?.id,
   });
 
   const todayAppts = appointments?.filter((a) => isToday(parseISO(a.appointment_date)) && a.status !== "cancelled") || [];

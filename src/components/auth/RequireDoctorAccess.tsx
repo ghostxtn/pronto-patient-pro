@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Navigate, Outlet } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { hasActiveDoctorProfile } from "@/lib/doctor-access";
+import { hasDoctorAccess } from "@/lib/doctor-access";
 import { getDefaultRouteByRole } from "@/lib/auth-routing";
 import api from "@/services/api";
 
@@ -24,7 +24,7 @@ export default function RequireDoctorAccess() {
     return <Navigate to="/auth" replace />;
   }
 
-  if (user.role === "doctor" || hasActiveDoctorProfile(doctorProfile)) {
+  if (hasDoctorAccess(user.role, doctorProfile)) {
     return <Outlet />;
   }
 

@@ -87,9 +87,13 @@ export class AppointmentsController {
   updateStatus(
     @Param('id') id: string,
     @Body() dto: UpdateStatusDto,
-    @CurrentUser() user: { clinicId: string },
+    @CurrentUser() user: { clinicId: string; role: string; userId: string },
   ) {
-    return this.appointmentsService.updateStatus(id, dto.status, user.clinicId);
+    return this.appointmentsService.updateStatus(id, dto.status, {
+      clinicId: user.clinicId,
+      role: user.role,
+      userId: user.userId,
+    });
   }
 
   @Delete(':id')

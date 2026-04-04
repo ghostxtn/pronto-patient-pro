@@ -247,6 +247,38 @@ type AuthResponse = {
   user?: unknown;
 };
 
+type NormalizedAppointmentStatus =
+  | "pending"
+  | "confirmed"
+  | "completed"
+  | "cancelled"
+  | "no_show";
+
+function normalizeAppointmentStatus(status: unknown): NormalizedAppointmentStatus {
+  if (status === "scheduled") {
+    return "confirmed";
+  }
+
+  if (
+    status === "pending" ||
+    status === "confirmed" ||
+    status === "completed" ||
+    status === "cancelled" ||
+    status === "no_show"
+  ) {
+    return status;
+  }
+
+  return "pending";
+}
+
+function normalizeAppointmentRecord<T extends { status?: unknown }>(appointment: T): T {
+  return {
+    ...appointment,
+    status: normalizeAppointmentStatus(appointment?.status),
+  };
+}
+
 const api = {
   auth: {
     login: (email: string, pass: string) =>
@@ -522,24 +554,25 @@ const api = {
       if (params?.status) search.set("status", params.status);
       return request<any[]>(
         `/appointments${search.toString() ? `?${search.toString()}` : ""}`,
-      );
+      ).then((appointments) => appointments.map((appointment) => normalizeAppointmentRecord(appointment)));
     },
-    get: (id: string) => request<any>(`/appointments/${id}`),
+    get: (id: string) =>
+      request<any>(`/appointments/${id}`).then((appointment) => normalizeAppointmentRecord(appointment)),
     create: (data: unknown) =>
       request<any>("/appointments", {
         method: "POST",
         body: JSON.stringify(data),
-      }),
+      }).then((appointment) => normalizeAppointmentRecord(appointment)),
     update: (id: string, data: unknown) =>
       request<any>(`/appointments/${id}`, {
         method: "PATCH",
         body: JSON.stringify(data),
-      }),
+      }).then((appointment) => normalizeAppointmentRecord(appointment)),
     updateStatus: (id: string, status: string) =>
       request<any>(`/appointments/${id}/status`, {
         method: "PATCH",
         body: JSON.stringify({ status }),
-      }),
+      }).then((appointment) => normalizeAppointmentRecord(appointment)),
     delete: (id: string) =>
       request<any>(`/appointments/${id}`, {
         method: "DELETE",

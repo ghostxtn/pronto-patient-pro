@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { getClinicNowParts } from "@/utils/calendarUtils";
 
 const fadeUp = {
   hidden: { opacity: 0, y: 20 },
@@ -32,6 +33,11 @@ const statusConfig: Record<string, { label: string; color: string }> = {
   confirmed: { label: "Onaylandı", color: "bg-primary/15 text-primary border-primary/30" },
   completed: { label: "Tamamlandı", color: "bg-success/15 text-success border-success/30" },
   cancelled: { label: "İptal", color: "bg-destructive/15 text-destructive border-destructive/30" },
+};
+
+statusConfig.no_show = {
+  label: "Gelmedi",
+  color: "bg-slate-200 text-slate-700 border-slate-300",
 };
 
 function getPatientName(appointment: any) {
@@ -50,8 +56,9 @@ function getDoctorDisplayName(doctor: any) {
 export default function StaffDashboard() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const today = new Date().toISOString().split("T")[0];
-  const todayDayOfWeek = new Date().getDay();
+  const clinicNow = getClinicNowParts();
+  const today = clinicNow.date;
+  const todayDayOfWeek = clinicNow.dayOfWeek;
 
   const { data, isLoading } = useQuery({
     queryKey: ["staff-dashboard", today],
@@ -60,7 +67,7 @@ export default function StaffDashboard() {
         api.appointments.list({ status: "pending" }),
         api.appointments.list({ date_from: today, date_to: today }),
         api.patients.list({ limit: 0 }),
-        api.doctors.list(),
+        api.doctors.list({ status: "active" }),
       ]);
 
       const patientList = Array.isArray(patients) ? patients : (patients.data ?? []);

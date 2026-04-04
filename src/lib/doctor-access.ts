@@ -1,3 +1,9 @@
+export function getDoctorProfileId(profile: any) {
+  return profile && typeof profile === "object" && typeof profile.id === "string"
+    ? profile.id
+    : null;
+}
+
 export function hasActiveDoctorProfile(profile: any) {
   if (!profile || typeof profile !== "object") {
     return false;
@@ -16,4 +22,8 @@ export function hasActiveDoctorProfile(profile: any) {
   }
 
   return false;
+}
+
+export function hasDoctorAccess(role?: string, profile?: any) {
+  return role === "doctor" || hasActiveDoctorProfile(profile);
 }

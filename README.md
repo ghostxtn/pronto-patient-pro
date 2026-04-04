@@ -4,7 +4,7 @@ docker compose down
 docker compose up -d --build
 $env:VITE_PROXY_TARGET="http://localhost"
 npm run dev
-
+npm install lenis
 Local Tenant Development
 
 This project uses domain-based tenant resolution.
@@ -121,3 +121,9 @@ Local seed accounts
 - Admin: `admin@yeniklinik.local` / `Admin123!`
 - Doctor: `doctor@yeniklinik.local` / `Doctor123!`
 - Patient: `patient@yeniklinik.local` / `Patient123!`
+
+
+
+Utku's mail: asdasdadads@gmail.com  Admin123!
+ACHREFS MAIL : achraf@yopmail.com Password123! 
+

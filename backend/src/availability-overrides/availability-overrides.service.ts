@@ -105,8 +105,8 @@ export class AvailabilityOverridesService {
         doctor_id: nextDoctorId,
         date: nextDate,
         type: nextType,
-        start_time: nextType === 'blackout' ? null : nextStartTime,
-        end_time: nextType === 'blackout' ? null : nextEndTime,
+        start_time: nextStartTime ?? null,
+        end_time: nextEndTime ?? null,
         reason: nextReason ?? null,
         updated_at: new Date(),
       })
@@ -178,9 +178,18 @@ export class AvailabilityOverridesService {
     }
 
     if (dto.type === 'blackout') {
-      if (dto.start_time || dto.end_time) {
+      const hasStart = Boolean(dto.start_time);
+      const hasEnd = Boolean(dto.end_time);
+
+      if (hasStart !== hasEnd) {
         throw new BadRequestException(
-          'start_time and end_time are not allowed for blackout',
+          'start_time and end_time must both be provided for timed blackout',
+        );
+      }
+
+      if (dto.start_time && dto.end_time && dto.start_time >= dto.end_time) {
+        throw new BadRequestException(
+          'start_time must be before end_time for blackout',
         );
       }
     }

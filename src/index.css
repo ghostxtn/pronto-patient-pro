@@ -198,6 +198,98 @@
 }
 
 @layer utilities {
+  .calendar-suite-shell {
+    background:
+      linear-gradient(180deg, rgba(248, 251, 255, 0.92) 0%, rgba(255, 255, 255, 0.98) 16%, rgba(255, 255, 255, 1) 100%);
+    border: 1px solid rgba(226, 232, 240, 0.92);
+    border-radius: 36px;
+    box-shadow: 0 30px 70px -40px rgba(15, 23, 42, 0.34);
+  }
+
+  .calendar-suite-hero {
+    background:
+      linear-gradient(135deg, rgba(248, 251, 255, 0.98) 0%, rgba(241, 245, 249, 0.92) 100%);
+    border: 1px solid rgba(226, 232, 240, 0.92);
+    border-radius: 28px;
+    box-shadow: 0 24px 50px -38px rgba(15, 23, 42, 0.28);
+  }
+
+  .calendar-suite-panel {
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 252, 0.96) 100%);
+    border: 1px solid rgba(226, 232, 240, 0.88);
+    border-radius: 28px;
+    box-shadow: 0 22px 44px -36px rgba(15, 23, 42, 0.28);
+  }
+
+  .calendar-suite-subpanel {
+    background: rgba(248, 250, 252, 0.82);
+    border: 1px solid rgba(226, 232, 240, 0.85);
+    border-radius: 22px;
+  }
+
+  .calendar-suite-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: #94a3b8;
+  }
+
+  .calendar-suite-kicker {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    border-radius: 9999px;
+    border: 1px solid rgba(191, 219, 254, 0.85);
+    background: rgba(239, 246, 255, 0.88);
+    color: #2563eb;
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .calendar-suite-dialog {
+    overflow: hidden;
+    border: 1px solid rgba(226, 232, 240, 0.92);
+    border-radius: 28px;
+    box-shadow: 0 32px 72px -32px rgba(15, 23, 42, 0.38);
+    background: linear-gradient(180deg, rgba(248, 251, 255, 0.98) 0%, rgba(255, 255, 255, 1) 16%);
+  }
+
+  .calendar-suite-dialog-header {
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+    color: white;
+  }
+
+  .calendar-suite-slot {
+    @apply rounded-2xl border text-sm font-medium transition-all;
+  }
+
+  .calendar-suite-slot--idle {
+    @apply border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50;
+  }
+
+  .calendar-suite-slot--selected {
+    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+    border-color: rgba(37, 99, 235, 0.7);
+    color: white;
+    box-shadow: 0 18px 32px -20px rgba(37, 99, 235, 0.48);
+  }
+
+  .calendar-suite-slot--disabled {
+    border-color: rgba(226, 232, 240, 0.92);
+    background:
+      repeating-linear-gradient(
+        -45deg,
+        rgba(248, 250, 252, 0.95),
+        rgba(248, 250, 252, 0.95) 8px,
+        rgba(241, 245, 249, 0.95) 8px,
+        rgba(241, 245, 249, 0.95) 16px
+      );
+    color: #94a3b8;
+  }
+
   .glass {
     @apply bg-card/70 backdrop-blur-xl border border-border/50;
   }
@@ -273,7 +365,7 @@
   }
 
   .rbc-calendar {
-    @apply rounded-2xl bg-card text-foreground;
+    @apply rounded-[28px] bg-white text-foreground;
   }
 
   .rbc-toolbar {
@@ -289,7 +381,7 @@
   }
 
   .rbc-header {
-    @apply border-border bg-muted/50 py-2 font-medium text-foreground;
+    @apply border-slate-200 bg-white py-2 font-medium text-slate-600;
   }
 
   .rbc-time-view,
@@ -298,15 +390,215 @@
   .rbc-time-header-content,
   .rbc-time-header,
   .rbc-day-slot .rbc-time-slot {
-    @apply border-border;
+    @apply border-slate-200;
   }
 
   .rbc-today {
-    @apply bg-accent/40;
+    background-color: rgba(239, 246, 255, 0.9);
   }
 
   .rbc-event {
-    @apply rounded-lg border px-2 py-1 text-xs font-medium shadow-none;
+    @apply rounded-xl border px-2 py-1 text-xs font-medium shadow-none;
+  }
+
+  .rbc-month-view,
+  .rbc-time-view,
+  .rbc-agenda-view {
+    @apply overflow-hidden rounded-[24px] border border-slate-200 bg-white;
+  }
+
+  .rbc-time-gutter,
+  .rbc-time-header-gutter {
+    @apply bg-slate-50;
+  }
+
+  .scheduler-shell .rbc-month-view,
+  .scheduler-shell .rbc-time-view {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.72),
+      0 24px 42px -36px rgba(15, 23, 42, 0.26);
+  }
+
+  .scheduler-shell .rbc-time-header {
+    @apply bg-white;
+  }
+
+  .scheduler-shell .rbc-header {
+    @apply py-3 text-[13px] font-semibold text-slate-500;
+  }
+
+  .scheduler-shell .rbc-time-content {
+    @apply bg-white;
+  }
+
+  .scheduler-shell .rbc-time-content,
+  .scheduler-shell .rbc-month-view {
+    border-radius: 24px;
+  }
+
+  .scheduler-shell .rbc-time-gutter .rbc-timeslot-group {
+    @apply bg-slate-50/80;
+  }
+
+  .scheduler-shell .rbc-label {
+    @apply pr-3 text-[11px] font-medium tracking-[0.08em] text-slate-400;
+  }
+
+  .scheduler-shell .rbc-timeslot-group {
+    min-height: 68px;
+  }
+
+  .scheduler-shell .rbc-day-bg {
+    background-color: rgba(255, 255, 255, 0.94);
+  }
+
+  .scheduler-shell .rbc-day-bg.rbc-today,
+  .scheduler-shell .rbc-time-content .rbc-day-slot.rbc-today {
+    background-color: rgba(239, 246, 255, 0.72);
+  }
+
+  .scheduler-shell .rbc-event {
+    @apply rounded-2xl border px-2.5 py-1.5 text-[11px] font-semibold;
+  }
+
+  .scheduler-shell .rbc-month-row {
+    min-height: 132px;
+  }
+
+  .scheduler-shell .rbc-date-cell {
+    @apply px-3 pt-3 text-right text-sm font-medium text-slate-500;
+  }
+
+  .scheduler-shell .rbc-off-range-bg {
+    background-color: #f8fbff;
+  }
+
+  .scheduler-slot-selected {
+    background:
+      linear-gradient(180deg, rgba(59, 130, 246, 0.28), rgba(191, 219, 254, 0.58)) !important;
+    box-shadow:
+      inset 0 0 0 1px rgba(59, 130, 246, 0.24),
+      inset 3px 0 0 rgba(37, 99, 235, 0.72);
+  }
+
+  .scheduler-slot-available {
+    background:
+      linear-gradient(180deg, rgba(220, 252, 231, 0.98), rgba(240, 253, 244, 0.98)) !important;
+    box-shadow:
+      inset 0 0 0 1px rgba(52, 211, 153, 0.22),
+      inset 3px 0 0 rgba(16, 185, 129, 0.6);
+  }
+
+  .scheduler-slot-unavailable {
+    background:
+      linear-gradient(180deg, rgba(226, 232, 240, 0.68), rgba(241, 245, 249, 0.76)) !important;
+    box-shadow: inset 3px 0 0 rgba(148, 163, 184, 0.38);
+  }
+
+  .scheduler-slot-past {
+    background:
+      repeating-linear-gradient(
+        -45deg,
+        rgba(248, 250, 252, 0.98),
+        rgba(248, 250, 252, 0.98) 8px,
+        rgba(241, 245, 249, 0.98) 8px,
+        rgba(241, 245, 249, 0.98) 16px
+      ) !important;
+    opacity: 0.96;
+  }
+
+  .scheduler-slot-booked {
+    background:
+      linear-gradient(180deg, rgba(219, 234, 254, 0.78), rgba(239, 246, 255, 0.84)) !important;
+    box-shadow:
+      inset 0 0 0 1px rgba(96, 165, 250, 0.18),
+      inset 3px 0 0 rgba(59, 130, 246, 0.48);
+  }
+
+  .scheduler-slot-blackout-full {
+    background-color: rgba(254, 226, 226, 0.75) !important;
+    box-shadow: inset 3px 0 0 rgba(239, 68, 68, 0.45);
+  }
+
+  .scheduler-slot-blackout-range {
+    background-color: rgba(254, 205, 211, 0.65) !important;
+    box-shadow: inset 3px 0 0 rgba(244, 63, 94, 0.4);
+  }
+
+  .scheduler-slot-custom-hours {
+    background-color: rgba(255, 237, 213, 0.72) !important;
+    box-shadow:
+      inset 0 0 0 1px rgba(251, 191, 36, 0.2),
+      inset 3px 0 0 rgba(245, 158, 11, 0.4);
+  }
+
+  .scheduler-slot-outside {
+    background-color: rgba(255, 255, 255, 0.96) !important;
+  }
+
+  .rbc-time-gutter .rbc-timeslot-group,
+  .rbc-time-view .rbc-allday-cell,
+  .rbc-month-row + .rbc-month-row,
+  .rbc-day-bg + .rbc-day-bg,
+  .rbc-header + .rbc-header {
+    @apply border-slate-200;
+  }
+
+  .rbc-time-content > * + * > * {
+    @apply border-slate-200;
+  }
+
+  .rbc-month-row {
+    min-height: 112px;
+  }
+
+  .rbc-date-cell {
+    @apply px-2 pt-2 text-right text-slate-500;
+  }
+
+  .rbc-off-range-bg {
+    background-color: #f8fafc;
+  }
+
+  .rbc-off-range {
+    @apply text-slate-300;
+  }
+
+  .rbc-day-slot .rbc-events-container {
+    margin-right: 4px;
+  }
+
+  .rbc-time-slot,
+  .rbc-label {
+    @apply text-slate-400;
+  }
+
+  .rbc-label {
+    font-size: 11px;
+  }
+
+  .rbc-current-time-indicator {
+    background-color: #ef4444;
+    height: 2px;
+  }
+
+  .rbc-current-time-indicator::before {
+    content: "";
+    position: absolute;
+    left: -6px;
+    top: -4px;
+    width: 10px;
+    height: 10px;
+    border-radius: 9999px;
+    background: #ef4444;
+  }
+
+  .rbc-show-more {
+    @apply text-xs font-medium text-primary;
+  }
+
+  .rbc-selected-cell {
+    background-color: rgba(59, 130, 246, 0.08);
   }
 
   .rbc-time-slot:hover,

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { Loader2, Trash2 } from "lucide-react";
+import { Clock3, Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import api, { ApiError } from "@/services/api";
 import type { AvailabilitySlot } from "@/types/calendar";
@@ -138,9 +138,9 @@ export function AvailabilityModal({
     },
     onError: (error: unknown) => {
       if (error instanceof ApiError && error.status === 409) {
-        toast.error("Bu gün ve saat aralığında zaten aktif bir müsaitlik slotu mevcut.");
+        toast.error("Bu gun ve saat araliginda zaten aktif bir musaitlik slotu mevcut.");
       } else {
-        toast.error("Müsaitlik kaydedilemedi.");
+        toast.error("Musaitlik kaydedilemedi.");
       }
     },
   });
@@ -173,74 +173,84 @@ export function AvailabilityModal({
           }
         }}
       >
-        <DialogContent className="sm:max-w-md rounded-2xl">
-          <DialogHeader>
-            <DialogTitle>{mode === "edit" ? "Musaitligi Duzenle" : "Musaitlik Ekle"}</DialogTitle>
-            <DialogDescription>
-              Hekimin calisma araligini ve randevu slot suresini belirleyin.
-            </DialogDescription>
-          </DialogHeader>
+        <DialogContent className="calendar-suite-dialog sm:max-w-2xl border-0 p-0">
+          <div className="calendar-suite-dialog-header px-6 py-5">
+            <DialogHeader>
+              <DialogTitle className="font-display text-2xl font-bold text-white">
+                {mode === "edit" ? "Haftalik Musaitligi Duzenle" : "Haftalik Musaitlik Ekle"}
+              </DialogTitle>
+              <DialogDescription className="text-blue-50">
+                Tekrarlayan calisma saatleri ve slot suresi bu yuzeyde yonetilir.
+              </DialogDescription>
+            </DialogHeader>
+          </div>
 
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="availability-day">Gun</Label>
-              <Select value={dayOfWeek} onValueChange={setDayOfWeek}>
-                <SelectTrigger id="availability-day" className="rounded-xl">
-                  <SelectValue placeholder="Gun secin" />
-                </SelectTrigger>
-                <SelectContent>
-                  {dayOptions.map((day) => (
-                    <SelectItem key={day.value} value={day.value}>
-                      {day.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label htmlFor="availability-start">Baslangic saati</Label>
-                <Input
-                  id="availability-start"
-                  type="time"
-                  value={startTime}
-                  onChange={(event) => setStartTime(event.target.value)}
-                  className="rounded-xl"
-                />
+          <div className="space-y-5 px-6 py-6">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="calendar-suite-subpanel p-4">
+                <Label htmlFor="availability-day" className="calendar-suite-label">Gun</Label>
+                <Select value={dayOfWeek} onValueChange={setDayOfWeek}>
+                  <SelectTrigger id="availability-day" className="mt-3 rounded-2xl border-slate-200 bg-white">
+                    <SelectValue placeholder="Gun secin" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {dayOptions.map((day) => (
+                      <SelectItem key={day.value} value={day.value}>
+                        {day.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="availability-end">Bitis saati</Label>
-                <Input
-                  id="availability-end"
-                  type="time"
-                  value={endTime}
-                  onChange={(event) => setEndTime(event.target.value)}
-                  className="rounded-xl"
-                />
+              <div className="calendar-suite-subpanel p-4">
+                <Label htmlFor="availability-slot-duration" className="calendar-suite-label">Slot Suresi</Label>
+                <Select value={slotDuration} onValueChange={setSlotDuration}>
+                  <SelectTrigger id="availability-slot-duration" className="mt-3 rounded-2xl border-slate-200 bg-white">
+                    <SelectValue placeholder="Sure secin" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {slotDurationOptions.map((option) => (
+                      <SelectItem key={option} value={option}>
+                        {option} dakika
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
-            {timeError ? (
-              <p className="text-sm text-destructive">{timeError}</p>
-            ) : null}
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="calendar-suite-subpanel p-4">
+                <Label htmlFor="availability-start" className="calendar-suite-label">Baslangic</Label>
+                <div className="mt-3 flex items-center gap-3 rounded-2xl bg-white px-4 py-3">
+                  <Clock3 className="h-4 w-4 text-slate-400" />
+                  <Input
+                    id="availability-start"
+                    type="time"
+                    value={startTime}
+                    onChange={(event) => setStartTime(event.target.value)}
+                    className="border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
+                  />
+                </div>
+              </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="availability-slot-duration">Slot suresi</Label>
-              <Select value={slotDuration} onValueChange={setSlotDuration}>
-                <SelectTrigger id="availability-slot-duration" className="rounded-xl">
-                  <SelectValue placeholder="Sure secin" />
-                </SelectTrigger>
-                <SelectContent>
-                  {slotDurationOptions.map((option) => (
-                    <SelectItem key={option} value={option}>
-                      {option} dakika
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="calendar-suite-subpanel p-4">
+                <Label htmlFor="availability-end" className="calendar-suite-label">Bitis</Label>
+                <div className="mt-3 flex items-center gap-3 rounded-2xl bg-white px-4 py-3">
+                  <Clock3 className="h-4 w-4 text-slate-400" />
+                  <Input
+                    id="availability-end"
+                    type="time"
+                    value={endTime}
+                    onChange={(event) => setEndTime(event.target.value)}
+                    className="border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
+                  />
+                </div>
+              </div>
             </div>
+
+            {timeError ? <p className="text-sm text-destructive">{timeError}</p> : null}
 
             <div className="flex items-center justify-between gap-3 pt-2">
               {mode === "edit" && slot ? (
@@ -251,20 +261,22 @@ export function AvailabilityModal({
                   onClick={() => setConfirmDeleteOpen(true)}
                   disabled={deleteMutation.isPending || saveMutation.isPending}
                 >
-                  <Trash2 className="h-4 w-4" />
+                  <Trash2 className="mr-2 h-4 w-4" />
                   Sil
                 </Button>
               ) : (
-                <div />
+                <Button type="button" variant="ghost" className="rounded-xl text-slate-600" onClick={onClose}>
+                  Vazgec
+                </Button>
               )}
 
               <Button
                 type="button"
-                className="rounded-xl"
+                className="h-12 rounded-2xl px-6"
                 onClick={() => saveMutation.mutate()}
                 disabled={!isValid || saveMutation.isPending || deleteMutation.isPending}
               >
-                {saveMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                {saveMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                 Kaydet
               </Button>
             </div>
@@ -290,7 +302,7 @@ export function AvailabilityModal({
               }}
               disabled={deleteMutation.isPending}
             >
-              {deleteMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              {deleteMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               Sil
             </AlertDialogAction>
           </AlertDialogFooter>

@@ -40,6 +40,7 @@ export default function MyAppointments() {
     confirmed: { color: "bg-success/10 text-success border-success/20", icon: CheckCircle2, label: t.confirmed },
     completed: { color: "bg-primary/10 text-primary border-primary/20", icon: CheckCircle2, label: t.completed },
     cancelled: { color: "bg-destructive/10 text-destructive border-destructive/20", icon: XCircle, label: t.cancelled },
+    no_show: { color: "bg-slate-200 text-slate-700 border-slate-300", icon: XCircle, label: "Gelmedi" },
   };
 
   const { data: appointments, isLoading } = useQuery({
@@ -58,7 +59,7 @@ export default function MyAppointments() {
 
   const selectedAppointment = appointments?.find((a) => a.id === detailId);
   const upcoming = appointments?.filter((a) => a.status === "pending" || a.status === "confirmed") || [];
-  const past = appointments?.filter((a) => a.status === "completed" || a.status === "cancelled") || [];
+  const past = appointments?.filter((a) => a.status === "completed" || a.status === "cancelled" || a.status === "no_show") || [];
 
   return (
     <AppLayout>
