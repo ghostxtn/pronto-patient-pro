@@ -113,23 +113,14 @@ export default function HeroSection() {
       {/* ── Sticky animasyon katmanı ── */}
       <div id="hero-sticky-bg" className="hero-sticky-bg">
 
-        {/* Halkalar */}
-        <div
-          id="hero-ring-1"
-          className="hero-ring"
-          style={{ width: 420, height: 420 }}
+        <video
+          autoPlay
+          muted
+          loop
+          playsInline
+          className="hero-video-bg"
+          src="/hero-animation.mp4"
         />
-        <div
-          id="hero-ring-2"
-          className="hero-ring"
-          style={{ width: 750, height: 750, borderColor: "rgba(101,169,143,0.08)" }}
-        />
-
-        {/* Blob'lar */}
-        <div id="hero-blob-1" className="hero-blob hero-blob-1" />
-        <div id="hero-blob-2" className="hero-blob hero-blob-2" />
-        <div id="hero-blob-3" className="hero-blob hero-blob-3" />
-        <div id="hero-blob-4" className="hero-blob hero-blob-4" />
 
         {/* ── Başlık — viewport dibinde, scroll ile yukarı çıkar ── */}
         <div id="hero-content" className="hero-content">
