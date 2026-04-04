@@ -44,6 +44,7 @@ export class HomepagePreviewService {
         id: specializations.id,
         name: specializations.name,
         description: specializations.description,
+        imageUrl: specializations.imageUrl,
       })
       .from(specializations)
       .where(

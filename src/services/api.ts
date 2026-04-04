@@ -334,6 +334,7 @@ const api = {
           id: string;
           firstName?: string | null;
           lastName?: string | null;
+          avatarUrl?: string | null;
           title?: string | null;
           bio?: string | null;
           specialization?: {
@@ -345,6 +346,7 @@ const api = {
           id: string;
           name: string;
           description?: string | null;
+          imageUrl?: string | null;
         }>;
       }>("/homepage-preview"),
   },
@@ -355,6 +357,7 @@ const api = {
           id: string;
           name: string;
           description?: string | null;
+          imageUrl?: string | null;
         }>
       >("/specializations/public-discovery"),
     list: () => request<any[]>("/specializations"),
@@ -373,6 +376,14 @@ const api = {
       request<any>(`/specializations/${id}`, {
         method: "DELETE",
       }),
+    uploadImage: (id: string, file: File) => {
+      const formData = new FormData();
+      formData.append("image", file);
+      return request<any>(`/specializations/${id}/image`, {
+        method: "PATCH",
+        body: formData,
+      });
+    },
   },
   doctors: {
     list: (params?: { specialization_id?: string; status?: "active" | "inactive" | "all" }) => {
@@ -617,6 +628,14 @@ const api = {
       const formData = new FormData();
       formData.append("file", file);
       return request<{ url: string }>("/storage/avatar", {
+        method: "POST",
+        body: formData,
+      });
+    },
+    uploadAvatarForUser: (userId: string, file: File) => {
+      const formData = new FormData();
+      formData.append("avatar", file);
+      return request<{ avatarUrl: string }>(`/storage/avatar/${userId}`, {
         method: "POST",
         body: formData,
       });

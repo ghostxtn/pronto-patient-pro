@@ -1,0 +1,22 @@
+$kind: http-request
+name: Create Appointment Note
+method: POST
+url: '{{baseUrl}}/appointments/{{appointmentId}}/notes'
+order: 7000
+auth:
+  type: bearer
+  credentials:
+    - key: token
+      value: '{{accessToken}}'
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "diagnosis": "Common cold",
+      "treatment": "Rest and fluids",
+      "prescription": "Paracetamol 500mg",
+      "notes": "Patient should return in 1 week if symptoms persist"
+    }

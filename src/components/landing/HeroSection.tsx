@@ -1,312 +1,202 @@
-import { motion } from "framer-motion";
-import SmartLink from "./SmartLink";
+import { useEffect, useRef } from "react";
+import Lenis from "@studio-freight/lenis";
+import { useNavigate } from "react-router-dom";
+import { useLanguage } from "@/contexts/LanguageContext";
 
-type HeroDoctor = {
-  id: string;
-  name: string;
-  title: string;
-};
+/* ─────────────────────────────────────────────────────
+   Card copy
+───────────────────────────────────────────────────── */
+const cardCopy = {
+  tr: [
+    { icon: "📅", title: "Akıllı Randevu",  desc: "Müsaitlik bazlı slot yönetimi, çakışma önleme." },
+    { icon: "🩺", title: "Hasta Notları",   desc: "AES-256 şifreli klinik notlar, staff kısıtlaması." },
+    { icon: "🔐", title: "KVKK Uyumu",      desc: "Rıza takibi, audit log, veri şifreleme." },
+    { icon: "👥", title: "Rol Yönetimi",    desc: "5 farklı rol ile tam yetki izolasyonu." },
+  ],
+  en: [
+    { icon: "📅", title: "Smart Scheduling", desc: "Availability-based slot planning with conflict prevention." },
+    { icon: "🩺", title: "Patient Notes",    desc: "AES-256 encrypted notes with role-based staff restrictions." },
+    { icon: "🔐", title: "Privacy Ready",    desc: "Consent tracking, audit logs, and encrypted data flow." },
+    { icon: "👥", title: "Role Control",     desc: "Five role layers with strict permission isolation." },
+  ],
+} as const;
 
-type HeroSectionProps = {
-  doctors: HeroDoctor[];
-};
+void cardCopy;
 
-const sectionMotionProps = {
-  initial: { opacity: 0, y: 28 },
-  whileInView: { opacity: 1, y: 0 },
-  viewport: { once: true, margin: "-60px" },
-  transition: { duration: 0.55, ease: "easeOut" as const },
-};
+/* ─────────────────────────────────────────────────────
+   HeroSection
+───────────────────────────────────────────────────── */
+export default function HeroSection() {
+  const navigate   = useNavigate();
+  const { lang }   = useLanguage();
+  const rafRef     = useRef<number>(0);
+  const heroTotalRef = useRef<number>(1);
 
-export function getInitials(name: string) {
+  /* ── Scroll engine ── */
+  useEffect(() => {
+    const heroEl    = document.getElementById("hero-section");
+    const heroBg    = document.getElementById("hero-sticky-bg");
+    const heroC     = document.getElementById("hero-content");
+    const b1        = document.getElementById("hero-blob-1");
+    const b2        = document.getElementById("hero-blob-2");
+    const b3        = document.getElementById("hero-blob-3");
+    const b4        = document.getElementById("hero-blob-4");
+    const r1        = document.getElementById("hero-ring-1");
+    const r2        = document.getElementById("hero-ring-2");
+
+    if (!heroEl) return;
+
+    // Lenis smooth scroll
+    const lenis = new Lenis({
+      duration: 1.2,
+      easing: (t: number) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+      smoothWheel: true,
+    });
+
+    /* ── Boyutu hesapla ── */
+    const calcSize = () => {
+      heroTotalRef.current = Math.max(1, heroEl.offsetHeight - window.innerHeight);
+    };
+    calcSize();
+    window.addEventListener("resize", calcSize, { passive: true });
+
+    // CSS smooth scroll — native, sifir bagimlilik
+    document.documentElement.style.scrollBehavior = "smooth";
+
+    // Lenis kendi RAF loop'unu calistir
+    function lenisRaf(time: number) {
+      lenis.raf(time);
+      rafRef.current = requestAnimationFrame(lenisRaf);
+    }
+    const lenisRafId = requestAnimationFrame(lenisRaf);
+
+    // Lenis scroll event'i dinle — window.scrollY yerine lenis'in degerini kullan
+    lenis.on("scroll", ({ scroll }: { scroll: number }) => {
+      const p = Math.max(0, Math.min(1, scroll / heroTotalRef.current));
+      const pStr = p.toFixed(5);
+
+      heroBg?.style.setProperty("--p", pStr);
+      heroC?.style.setProperty("--p", pStr);
+
+      if (b1) b1.style.transform = `translate(${p * -60}px, ${p * -50}px) scale(${1 - p * 0.08})`;
+      if (b2) b2.style.transform = `translate(${p * 55}px, ${p * -35}px) scale(${1 - p * 0.10})`;
+      if (b4) b4.style.transform = `translateX(${p * 35}px)`;
+      if (r1) { r1.style.transform = `translate(-50%,-50%) scale(${1 + p * 0.6})`; r1.style.opacity = `${Math.max(0, 0.6 - p * 0.55)}`; }
+      if (r2) { r2.style.transform = `translate(-50%,-50%) scale(${1 + p * 0.3})`; r2.style.opacity = `${Math.max(0, 0.4 - p * 0.35)}`; }
+      if (heroC) heroC.style.transform = `translateY(${p * -18}%)`;
+    });
+
+    const initialScroll = window.scrollY;
+    const initialProgress = Math.max(0, Math.min(1, initialScroll / heroTotalRef.current));
+    const initialProgressStr = initialProgress.toFixed(5);
+    heroBg?.style.setProperty("--p", initialProgressStr);
+    heroC?.style.setProperty("--p", initialProgressStr);
+    if (b1) b1.style.transform = `translate(${initialProgress * -60}px, ${initialProgress * -50}px) scale(${1 - initialProgress * 0.08})`;
+    if (b2) b2.style.transform = `translate(${initialProgress * 55}px, ${initialProgress * -35}px) scale(${1 - initialProgress * 0.10})`;
+    if (b4) b4.style.transform = `translateX(${initialProgress * 35}px)`;
+    if (r1) { r1.style.transform = `translate(-50%,-50%) scale(${1 + initialProgress * 0.6})`; r1.style.opacity = `${Math.max(0, 0.6 - initialProgress * 0.55)}`; }
+    if (r2) { r2.style.transform = `translate(-50%,-50%) scale(${1 + initialProgress * 0.3})`; r2.style.opacity = `${Math.max(0, 0.4 - initialProgress * 0.35)}`; }
+    if (heroC) heroC.style.transform = `translateY(${initialProgress * -18}%)`;
+
+    return () => {
+      cancelAnimationFrame(lenisRafId);
+      cancelAnimationFrame(rafRef.current);
+      lenis.destroy();
+      window.removeEventListener("resize", calcSize);
+      document.documentElement.style.scrollBehavior = "";
+    };
+  }, []);
+
+  return (
+    <section id="hero-section" className="hero-section">
+
+      {/* ── Sticky animasyon katmanı ── */}
+      <div id="hero-sticky-bg" className="hero-sticky-bg">
+
+        {/* Halkalar */}
+        <div
+          id="hero-ring-1"
+          className="hero-ring"
+          style={{ width: 420, height: 420 }}
+        />
+        <div
+          id="hero-ring-2"
+          className="hero-ring"
+          style={{ width: 750, height: 750, borderColor: "rgba(101,169,143,0.08)" }}
+        />
+
+        {/* Blob'lar */}
+        <div id="hero-blob-1" className="hero-blob hero-blob-1" />
+        <div id="hero-blob-2" className="hero-blob hero-blob-2" />
+        <div id="hero-blob-3" className="hero-blob hero-blob-3" />
+        <div id="hero-blob-4" className="hero-blob hero-blob-4" />
+
+        {/* ── Başlık — viewport dibinde, scroll ile yukarı çıkar ── */}
+        <div id="hero-content" className="hero-content">
+          <div className="hero-content-shell">
+
+            {/* Logo satırı */}
+            <div className="hero-logo-row">
+              <svg width="40" height="40" viewBox="0 0 40 40" fill="none" aria-hidden>
+                <rect x="4"  y="16" width="32" height="8" rx="4" fill="#65a98f" />
+                <rect x="16" y="4"  width="8"  height="32" rx="4" fill="#4f8fe6" />
+              </svg>
+              <span className="hero-brand-text">
+                {lang === "tr" ? "Pronto Tıp Merkezi" : "Pronto Medical Center"}
+              </span>
+            </div>
+
+            {/* Başlık */}
+            <h1 className="hero-tagline">
+              {lang === "tr" ? (
+                <>Sağlığınız İçin<br />Burdayız!</>
+              ) : (
+                <>Your Health,<br />Our Priority.</>
+              )}
+            </h1>
+
+            {/* Alt başlık */}
+            <p className="hero-sub">
+              {lang === "tr"
+                ? "Pronto Tıp Merkezi Hizmetinizde"
+                : "Pronto Medical Center at Your Service"}
+            </p>
+
+            {/* CTA */}
+            <button
+              className="hero-cta-btn"
+              onClick={() => navigate("/register")}
+            >
+              {lang === "tr" ? "Ücretsiz Deneyin →" : "Try It Free →"}
+            </button>
+
+          </div>
+        </div>
+
+        {/* Scroll ipucu */}
+        <div className="hero-scroll-hint" aria-hidden>
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path
+              d="M8 2v12M3 9l5 5 5-5"
+              stroke="#5a7a8a"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          <span>{lang === "tr" ? "kaydırın" : "scroll"}</span>
+        </div>
+
+      </div>
+    </section>
+  );
+}
+
+export function getInitials(name: string): string {
   return name
     .split(" ")
     .filter(Boolean)
     .slice(0, 2)
     .map((part) => part[0]?.toUpperCase())
     .join("");
-}
-
-export default function HeroSection({ doctors }: HeroSectionProps) {
-  return (
-    <motion.section
-      {...sectionMotionProps}
-      style={{ minHeight: "100vh", display: "flex", alignItems: "stretch", paddingTop: "68px" }}
-    >
-      <div style={{ flex: 1, display: "flex", alignItems: "center", padding: "48px 64px" }}>
-        <div style={{ maxWidth: 520 }}>
-          <div
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              background: "#eaf5ff",
-              border: "0.5px solid #b5d1cc",
-              borderRadius: 999,
-              padding: "5px 14px 5px 8px",
-              fontSize: 11,
-              color: "#2f75ca",
-              fontWeight: 500,
-              marginBottom: 28,
-            }}
-          >
-            <span
-              style={{
-                width: 6,
-                height: 6,
-                borderRadius: "50%",
-                background: "#4f8fe6",
-                display: "inline-block",
-              }}
-            />
-            Modern klinik yönetimi
-          </div>
-
-          <h1
-            style={{
-              fontFamily: "Manrope, sans-serif",
-              fontSize: 52,
-              fontWeight: 300,
-              lineHeight: 1.08,
-              letterSpacing: "-0.03em",
-              color: "#1a2e3b",
-              marginBottom: 20,
-            }}
-          >
-            Sağlığınız için <span style={{ fontWeight: 700, color: "#4f8fe6" }}>doğru adres.</span>
-          </h1>
-
-          <p style={{ fontSize: 16, color: "#5a7a8a", lineHeight: 1.65, marginBottom: 36 }}>
-            Antalya&apos;nın merkezinde, uzman doktorlarımız ve kişiselleştirilmiş sağlık
-            hizmetlerimizle yanınızdayız. Randevu almak hiç bu kadar kolay olmamıştı.
-          </p>
-
-          <div style={{ display: "flex", gap: 12 }}>
-            <SmartLink
-              href="/request-appointment"
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                background: "#4f8fe6",
-                color: "white",
-                borderRadius: 999,
-                padding: "12px 24px",
-                fontSize: 14,
-                fontWeight: 500,
-                textDecoration: "none",
-                boxShadow: "0 4px 14px rgba(79,143,230,0.3)",
-              }}
-            >
-              Randevu Al →
-            </SmartLink>
-            <SmartLink
-              href="#doktorlarimiz"
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                background: "white",
-                color: "#1a2e3b",
-                borderRadius: 999,
-                padding: "12px 24px",
-                fontSize: 14,
-                fontWeight: 500,
-                textDecoration: "none",
-                border: "0.5px solid #b5d1cc",
-              }}
-            >
-              Doktorlarımız
-            </SmartLink>
-          </div>
-        </div>
-      </div>
-
-      <div
-        style={{
-          width: "44%",
-          margin: "12px 12px 12px 0",
-          borderRadius: 28,
-          overflow: "hidden",
-          position: "relative",
-          background: "linear-gradient(145deg, #c8e6f5 0%, #b5d1cc 40%, #9ecfbd 100%)",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <div
-          style={{
-            position: "absolute",
-            top: "-10%",
-            left: "-10%",
-            width: 400,
-            height: 400,
-            borderRadius: "50%",
-            background: "#4f8fe6",
-            opacity: 0.18,
-            filter: "blur(80px)",
-            pointerEvents: "none",
-          }}
-        />
-        <div
-          style={{
-            position: "absolute",
-            bottom: "-5%",
-            right: "-10%",
-            width: 350,
-            height: 350,
-            borderRadius: "50%",
-            background: "#236a53",
-            opacity: 0.15,
-            filter: "blur(90px)",
-            pointerEvents: "none",
-          }}
-        />
-
-        <div
-          style={{
-            position: "relative",
-            zIndex: 1,
-            width: "100%",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            padding: "40px 32px",
-          }}
-        >
-          <div style={{ textAlign: "center", marginBottom: 24 }}>
-            <p
-              style={{
-                fontSize: 10,
-                fontWeight: 600,
-                letterSpacing: "0.12em",
-                textTransform: "uppercase",
-                color: "rgba(26,46,59,0.45)",
-                marginBottom: 4,
-              }}
-            >
-              Canlı Takip
-            </p>
-            <h3
-              style={{
-                fontFamily: "Manrope, sans-serif",
-                fontSize: 20,
-                fontWeight: 600,
-                color: "rgba(26,46,59,0.8)",
-                letterSpacing: "-0.02em",
-              }}
-            >
-              Doktorlarımız
-            </h3>
-          </div>
-
-          <div
-            style={{
-              width: "90%",
-              maxWidth: 300,
-              background: "rgba(255,255,255,0.22)",
-              backdropFilter: "blur(20px)",
-              WebkitBackdropFilter: "blur(20px)",
-              border: "1px solid rgba(255,255,255,0.45)",
-              borderRadius: 20,
-              padding: "20px",
-              boxShadow: "0 8px 32px rgba(8,30,42,0.10)",
-            }}
-          >
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr 1fr",
-                gap: 8,
-                marginBottom: 16,
-              }}
-            >
-              {[["2.4k", "Hasta"], ["98%", "Memnuniyet"], ["7/24", "Destek"]].map(([val, lbl]) => (
-                <div
-                  key={lbl}
-                  style={{
-                    background: "rgba(255,255,255,0.30)",
-                    border: "1px solid rgba(255,255,255,0.4)",
-                    borderRadius: 12,
-                    padding: "10px 6px",
-                    textAlign: "center",
-                  }}
-                >
-                  <div
-                    style={{
-                      fontFamily: "Manrope, sans-serif",
-                      fontSize: 16,
-                      fontWeight: 700,
-                      color: "#081e2a",
-                    }}
-                  >
-                    {val}
-                  </div>
-                  <div style={{ fontSize: 10, color: "#3a5a6a", marginTop: 2 }}>{lbl}</div>
-                </div>
-              ))}
-            </div>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              {doctors.map((doctor) => (
-                <div
-                  key={doctor.id}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                    padding: "8px",
-                    borderRadius: 12,
-                  }}
-                >
-                  <div
-                    style={{
-                      width: 32,
-                      height: 32,
-                      borderRadius: "50%",
-                      background: "rgba(255,255,255,0.40)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: 11,
-                      fontWeight: 600,
-                      color: "#1a2e3b",
-                      flexShrink: 0,
-                    }}
-                  >
-                    {getInitials(doctor.name)}
-                  </div>
-                  <div style={{ minWidth: 0 }}>
-                    <div
-                      style={{
-                        fontSize: 12,
-                        fontWeight: 500,
-                        color: "#081e2a",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {doctor.name}
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 10,
-                        color: "#3a5a6a",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {doctor.title}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    </motion.section>
-  );
 }

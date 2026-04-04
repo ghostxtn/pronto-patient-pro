@@ -1,0 +1,10 @@
+$kind: http-request
+name: Get Appointment Notes
+method: GET
+url: '{{baseUrl}}/appointments/{{appointmentId}}/notes'
+order: 8000
+auth:
+  type: bearer
+  credentials:
+    - key: token
+      value: '{{accessToken}}'

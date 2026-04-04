@@ -1,67 +1,38 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { motion } from "framer-motion";
-import { Navigate, useLocation, useSearchParams } from "react-router-dom";
-import { ArrowRight, ChevronDown, Stethoscope } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import LanguageSwitcher from "@/components/LanguageSwitcher";
+import { Navigate, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import AppLayout from "@/components/AppLayout";
 import LandingFooter from "@/components/landing/LandingFooter";
-import SmartLink from "@/components/landing/SmartLink";
-import { getLandingContent } from "@/components/landing/content";
+import LandingNav from "@/components/landing/LandingNav";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { usePublicDoctors } from "@/hooks/usePublicDoctors";
 
-const fadeUp = {
-  hidden: { opacity: 0, y: 20 },
-  visible: (index: number) => ({
-    opacity: 1,
-    y: 0,
-    transition: {
-      delay: index * 0.06,
-      duration: 0.5,
-      ease: [0.22, 1, 0.36, 1] as const,
-    },
-  }),
-};
+const appleEase = [0.25, 0.1, 0.25, 1] as const;
 
-function getGridColumns(width: number) {
-  if (width >= 1024) {
-    return 3;
-  }
-
-  if (width >= 768) {
-    return 2;
-  }
-
-  return 1;
+function getDoctorInitials(fullName: string) {
+  return (
+    fullName
+      .split(" ")
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase() ?? "")
+      .join("") || "D"
+  );
 }
 
 export default function FindDoctors() {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const { lang } = useLanguage();
   const location = useLocation();
   const isPatientDoctorsRoute =
     user?.role === "patient" && location.pathname.startsWith("/patient/doctors");
-  const content = getLandingContent(lang);
   const { doctors, specialties, isLoading, isError, hasLoadedEmptyDoctors } = usePublicDoctors();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [columns, setColumns] = useState(() =>
-    typeof window === "undefined" ? 3 : getGridColumns(window.innerWidth),
-  );
 
   const selectedSlug = searchParams.get("doctor");
   const selectedSpecialtySlug = searchParams.get("specialty");
-
-  useEffect(() => {
-    const onResize = () => setColumns(getGridColumns(window.innerWidth));
-
-    onResize();
-    window.addEventListener("resize", onResize);
-
-    return () => window.removeEventListener("resize", onResize);
-  }, []);
 
   const activeSpecialty = useMemo(() => {
     if (!selectedSpecialtySlug) {
@@ -163,16 +134,13 @@ export default function FindDoctors() {
     setSearchParams(nextParams);
   }
 
-  const selectedIndex = selectedDoctor
-    ? filteredDoctors.findIndex((doctor) => doctor.slug === selectedDoctor.slug)
-    : -1;
-
-  function getAppointmentHref(doctorId?: string) {
-    if (user?.role === "patient" && doctorId) {
-      return `/patient/doctors/${doctorId}`;
+  function handleProfileClick(doctor: (typeof doctors)[number]) {
+    if (user?.role === "patient") {
+      navigate(`/patient/doctors/${doctor.id}`);
+      return;
     }
 
-    return "/request-appointment";
+    toggleDoctor(doctor.slug);
   }
 
   if (user?.role === "patient" && location.pathname === "/doctors") {
@@ -181,333 +149,435 @@ export default function FindDoctors() {
   }
 
   const pageContent = (
-    <div className="homepage-shell-gradient min-h-screen bg-homepage-shell text-homepage-ink">
-      {!isPatientDoctorsRoute ? (
-        <header className="sticky top-0 z-40 border-b border-homepage-border bg-white/90 backdrop-blur-md">
-          <div className="container flex h-20 items-center justify-between gap-4">
-            <SmartLink href="/" className="flex min-w-0 items-center gap-3">
-              <span className="flex h-11 w-11 items-center justify-center rounded-full border border-homepage-border bg-homepage-brand-deep text-white">
-                <Stethoscope className="h-5 w-5" />
-              </span>
-              <span className="min-w-0">
-                <span className="block truncate font-display text-[1.7rem] leading-none tracking-tight text-homepage-ink">
-                  {content.brand.name}
-                </span>
-                <span className="mt-1 block truncate text-[0.68rem] uppercase tracking-[0.22em] text-homepage-soft">
-                  {content.brand.label}
-                </span>
-              </span>
-            </SmartLink>
+    <div className="min-h-screen bg-[#f4f8fd] text-[#1a2e3b]">
+      {!isPatientDoctorsRoute ? <LandingNav /> : null}
 
-            <div className="flex items-center gap-3">
-              <SmartLink
-                href="/"
-                className="homepage-focus hidden rounded-full px-4 py-2 text-sm font-medium text-homepage-muted transition-colors duration-200 hover:text-homepage-ink md:inline-flex"
-              >
-                {lang === "tr" ? "Anasayfa" : "Home"}
-              </SmartLink>
-              <SmartLink
-                href="/specialties"
-                className="homepage-focus hidden rounded-full px-4 py-2 text-sm font-medium text-homepage-muted transition-colors duration-200 hover:text-homepage-ink md:inline-flex"
-              >
-                {lang === "tr" ? "Uzmanlik Alanlari" : "Specialties"}
-              </SmartLink>
-              <LanguageSwitcher className="h-11 w-11 rounded-full border border-homepage-border text-homepage-muted hover:border-homepage-border-strong hover:bg-homepage-shell" />
-              <Button
-                asChild
-                className="homepage-focus rounded-full border border-homepage-brand bg-homepage-brand px-5 text-sm font-medium text-white hover:bg-homepage-brand-deep"
-              >
-                <SmartLink href={getAppointmentHref(selectedDoctor?.id)}>
-                  {user?.role === "patient"
-                    ? lang === "tr"
-                      ? "Randevu Al"
-                      : "Book Appointment"
-                    : lang === "tr"
-                      ? "Randevu Talebi Olustur"
-                      : "Create Appointment Request"}
-                </SmartLink>
-              </Button>
-            </div>
-          </div>
-        </header>
-      ) : null}
-
-      <main className={isPatientDoctorsRoute ? "py-2" : "pb-16 pt-10 md:pb-20 md:pt-14"}>
-        <div className="container">
-          <motion.section initial="hidden" animate="visible">
-            <motion.div custom={0} variants={fadeUp} className="max-w-3xl">
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-homepage-soft">
-                {lang === "tr" ? "Doktorlarimiz" : "Doctors"}
-              </p>
-              <h1 className="mt-3 font-display text-5xl leading-[0.95] tracking-tight text-homepage-ink md:text-6xl">
-                {lang === "tr"
-                  ? "Klinik ekibi, uzmanlik alanlari ve kisa profiller tek yuzeyde."
-                  : "The clinic team, specialties, and short profiles in one surface."}
-              </h1>
-              <p className="mt-6 max-w-2xl text-base leading-7 text-homepage-text md:text-lg">
-                {lang === "tr"
-                  ? "Gercek aktif hekim kadrosunu uzmanlik alanlariyla birlikte inceleyin. Bu yuzey kesif icindir; anlik uygunluk veya aninda rezervasyon vaadi sunmaz."
-                  : "Review the current active doctors with their specialties. This surface supports discovery, not instant availability or instant booking promises."}
-              </p>
-            </motion.div>
-
-            <motion.div
-              custom={1}
-              variants={fadeUp}
-              className="homepage-shadow-card mt-10 rounded-[2rem] border border-homepage-border-strong bg-white p-5 md:p-6"
+      <main className={isPatientDoctorsRoute ? "pb-12 pt-6" : "pt-20"}>
+        <section className="mx-auto max-w-[1200px] px-6 pb-8 pt-10 md:px-10 md:pb-12 md:pt-16 lg:px-20 lg:pb-12 lg:pt-20">
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.2 }}
+            transition={{ duration: 0.6, ease: appleEase }}
+          >
+            <p
+              className="text-[11px] font-medium uppercase tracking-[2px] text-[#5a7a8a]"
+              style={{ fontFamily: "Inter, sans-serif" }}
             >
-              <div className="flex flex-wrap items-center gap-3">
-                <Button
+              DOKTORLARIMIZ
+            </p>
+            <h1
+              className="mt-2 text-[34px] font-bold leading-tight text-[#1a2e3b] md:text-[42px]"
+              style={{ fontFamily: "Manrope, sans-serif" }}
+            >
+              Doktorlarımız
+            </h1>
+            <p
+              className="mt-3 max-w-[520px] text-[16px] leading-7 text-[#5a7a8a]"
+              style={{ fontFamily: "Inter, sans-serif" }}
+            >
+              Kliniğimizin uzman hekim kadrosunu inceleyin ve randevu alın.
+            </p>
+          </motion.div>
+        </section>
+
+        <section className="mx-auto max-w-[1200px] px-6 pb-8 md:px-10 md:pb-10 lg:px-20 lg:pb-8">
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setSpecialtyFilter("all")}
+              style={{
+                background: activeSpecialty === "all" ? "#4f8fe6" : "white",
+                color: activeSpecialty === "all" ? "white" : "#5a7a8a",
+                borderRadius: "980px",
+                padding: "7px 18px",
+                fontFamily: "Inter, sans-serif",
+                fontWeight: activeSpecialty === "all" ? 600 : 500,
+                fontSize: "13px",
+                border: activeSpecialty === "all" ? "none" : "1px solid #b5d1cc",
+                cursor: "pointer",
+              }}
+            >
+              Tümü
+            </button>
+
+            {specialties.map((specialty) => {
+              const isActive = activeSpecialty === specialty.key;
+
+              return (
+                <button
+                  key={specialty.key}
                   type="button"
-                  variant={activeSpecialty === "all" ? "default" : "outline"}
-                  className="rounded-full"
-                  onClick={() => setSpecialtyFilter("all")}
+                  onClick={() => setSpecialtyFilter(specialty.key)}
+                  style={{
+                    background: isActive ? "#4f8fe6" : "white",
+                    color: isActive ? "white" : "#5a7a8a",
+                    borderRadius: "980px",
+                    padding: "7px 18px",
+                    fontFamily: "Inter, sans-serif",
+                    fontWeight: isActive ? 600 : 500,
+                    fontSize: "13px",
+                    border: isActive ? "none" : "1px solid #b5d1cc",
+                    cursor: "pointer",
+                  }}
                 >
-                  {lang === "tr" ? "Tumu" : "All"}
-                </Button>
-                {specialties.map((specialty) => (
-                  <Button
-                    key={specialty.key}
-                    type="button"
-                    variant={activeSpecialty === specialty.key ? "default" : "outline"}
-                    className="rounded-full"
-                    onClick={() => setSpecialtyFilter(specialty.key)}
-                  >
-                    {specialty.name}
-                  </Button>
-                ))}
-              </div>
-            </motion.div>
+                  {specialty.name}
+                </button>
+              );
+            })}
+          </div>
+        </section>
 
-            <div className="mt-8 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-              {isLoading
-                ? Array.from({ length: 6 }).map((_, index) => (
-                    <motion.article
-                      key={`doctor-loading-${index}`}
-                      custom={index + 2}
-                      variants={fadeUp}
-                      className="homepage-shadow-card overflow-hidden rounded-[1.7rem] border border-homepage-border bg-white"
-                    >
-                      <div className="h-[280px] animate-pulse bg-homepage-shell-cool" />
-                      <div className="space-y-3 p-5">
-                        <div className="h-5 w-32 rounded bg-homepage-shell-cool" />
-                        <div className="h-8 w-2/3 rounded bg-homepage-shell-cool" />
-                        <div className="h-4 w-40 rounded bg-homepage-shell-cool" />
-                        <div className="h-12 rounded bg-homepage-shell-cool" />
-                      </div>
-                    </motion.article>
-                  ))
-                : null}
-
-              {!isLoading && isError ? (
-                <motion.div
-                  custom={2}
-                  variants={fadeUp}
-                  className="homepage-shadow-card rounded-[1.7rem] border border-homepage-border bg-white p-8 text-center md:col-span-2 lg:col-span-3"
+        <section className="mx-auto max-w-[1200px] px-6 pb-12 md:px-10 md:pb-16 lg:px-20 lg:pb-20">
+          {isLoading ? (
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+              {Array.from({ length: 6 }).map((_, index) => (
+                <div
+                  key={`doctor-skeleton-${index}`}
+                  className="flex flex-col"
+                  style={{ borderRadius: "18px", overflow: "visible", background: "transparent" }}
                 >
-                  <h2 className="font-display text-2xl tracking-tight text-homepage-ink">
-                    {lang === "tr"
-                      ? "Doktor verileri su anda yuklenemiyor."
-                      : "Doctor data could not be loaded right now."}
-                  </h2>
-                  <p className="mt-3 text-sm leading-7 text-homepage-text">
-                    {lang === "tr"
-                      ? "Lutfen biraz sonra tekrar deneyin."
-                      : "Please try again shortly."}
-                  </p>
-                </motion.div>
-              ) : null}
-
-              {!isLoading && !isError && filteredDoctors.length === 0 ? (
-                <motion.div
-                  custom={2}
-                  variants={fadeUp}
-                  className="homepage-shadow-card rounded-[1.7rem] border border-homepage-border bg-white p-8 text-center md:col-span-2 lg:col-span-3"
-                >
-                  <h2 className="font-display text-2xl tracking-tight text-homepage-ink">
-                    {hasLoadedEmptyDoctors
-                      ? lang === "tr"
-                        ? "Goruntulenecek aktif doktor bulunamadi."
-                        : "No active doctors found."
-                      : lang === "tr"
-                        ? "Secili uzmanlikta aktif doktor bulunamadi."
-                        : "No active doctors found for the selected specialty."}
-                  </h2>
-                  <p className="mt-3 text-sm leading-7 text-homepage-text">
-                    {hasLoadedEmptyDoctors
-                      ? lang === "tr"
-                        ? "Klinik kayitlarinda aktif hekim bulunmuyorsa bu alan bos gorunur."
-                        : "This state appears only when there are no active doctors in the clinic records."
-                      : lang === "tr"
-                        ? "Secili filtre aktif hekim kayitlariyla eslesmiyor."
-                        : "The selected filter does not match any active doctor records."}
-                  </p>
-                </motion.div>
-              ) : null}
-
-              {!isLoading && !isError
-                ? filteredDoctors.flatMap((doctor, index) => {
-                    const isSelected = doctor.slug === selectedSlug;
-                    const currentRow = Math.floor(index / columns);
-                    const rowStart = currentRow * columns;
-                    const rowEnd = Math.min(rowStart + columns - 1, filteredDoctors.length - 1);
-                    const shouldRenderDetail =
-                      selectedIndex >= rowStart &&
-                      selectedIndex <= rowEnd &&
-                      index === rowEnd &&
-                      selectedDoctor;
-
-                    const card = (
-                      <motion.article
-                        key={doctor.id}
-                        custom={index + 2}
-                        variants={fadeUp}
-                        className={[
-                          "homepage-shadow-card overflow-hidden rounded-[1.7rem] border bg-white transition-all duration-300",
-                          isSelected
-                            ? "border-homepage-brand shadow-[0_28px_60px_rgba(16,42,67,0.14)]"
-                            : "border-homepage-border",
-                        ].join(" ")}
-                      >
-                        <div className="relative h-[280px] overflow-hidden bg-[radial-gradient(circle_at_top,rgba(42,127,132,0.18),transparent_55%),linear-gradient(180deg,#e8f2f1_0%,#c9dddd_100%)]">
-                          <img
-                            src={doctor.imageSrc}
-                            alt={doctor.fullName}
-                            className="h-full w-full object-contain p-6 transition-transform duration-700 hover:scale-[1.02]"
-                          />
-                          <div className="absolute inset-x-0 bottom-0 bg-[linear-gradient(180deg,rgba(16,42,67,0)_0%,rgba(16,42,67,0.84)_100%)] p-5 text-white">
-                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/72">
-                              {doctor.title}
-                            </p>
-                            <h2 className="mt-2 font-display text-[1.85rem] leading-none tracking-tight">
-                              {doctor.fullName}
-                            </h2>
-                            <p className="mt-3 text-sm leading-6 text-white/88">{doctor.specialtyName}</p>
-                          </div>
-                        </div>
-
-                        <div className="p-5">
-                          <p className="text-sm leading-7 text-homepage-text">{doctor.previewText}</p>
-                          <div className="mt-5 flex flex-wrap gap-2">
-                            {doctor.focusTags.map((tag) => (
-                              <Badge
-                                key={`${doctor.id}-${tag}`}
-                                variant="secondary"
-                                className="rounded-full border border-homepage-border bg-homepage-shell px-3 py-1 text-xs font-medium text-homepage-muted"
-                              >
-                                {tag}
-                              </Badge>
-                            ))}
-                          </div>
-                          <Button
-                            type="button"
-                            variant={isSelected ? "default" : "outline"}
-                            className="mt-5 w-full rounded-full"
-                            onClick={() => toggleDoctor(doctor.slug)}
-                          >
-                            {lang === "tr" ? "Profili Incele" : "Review Profile"}
-                            <ChevronDown
-                              className={[
-                                "ml-2 h-4 w-4 transition-transform duration-200",
-                                isSelected ? "rotate-180" : "",
-                              ].join(" ")}
-                            />
-                          </Button>
-                        </div>
-                      </motion.article>
-                    );
-
-                    if (!shouldRenderDetail) {
-                      return [card];
-                    }
-
-                    const detail = (
-                      <motion.section
-                        key={`detail-${selectedDoctor.slug}`}
-                        custom={index + 3}
-                        variants={fadeUp}
-                        className="homepage-shadow-card rounded-[2rem] border border-homepage-border-strong bg-white p-6 md:col-span-2 md:p-8 lg:col-span-3"
-                      >
-                        <div className="grid gap-8 lg:grid-cols-[320px_minmax(0,1fr)] lg:items-start">
-                          <div className="overflow-hidden rounded-[1.6rem] border border-homepage-border bg-[radial-gradient(circle_at_top,rgba(42,127,132,0.18),transparent_55%),linear-gradient(180deg,#e8f2f1_0%,#c9dddd_100%)]">
-                            <img
-                              src={selectedDoctor.imageSrc}
-                              alt={selectedDoctor.fullName}
-                              className="h-full w-full object-contain p-8"
-                            />
-                          </div>
-
-                          <div>
-                            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-homepage-soft">
-                              {selectedDoctor.title}
-                            </p>
-                            <h3 className="mt-3 font-display text-4xl leading-tight tracking-tight text-homepage-ink">
-                              {selectedDoctor.fullName}
-                            </h3>
-                            <p className="mt-3 text-base leading-7 text-homepage-text">
-                              {selectedDoctor.specialtyName}
-                            </p>
-
-                            {selectedDoctor.biography ? (
-                              <p className="mt-6 max-w-3xl text-base leading-8 text-homepage-text">
-                                {selectedDoctor.biography}
-                              </p>
-                            ) : (
-                              <p className="mt-6 max-w-3xl text-base leading-8 text-homepage-text">
-                                {selectedDoctor.previewText}
-                              </p>
-                            )}
-
-                            <div className="mt-6 flex flex-wrap gap-2">
-                              {selectedDoctor.focusTags.map((tag) => (
-                                <span
-                                  key={`detail-${selectedDoctor.id}-${tag}`}
-                                  className="rounded-full border border-homepage-border bg-homepage-shell px-3 py-2 text-xs font-medium uppercase tracking-[0.14em] text-homepage-muted"
-                                >
-                                  {tag}
-                                </span>
-                              ))}
-                            </div>
-
-                            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-                              <Button asChild className="rounded-full px-6">
-                                <SmartLink href={getAppointmentHref(selectedDoctor.id)}>
-                                  {user?.role === "patient"
-                                    ? lang === "tr"
-                                      ? "Randevu Al"
-                                      : "Book Appointment"
-                                    : lang === "tr"
-                                      ? "Randevu Talebi Olustur"
-                                      : "Create Appointment Request"}
-                                  <ArrowRight className="ml-2 h-4 w-4" />
-                                </SmartLink>
-                              </Button>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                className="rounded-full px-6"
-                                onClick={closeDoctorDetail}
-                              >
-                                {lang === "tr" ? "Detayi Kapat" : "Close Detail"}
-                              </Button>
-                            </div>
-
-                            <p className="mt-5 text-sm leading-7 text-homepage-muted">
-                              {lang === "tr"
-                                ? "Bu yuzey doktor kesfi icindir. Uygunluk ve kesin randevu plani klinik ekibi tarafindan talep sonrasinda netlestirilir."
-                                : "This surface supports doctor discovery. Availability and confirmed scheduling are clarified by the clinic team after the request."}
-                            </p>
-                          </div>
-                        </div>
-                      </motion.section>
-                    );
-
-                    return [card, detail];
-                  })
-                : null}
+                  <div
+                    className="animate-pulse"
+                    style={{
+                      height: "280px",
+                      width: "100%",
+                      borderRadius: "18px",
+                      background: "linear-gradient(160deg, #eaf5ff 0%, #c8e6f5 55%, #b5d1cc 100%)",
+                      flexShrink: 0,
+                    }}
+                  />
+                  <div style={{ height: "16px" }} />
+                  <div className="px-2 pb-2 text-center">
+                    <div className="mx-auto h-7 w-48 rounded-full bg-[#dfeaf7]" />
+                    <div className="mx-auto mt-3 h-4 w-32 rounded-full bg-[#e7eff9]" />
+                    <div className="mx-auto mt-5 h-10 w-56 rounded-full bg-[#eef4fb]" />
+                  </div>
+                </div>
+              ))}
             </div>
-          </motion.section>
-        </div>
+          ) : null}
+
+          {!isLoading && isError ? (
+            <div
+              className="rounded-[24px] border border-[#d9e6f3] bg-[#eaf5ff] px-6 py-10 text-center text-[#5a7a8a]"
+              style={{ fontFamily: "Inter, sans-serif" }}
+            >
+              Doktor verileri şu anda yüklenemiyor. Lütfen biraz sonra tekrar deneyin.
+            </div>
+          ) : null}
+
+          {!isLoading && !isError && filteredDoctors.length === 0 ? (
+            <div
+              className="rounded-[24px] border border-[#d9e6f3] bg-[#eaf5ff] px-6 py-10 text-center text-[#5a7a8a]"
+              style={{ fontFamily: "Inter, sans-serif" }}
+            >
+              {hasLoadedEmptyDoctors
+                ? "Görüntülenecek aktif doktor bulunamadı."
+                : "Seçili uzmanlıkta aktif doktor bulunamadı."}
+            </div>
+          ) : null}
+
+          {!isLoading && !isError && filteredDoctors.length > 0 ? (
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+              {filteredDoctors.map((doctor, index) => (
+                <motion.article
+                  key={doctor.id}
+                  initial={{ opacity: 0, y: 40, x: -30 }}
+                  whileInView={{ opacity: 1, y: 0, x: 0 }}
+                  viewport={{ once: true, amount: 0.1 }}
+                  transition={{ duration: 0.65, delay: index * 0.08, ease: appleEase }}
+                  whileHover={{ scale: 1.02 }}
+                  className="flex flex-col items-stretch"
+                  style={{
+                    borderRadius: "18px",
+                    overflow: "visible",
+                    background: "transparent",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "stretch",
+                  }}
+                >
+                  <div
+                    style={{
+                      height: "280px",
+                      width: "100%",
+                      borderRadius: "18px",
+                      overflow: "hidden",
+                      flexShrink: 0,
+                      background: doctor.imageSrc
+                        ? undefined
+                        : "linear-gradient(160deg, #eaf5ff 0%, #c8e6f5 55%, #b5d1cc 100%)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    {doctor.imageSrc ? (
+                      <img
+                        src={doctor.imageSrc}
+                        alt={doctor.fullName}
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "cover",
+                          objectPosition: "center top",
+                          display: "block",
+                        }}
+                      />
+                    ) : (
+                      <div
+                        style={{
+                          width: "80px",
+                          height: "80px",
+                          borderRadius: "50%",
+                          background: "rgba(255,255,255,0.6)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontFamily: "Manrope, sans-serif",
+                          fontWeight: 700,
+                          fontSize: "28px",
+                          color: "#005cae",
+                        }}
+                      >
+                        {getDoctorInitials(doctor.fullName)}
+                      </div>
+                    )}
+                  </div>
+
+                  <div style={{ height: "16px" }} />
+
+                  <div
+                    style={{
+                      padding: "0 8px 8px",
+                      textAlign: "center",
+                      alignItems: "center",
+                      display: "flex",
+                      flexDirection: "column",
+                    }}
+                  >
+                    <h2
+                      style={{
+                        fontFamily: "Manrope, sans-serif",
+                        fontWeight: 700,
+                        fontSize: "20px",
+                        color: "#1a2e3b",
+                        marginBottom: "4px",
+                        lineHeight: 1.3,
+                      }}
+                    >
+                      {[doctor.title, doctor.fullName].filter(Boolean).join(" ")}
+                    </h2>
+
+                    <p
+                      style={{
+                        fontFamily: "Inter, sans-serif",
+                        fontWeight: 400,
+                        fontSize: "14px",
+                        color: "#5a7a8a",
+                        marginBottom: 0,
+                      }}
+                    >
+                      {doctor.specialtyName}
+                    </p>
+
+                    <div
+                      style={{
+                        marginTop: "20px",
+                        display: "flex",
+                        flexDirection: "row",
+                        justifyContent: "center",
+                        gap: "16px",
+                      }}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => navigate("/request-appointment")}
+                        style={{
+                          borderRadius: "980px",
+                          background: "#4f8fe6",
+                          color: "white",
+                          padding: "9px 22px",
+                          border: "none",
+                          fontFamily: "Inter, sans-serif",
+                          fontWeight: 600,
+                          fontSize: "14px",
+                          cursor: "pointer",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        Randevu Al
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleProfileClick(doctor)}
+                        style={{
+                          borderRadius: "0",
+                          background: "transparent",
+                          border: "none",
+                          color: "#4f8fe6",
+                          fontFamily: "Inter, sans-serif",
+                          fontWeight: 500,
+                          fontSize: "14px",
+                          cursor: "pointer",
+                          padding: "9px 8px",
+                        }}
+                      >
+                        Profili Gör ›
+                      </button>
+                    </div>
+                  </div>
+                </motion.article>
+              ))}
+            </div>
+          ) : null}
+
+          {!isPatientDoctorsRoute && selectedDoctor ? (
+            <motion.section
+              initial={{ opacity: 0, y: 24 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.45, ease: appleEase }}
+              className="mt-10 rounded-[24px] border border-[#d9e6f3] bg-white p-6 md:p-8"
+            >
+              <div className="grid gap-8 lg:grid-cols-[280px_minmax(0,1fr)] lg:items-start">
+                <div
+                  style={{
+                    height: "320px",
+                    width: "100%",
+                    borderRadius: "18px",
+                    overflow: "hidden",
+                    flexShrink: 0,
+                    background: selectedDoctor.imageSrc
+                      ? undefined
+                      : "linear-gradient(160deg, #eaf5ff 0%, #c8e6f5 55%, #b5d1cc 100%)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  {selectedDoctor.imageSrc ? (
+                    <img
+                      src={selectedDoctor.imageSrc}
+                      alt={selectedDoctor.fullName}
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        objectFit: "cover",
+                        objectPosition: "center top",
+                        display: "block",
+                      }}
+                    />
+                  ) : (
+                    <div
+                      style={{
+                        width: "80px",
+                        height: "80px",
+                        borderRadius: "50%",
+                        background: "rgba(255,255,255,0.6)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontFamily: "Manrope, sans-serif",
+                        fontWeight: 700,
+                        fontSize: "28px",
+                        color: "#005cae",
+                      }}
+                    >
+                      {getDoctorInitials(selectedDoctor.fullName)}
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <h3
+                    style={{
+                      fontFamily: "Manrope, sans-serif",
+                      fontWeight: 700,
+                      fontSize: "32px",
+                      lineHeight: 1.2,
+                      color: "#1a2e3b",
+                    }}
+                  >
+                    {[selectedDoctor.title, selectedDoctor.fullName].filter(Boolean).join(" ")}
+                  </h3>
+                  <p
+                    className="mt-3"
+                    style={{ fontFamily: "Inter, sans-serif", fontSize: "15px", color: "#5a7a8a" }}
+                  >
+                    {selectedDoctor.specialtyName}
+                  </p>
+
+                  <p
+                    className="mt-6"
+                    style={{ fontFamily: "Inter, sans-serif", fontSize: "15px", lineHeight: 1.8, color: "#5a7a8a" }}
+                  >
+                    {selectedDoctor.biography || selectedDoctor.previewText}
+                  </p>
+
+                  <div className="mt-8 flex flex-wrap gap-2">
+                    {selectedDoctor.focusTags.map((tag) => (
+                      <span
+                        key={`${selectedDoctor.id}-${tag}`}
+                        style={{
+                          borderRadius: "980px",
+                          background: "#eaf5ff",
+                          color: "#005cae",
+                          padding: "4px 10px",
+                          fontFamily: "Inter, sans-serif",
+                          fontSize: "12px",
+                          fontWeight: 500,
+                        }}
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+
+                  <div className="mt-8 flex flex-wrap gap-4">
+                    <button
+                      type="button"
+                      onClick={() => navigate("/request-appointment")}
+                      style={{
+                        borderRadius: "980px",
+                        background: "#4f8fe6",
+                        color: "white",
+                        padding: "9px 22px",
+                        border: "none",
+                        fontFamily: "Inter, sans-serif",
+                        fontWeight: 600,
+                        fontSize: "14px",
+                        cursor: "pointer",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      Randevu Al
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={closeDoctorDetail}
+                      style={{
+                        borderRadius: "980px",
+                        background: "white",
+                        color: "#5a7a8a",
+                        padding: "9px 18px",
+                        border: "1px solid #b5d1cc",
+                        fontFamily: "Inter, sans-serif",
+                        fontWeight: 500,
+                        fontSize: "14px",
+                        cursor: "pointer",
+                      }}
+                    >
+                      Detayı Kapat
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </motion.section>
+          ) : null}
+        </section>
       </main>
 
       {!isPatientDoctorsRoute ? <LandingFooter /> : null}

@@ -4,7 +4,6 @@ import {
   type DoctorPresentation,
 } from "@/data/doctorPresentation";
 import {
-  getFallbackSpecialtyImage,
   specialtyPresentation,
   type SpecialtyPresentation,
 } from "@/data/specialtyPresentation";
@@ -27,6 +26,7 @@ export type HomepagePreviewSpecialtyRecord = {
   id: string;
   name: string;
   description?: string | null;
+  imageUrl?: string | null;
 };
 
 export type HomepagePreviewResponse = {
@@ -51,12 +51,13 @@ export type HomepageSpecialtyPreviewItem = {
   slug: string;
   name: string;
   description: string;
-  imageSrc: string;
+  imageSrc: string | null;
   previewText?: string;
 };
 
 const MAX_DOCTOR_PREVIEW = 3;
 const MAX_SPECIALTY_PREVIEW = 6;
+const SPECIALTY_FALLBACK_IMAGE = null;
 
 export function toHomepageSlug(value: string) {
   return value
@@ -165,7 +166,7 @@ function mapDoctorPreviewItem(
 
 function mapSpecialtyPreviewItem(
   specialty: HomepagePreviewSpecialtyRecord,
-  index: number,
+  _index: number,
   lang: SupportedLanguage,
 ): HomepageSpecialtyPreviewItem & { homepagePriority?: number } {
   const slug = toHomepageSlug(specialty.name);
@@ -180,7 +181,7 @@ function mapSpecialtyPreviewItem(
       (lang === "tr"
         ? "Klinik ekip değerlendirmesiyle desteklenen uzmanlık alanı."
         : "A specialty area supported by coordinated clinic review."),
-    imageSrc: presentation?.imageSrc || getFallbackSpecialtyImage(index),
+    imageSrc: specialty.imageUrl?.trim() ? specialty.imageUrl.trim() : SPECIALTY_FALLBACK_IMAGE,
     previewText: presentation?.previewText,
     homepagePriority: presentation?.homepagePriority,
   };

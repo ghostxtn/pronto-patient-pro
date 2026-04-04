@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
-import { CalendarClock, Palette, Plus, Settings, Shield, Trash2, Users } from "lucide-react";
+import { Loader2, Plus, Shield, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -13,7 +13,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 
 const fadeUp = {
   hidden: { opacity: 0, y: 20 },
@@ -32,28 +31,8 @@ export default function ClinicSettings() {
   const [showAddSpec, setShowAddSpec] = useState(false);
   const [specName, setSpecName] = useState("");
   const [specDesc, setSpecDesc] = useState("");
-  const [clinicInfo, setClinicInfo] = useState({
-    clinicName: "MediBook Clinic",
-    clinicPhone: "+1 (555) 000-0000",
-    clinicAddress: "123 Health Avenue, Suite 200",
-    clinicEmail: "admin@medibook.com",
-  });
-  const [appointmentSettings, setAppointmentSettings] = useState({
-    defaultDuration: "30",
-    bufferTime: "10",
-    allowSameDayBooking: true,
-    allowSelfBooking: true,
-  });
-  const [staffAccess, setStaffAccess] = useState({
-    approverRole: "Admin",
-    canManagePatients: true,
-    canManageDoctors: false,
-  });
-  const [branding, setBranding] = useState({
-    clinicLogo: "medibook-mark.svg",
-    defaultLanguage: "English",
-    primaryColor: "Ocean Blue",
-  });
+  const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const [uploadingSpecIds, setUploadingSpecIds] = useState<Record<string, boolean>>({});
 
   const { data: specializations } = useQuery({
     queryKey: ["specializations"],
@@ -81,8 +60,20 @@ export default function ClinicSettings() {
     onError: () => toast.error(t.specDeleteFailed),
   });
 
-  const saveOperationalSettings = () => {
-    toast.success(t.settingsSaved);
+  const handleSpecImageUpload = async (specId: string, file?: File) => {
+    if (!file) return;
+
+    setUploadingSpecIds((current) => ({ ...current, [specId]: true }));
+
+    try {
+      await api.specializations.uploadImage(specId, file);
+      await qc.invalidateQueries({ queryKey: ["specializations"] });
+      toast.success("Uzmanlik gorseli yuklendi");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Gorsel yuklenemedi");
+    } finally {
+      setUploadingSpecIds((current) => ({ ...current, [specId]: false }));
+    }
   };
 
   return (
@@ -93,145 +84,8 @@ export default function ClinicSettings() {
           <p className="text-muted-foreground mt-1">{t.clinicSettingsDesc}</p>
         </motion.div>
 
-        <motion.div custom={1} variants={fadeUp}>
-          <Card className="shadow-card">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Settings className="h-5 w-5 text-primary" />
-                {t.clinicInfo}
-              </CardTitle>
-              <CardDescription>{t.clinicInfoDesc}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid sm:grid-cols-2 gap-4">
-                <div>
-                  <Label>{t.clinicName}</Label>
-                  <Input value={clinicInfo.clinicName} onChange={(e) => setClinicInfo({ ...clinicInfo, clinicName: e.target.value })} className="mt-1" />
-                </div>
-                <div>
-                  <Label>{t.contactPhone}</Label>
-                  <Input value={clinicInfo.clinicPhone} onChange={(e) => setClinicInfo({ ...clinicInfo, clinicPhone: e.target.value })} className="mt-1" />
-                </div>
-                <div>
-                  <Label>{t.clinicAddress}</Label>
-                  <Input value={clinicInfo.clinicAddress} onChange={(e) => setClinicInfo({ ...clinicInfo, clinicAddress: e.target.value })} className="mt-1" />
-                </div>
-                <div>
-                  <Label>{t.contactEmail}</Label>
-                  <Input value={clinicInfo.clinicEmail} onChange={(e) => setClinicInfo({ ...clinicInfo, clinicEmail: e.target.value })} className="mt-1" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        <motion.div custom={2} variants={fadeUp}>
-          <Card className="shadow-card">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <CalendarClock className="h-5 w-5 text-primary" />
-                {t.appointmentSettings}
-              </CardTitle>
-              <CardDescription>{t.appointmentSettingsDesc}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid sm:grid-cols-2 gap-4">
-                <div>
-                  <Label>{t.defaultSlotDuration}</Label>
-                  <Input type="number" value={appointmentSettings.defaultDuration} onChange={(e) => setAppointmentSettings({ ...appointmentSettings, defaultDuration: e.target.value })} className="mt-1" />
-                </div>
-                <div>
-                  <Label>{t.bufferTime}</Label>
-                  <Input type="number" value={appointmentSettings.bufferTime} onChange={(e) => setAppointmentSettings({ ...appointmentSettings, bufferTime: e.target.value })} className="mt-1" />
-                </div>
-              </div>
-              <div className="mt-6 space-y-4">
-                <div className="flex items-center justify-between rounded-xl border p-4">
-                  <div>
-                    <p className="font-medium text-sm">{t.allowSameDayBooking}</p>
-                    <p className="text-xs text-muted-foreground">{t.allowSameDayBookingDesc}</p>
-                  </div>
-                  <Switch checked={appointmentSettings.allowSameDayBooking} onCheckedChange={(checked) => setAppointmentSettings({ ...appointmentSettings, allowSameDayBooking: checked })} />
-                </div>
-                <div className="flex items-center justify-between rounded-xl border p-4">
-                  <div>
-                    <p className="font-medium text-sm">{t.allowSelfBooking}</p>
-                    <p className="text-xs text-muted-foreground">{t.allowSelfBookingDesc}</p>
-                  </div>
-                  <Switch checked={appointmentSettings.allowSelfBooking} onCheckedChange={(checked) => setAppointmentSettings({ ...appointmentSettings, allowSelfBooking: checked })} />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        <motion.div custom={3} variants={fadeUp}>
-          <Card className="shadow-card">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Users className="h-5 w-5 text-primary" />
-                {t.staffAccess}
-              </CardTitle>
-              <CardDescription>{t.staffAccessDesc}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid sm:grid-cols-2 gap-4">
-                <div>
-                  <Label>{t.approvalRole}</Label>
-                  <Input value={staffAccess.approverRole} onChange={(e) => setStaffAccess({ ...staffAccess, approverRole: e.target.value })} className="mt-1" />
-                </div>
-              </div>
-              <div className="mt-6 space-y-4">
-                <div className="flex items-center justify-between rounded-xl border p-4">
-                  <div>
-                    <p className="font-medium text-sm">{t.staffManagePatients}</p>
-                    <p className="text-xs text-muted-foreground">{t.staffManagePatientsDesc}</p>
-                  </div>
-                  <Switch checked={staffAccess.canManagePatients} onCheckedChange={(checked) => setStaffAccess({ ...staffAccess, canManagePatients: checked })} />
-                </div>
-                <div className="flex items-center justify-between rounded-xl border p-4">
-                  <div>
-                    <p className="font-medium text-sm">{t.staffManageDoctors}</p>
-                    <p className="text-xs text-muted-foreground">{t.staffManageDoctorsDesc}</p>
-                  </div>
-                  <Switch checked={staffAccess.canManageDoctors} onCheckedChange={(checked) => setStaffAccess({ ...staffAccess, canManageDoctors: checked })} />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        <motion.div custom={4} variants={fadeUp}>
-          <Card className="shadow-card">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Palette className="h-5 w-5 text-primary" />
-                {t.branding}
-              </CardTitle>
-              <CardDescription>{t.brandingDesc}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid sm:grid-cols-3 gap-4">
-                <div>
-                  <Label>{t.clinicLogo}</Label>
-                  <Input value={branding.clinicLogo} onChange={(e) => setBranding({ ...branding, clinicLogo: e.target.value })} className="mt-1" />
-                </div>
-                <div>
-                  <Label>{t.defaultLanguage}</Label>
-                  <Input value={branding.defaultLanguage} onChange={(e) => setBranding({ ...branding, defaultLanguage: e.target.value })} className="mt-1" />
-                </div>
-                <div>
-                  <Label>{t.primaryColor}</Label>
-                  <Input value={branding.primaryColor} onChange={(e) => setBranding({ ...branding, primaryColor: e.target.value })} className="mt-1" />
-                </div>
-              </div>
-              <Button className="mt-6" onClick={saveOperationalSettings}>{t.saveSettings}</Button>
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        {isOwner && (
-          <motion.div custom={5} variants={fadeUp}>
+        {(isOwner || user?.role === "admin") && (
+          <motion.div custom={1} variants={fadeUp}>
             <Card className="shadow-card">
               <CardHeader className="flex flex-row items-center justify-between">
                 <div>
@@ -259,13 +113,56 @@ export default function ClinicSettings() {
                   <div className="space-y-2">
                     {specializations.map((s) => (
                       <div key={s.id} className="flex items-center justify-between p-3 rounded-xl bg-muted/40 hover:bg-muted/60 transition-colors">
-                        <div>
-                          <p className="font-medium text-sm">{s.name}</p>
-                          {s.description && <p className="text-xs text-muted-foreground">{s.description}</p>}
+                        <div className="flex items-center gap-3">
+                          {s.imageUrl ? (
+                            <img
+                              src={s.imageUrl}
+                              alt={s.name}
+                              className="h-[52px] w-[52px] rounded-lg object-cover"
+                            />
+                          ) : (
+                            <div
+                              className="flex h-[52px] w-[52px] items-center justify-center rounded-lg text-center text-[11px]"
+                              style={{
+                                background: "linear-gradient(135deg,#eaf5ff,#b5d1cc)",
+                                color: "#5a7a8a",
+                              }}
+                            >
+                              Görsel yok
+                            </div>
+                          )}
+                          <div>
+                            <p className="font-medium text-sm">{s.name}</p>
+                            {s.description && <p className="text-xs text-muted-foreground">{s.description}</p>}
+                          </div>
                         </div>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteSpec.mutate(s.id)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        <div className="flex items-center gap-2">
+                          <input
+                            ref={(element) => {
+                              fileInputRefs.current[s.id] = element;
+                            }}
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp"
+                            className="hidden"
+                            onChange={(event) => {
+                              const file = event.target.files?.[0];
+                              void handleSpecImageUpload(s.id, file);
+                              event.target.value = "";
+                            }}
+                          />
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => fileInputRefs.current[s.id]?.click()}
+                            disabled={!!uploadingSpecIds[s.id]}
+                          >
+                            {uploadingSpecIds[s.id] ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                            Görsel Yükle
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteSpec.mutate(s.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
                     ))}
                   </div>

@@ -1,4 +1,6 @@
-import { motion } from "framer-motion";
+import { motion, useInView } from "framer-motion";
+import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import SmartLink from "./SmartLink";
 import { getInitials } from "./HeroSection";
 
@@ -7,6 +9,7 @@ type DoctorItem = {
   name: string;
   specialtyName?: string;
   title?: string;
+  imageSrc?: string;
 };
 
 type DoctorsSectionProps = {
@@ -22,95 +25,372 @@ const sectionMotionProps = {
   transition: { duration: 0.55, ease: "easeOut" as const },
 };
 
+const appleEase = [0.25, 0.1, 0.25, 1] as const;
+
 export default function DoctorsSection({
   doctors,
   isLoading,
   hasLoadedEmpty,
 }: DoctorsSectionProps) {
+  const navigate = useNavigate();
+  const sectionRef = useRef<HTMLElement | null>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const isDragging = useRef(false);
+  const startX = useRef(0);
+  const scrollLeft = useRef(0);
+  const isInView = useInView(sectionRef, { once: true, amount: 0.2 });
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(true);
+  const useGridMode = doctors.length <= 4;
+
+  const updateScrollState = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setCanScrollLeft(el.scrollLeft > 0);
+    setCanScrollRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 10);
+  };
+
+  useEffect(() => {
+    updateScrollState();
+    window.addEventListener("resize", updateScrollState);
+    return () => window.removeEventListener("resize", updateScrollState);
+  }, [doctors.length, useGridMode]);
+
   return (
     <motion.section
       {...sectionMotionProps}
+      ref={sectionRef}
       id="doktorlarimiz"
-      style={{ maxWidth: 1280, margin: "0 auto", padding: "0 48px 80px" }}
+      className="relative z-[10] w-full bg-[#f4f8fd] px-6 py-20 md:px-12 lg:px-20"
     >
-      <h2
-        style={{
-          fontFamily: "Manrope, sans-serif",
-          fontSize: 32,
-          fontWeight: 300,
-          letterSpacing: "-0.025em",
-          color: "#1a2e3b",
-          marginBottom: 40,
-        }}
-      >
-        Doktorlarımız
-      </h2>
-      {isLoading ? (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 20 }}>
-          {Array.from({ length: 3 }).map((_, i) => (
-            <div
-              key={i}
-              style={{ borderRadius: 16, border: "0.5px solid #b5d1cc", background: "white", padding: 24, height: 160 }}
-            />
-          ))}
-        </div>
-      ) : hasLoadedEmpty ? (
-        <div style={{ textAlign: "center", color: "#5a7a8a", padding: 40 }}>Doktorlarımız yakında eklenecek</div>
-      ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 20 }}>
-          {doctors.map((doctor) => (
-            <div
-              key={doctor.id}
-              style={{
-                borderRadius: 16,
-                border: "0.5px solid #b5d1cc",
-                background: "white",
-                padding: 24,
-              }}
+      <style>{".doctor-scroll-container::-webkit-scrollbar { display: none; }"}</style>
+
+      <div className="mx-auto max-w-[1440px]">
+        <div className="mb-10 flex items-end justify-between gap-4">
+          <motion.h2
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.3 }}
+            transition={{ duration: 0.6, ease: appleEase }}
+            className="text-[2rem] font-bold text-[#1a2e3b]"
+            style={{ fontFamily: "Manrope, sans-serif" }}
+          >
+            Doktorlarımız
+          </motion.h2>
+
+          <motion.div
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true, amount: 0.3 }}
+            transition={{ duration: 0.6, delay: 0.2 }}
+          >
+            <SmartLink
+              href="/doctors"
+              className="shrink-0 text-sm font-medium text-[#4f8fe6] transition-colors duration-200 hover:text-[#2f75ca]"
+              style={{ fontFamily: "Inter, sans-serif" }}
             >
-              <div
-                style={{
-                  width: 52,
-                  height: 52,
-                  borderRadius: "50%",
-                  background: "#eaf5ff",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: 15,
-                  fontWeight: 600,
-                  color: "#4f8fe6",
-                  marginBottom: 16,
-                }}
-              >
-                {getInitials(doctor.name)}
-              </div>
-              <div style={{ fontSize: 15, fontWeight: 600, color: "#1a2e3b", marginBottom: 4 }}>
-                {doctor.name}
-              </div>
-              <div style={{ fontSize: 13, color: "#5a7a8a", marginBottom: 16 }}>
-                {doctor.specialtyName || doctor.title}
-              </div>
-              <SmartLink
-                href="/request-appointment"
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  background: "#4f8fe6",
-                  color: "white",
-                  borderRadius: 999,
-                  padding: "6px 16px",
-                  fontSize: 12,
-                  fontWeight: 500,
-                  textDecoration: "none",
-                }}
-              >
-                Randevu Al
-              </SmartLink>
-            </div>
-          ))}
+              Tümünü Gör →
+            </SmartLink>
+          </motion.div>
         </div>
-      )}
+
+        {isLoading ? (
+          <div className="flex gap-5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:grid lg:grid-cols-4">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div
+                key={i}
+                style={{
+                  borderRadius: "18px",
+                  overflow: "visible",
+                  background: "transparent",
+                  flexShrink: 0,
+                  width: "300px",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "stretch",
+                }}
+                className="min-h-[420px] lg:w-auto"
+              >
+                <div
+                  style={{
+                    height: "260px",
+                    width: "100%",
+                    borderRadius: "18px",
+                    overflow: "hidden",
+                    background: "linear-gradient(160deg, #eaf5ff 0%, #c8e6f5 55%, #b5d1cc 100%)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                  }}
+                />
+                <div style={{ height: "16px" }} />
+                <div
+                  style={{
+                    padding: "0 8px 8px",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    textAlign: "center",
+                  }}
+                >
+                  <div className="mb-2 h-7 w-40 rounded-full bg-[#eef4fb]" />
+                  <div className="h-5 w-32 rounded-full bg-[#f3f7fb]" />
+                  <div className="mt-5 flex items-center justify-center gap-4">
+                    <div className="h-10 w-28 rounded-full bg-[#eef4fb]" />
+                    <div className="h-10 w-24 rounded-full bg-[#f3f7fb]" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : hasLoadedEmpty ? (
+          <div style={{ textAlign: "center", color: "#5a7a8a", padding: 40 }}>Doktorlarımız yakında eklenecek</div>
+        ) : (
+          <div className={useGridMode ? "" : "relative px-0 md:px-6"}>
+            {!useGridMode ? (
+              <button
+                type="button"
+                onClick={() => scrollRef.current?.scrollBy({ left: -340, behavior: "smooth" })}
+                className="hidden md:flex absolute left-[-20px] top-1/2 z-10 h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border-[1.5px] border-[#b5d1cc] bg-white shadow-[0_2px_12px_rgba(79,143,230,0.15)]"
+                style={{
+                  opacity: canScrollLeft ? 1 : 0.3,
+                  pointerEvents: canScrollLeft ? "auto" : "none",
+                }}
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                  <path d="M10 3 5 8l5 5" stroke="#4f8fe6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            ) : null}
+
+            {!useGridMode ? (
+              <button
+                type="button"
+                onClick={() => scrollRef.current?.scrollBy({ left: 340, behavior: "smooth" })}
+                className="hidden md:flex absolute right-[-20px] top-1/2 z-10 h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border-[1.5px] border-[#b5d1cc] bg-white shadow-[0_2px_12px_rgba(79,143,230,0.15)]"
+                style={{
+                  opacity: canScrollRight ? 1 : 0.3,
+                  pointerEvents: canScrollRight ? "auto" : "none",
+                }}
+              >
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                  <path d="m6 3 5 5-5 5" stroke="#4f8fe6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+            ) : null}
+
+            <div
+              ref={scrollRef}
+              onScroll={updateScrollState}
+              onMouseDown={
+                useGridMode
+                  ? undefined
+                  : (e) => {
+                      if (!scrollRef.current) return;
+                      isDragging.current = true;
+                      startX.current = e.pageX - scrollRef.current.offsetLeft;
+                      scrollLeft.current = scrollRef.current.scrollLeft;
+                      scrollRef.current.style.cursor = "grabbing";
+                    }
+              }
+              onMouseLeave={
+                useGridMode
+                  ? undefined
+                  : () => {
+                      isDragging.current = false;
+                      if (scrollRef.current) scrollRef.current.style.cursor = "grab";
+                    }
+              }
+              onMouseUp={
+                useGridMode
+                  ? undefined
+                  : () => {
+                      isDragging.current = false;
+                      if (scrollRef.current) scrollRef.current.style.cursor = "grab";
+                    }
+              }
+              onMouseMove={
+                useGridMode
+                  ? undefined
+                  : (e) => {
+                      if (!isDragging.current || !scrollRef.current) return;
+                      e.preventDefault();
+                      const x = e.pageX - scrollRef.current.offsetLeft;
+                      const walk = (x - startX.current) * 1.5;
+                      scrollRef.current.scrollLeft = scrollLeft.current - walk;
+                    }
+              }
+              className={[
+                "doctor-scroll-container",
+                useGridMode
+                  ? "grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-4"
+                  : "flex snap-x snap-mandatory gap-5 overflow-x-auto px-2 py-2",
+              ].join(" ")}
+              style={
+                useGridMode
+                  ? undefined
+                  : {
+                      scrollbarWidth: "none",
+                      msOverflowStyle: "none",
+                      cursor: "grab",
+                    }
+              }
+            >
+              {doctors.map((doctor, index) => (
+                <motion.div
+                  key={doctor.id}
+                  initial={{ opacity: 0, y: 40, x: -30 }}
+                  whileInView={{ opacity: 1, y: 0, x: 0 }}
+                  viewport={{ once: true, amount: 0.1 }}
+                  transition={{ duration: 0.65, delay: index * 0.1, ease: appleEase }}
+                  whileHover={{ scale: 1.02 }}
+                  className={["min-h-[420px]", useGridMode ? "w-full" : "w-[300px] shrink-0 snap-start"].join(" ")}
+                  style={{
+                    borderRadius: "18px",
+                    overflow: "visible",
+                    background: "transparent",
+                    flexShrink: 0,
+                    width: useGridMode ? undefined : "300px",
+                    cursor: "grab",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "stretch",
+                  }}
+                >
+                  <div
+                    style={{
+                      height: "260px",
+                      width: "100%",
+                      borderRadius: "18px",
+                      overflow: "hidden",
+                      background: "linear-gradient(160deg, #eaf5ff 0%, #c8e6f5 55%, #b5d1cc 100%)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      flexShrink: 0,
+                    }}
+                  >
+                    {doctor.imageSrc ? (
+                      <img
+                        src={doctor.imageSrc}
+                        alt={doctor.name}
+                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                      />
+                    ) : (
+                      <div
+                        style={{
+                          width: "80px",
+                          height: "80px",
+                          borderRadius: "50%",
+                          background: "rgba(255,255,255,0.6)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontFamily: "Manrope, sans-serif",
+                          fontWeight: 700,
+                          fontSize: "28px",
+                          color: "#005cae",
+                        }}
+                      >
+                        {getInitials(doctor.name)}
+                      </div>
+                    )}
+                  </div>
+
+                  <div style={{ height: "16px" }} />
+
+                  <div
+                    style={{
+                      padding: "0 8px 8px",
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      textAlign: "center",
+                    }}
+                  >
+                    <h3
+                      style={{
+                        fontSize: "22px",
+                        fontWeight: "700",
+                        fontFamily: "Manrope, sans-serif",
+                        color: "#1a2e3b",
+                        marginBottom: "6px",
+                        lineHeight: "1.2",
+                      }}
+                    >
+                      {doctor.name}
+                    </h3>
+
+                    <p
+                      style={{
+                        fontSize: "14px",
+                        fontWeight: "400",
+                        fontFamily: "Inter, sans-serif",
+                        color: "#5a7a8a",
+                        marginBottom: "0",
+                        lineHeight: "1.5",
+                      }}
+                    >
+                      {doctor.specialtyName || doctor.title}
+                    </p>
+
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "row",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "16px",
+                        marginTop: "20px",
+                      }}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => navigate("/request-appointment")}
+                        className="transition-colors duration-200 hover:bg-[#2f75ca]"
+                        style={{
+                          borderRadius: "980px",
+                          background: "#4f8fe6",
+                          color: "white",
+                          padding: "9px 22px",
+                          fontFamily: "Inter, sans-serif",
+                          fontWeight: 600,
+                          fontSize: "14px",
+                          border: "none",
+                          whiteSpace: "nowrap",
+                          cursor: "pointer",
+                        }}
+                      >
+                        Randevu Al
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => navigate("/doctors")}
+                        className="transition-colors duration-200 hover:text-[#2f75ca] hover:underline"
+                        style={{
+                          background: "transparent",
+                          border: "none",
+                          color: "#4f8fe6",
+                          fontFamily: "Inter, sans-serif",
+                          fontWeight: 500,
+                          fontSize: "14px",
+                          padding: "9px 8px",
+                          cursor: "pointer",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        Profili Gör ›
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
     </motion.section>
   );
 }

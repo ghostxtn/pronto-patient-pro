@@ -1,0 +1,10 @@
+$kind: http-request
+name: Delete Appointment Note
+method: DELETE
+url: '{{baseUrl}}/appointments/notes/{{noteId}}'
+order: 10000
+auth:
+  type: bearer
+  credentials:
+    - key: token
+      value: '{{accessToken}}'

@@ -1,0 +1,25 @@
+$kind: http-request
+name: Create Appointment
+method: POST
+url: '{{baseUrl}}/appointments'
+order: 1000
+auth:
+  type: bearer
+  credentials:
+    - key: token
+      value: '{{accessToken}}'
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "doctorId": "{{doctorId}}",
+      "patientId": "{{patientId}}",
+      "appointmentDate": "2025-01-15",
+      "startTime": "09:00",
+      "endTime": "09:30",
+      "type": "consultation",
+      "notes": "Initial consultation"
+    }
