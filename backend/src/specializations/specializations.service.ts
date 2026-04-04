@@ -27,7 +27,16 @@ export class SpecializationsService {
 
   async findAllByClinic(clinicId: string) {
     return this.db
-      .select()
+      .select({
+        id: specializations.id,
+        name: specializations.name,
+        description: specializations.description,
+        imageUrl: specializations.imageUrl,
+        clinic_id: specializations.clinic_id,
+        is_active: specializations.is_active,
+        created_at: specializations.created_at,
+        updated_at: specializations.updated_at,
+      })
       .from(specializations)
       .where(
         and(
@@ -43,6 +52,7 @@ export class SpecializationsService {
         id: specializations.id,
         name: specializations.name,
         description: specializations.description,
+        imageUrl: specializations.imageUrl,
       })
       .from(specializations)
       .where(
@@ -81,6 +91,26 @@ export class SpecializationsService {
         updated_at: new Date(),
       })
       .where(eq(specializations.id, id))
+      .returning();
+
+    return specialization;
+  }
+
+  async updateImageUrl(id: string, clinicId: string, imageUrl: string) {
+    await this.findById(id, clinicId);
+
+    const [specialization] = await this.db
+      .update(specializations)
+      .set({
+        imageUrl,
+        updated_at: new Date(),
+      })
+      .where(
+        and(
+          eq(specializations.id, id),
+          eq(specializations.clinic_id, clinicId),
+        ),
+      )
       .returning();
 
     return specialization;

@@ -107,6 +107,7 @@ export class DoctorsService {
         firstName: users.first_name,
         lastName: users.last_name,
         email: users.email,
+        avatarUrl: users.avatar_url,
         specialization: {
           id: specializations.id,
           name: specializations.name,
@@ -152,6 +153,7 @@ export class DoctorsService {
         firstName: users.first_name,
         lastName: users.last_name,
         email: users.email,
+        avatarUrl: users.avatar_url,
         specialization: {
           id: specializations.id,
           name: specializations.name,

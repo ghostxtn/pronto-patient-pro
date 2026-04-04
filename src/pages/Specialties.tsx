@@ -1,226 +1,218 @@
 import { motion } from "framer-motion";
-import { ArrowRight, Stethoscope } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import LanguageSwitcher from "@/components/LanguageSwitcher";
+import { useNavigate } from "react-router-dom";
 import LandingFooter from "@/components/landing/LandingFooter";
-import SmartLink from "@/components/landing/SmartLink";
+import LandingNav from "@/components/landing/LandingNav";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { getLandingContent } from "@/components/landing/content";
-import { usePublicSpecialties } from "@/hooks/usePublicSpecialties";
+import { useHomepagePreviewData } from "@/hooks/useHomepagePreviewData";
 
-const fadeUp = {
-  hidden: { opacity: 0, y: 20 },
-  visible: (index: number) => ({
-    opacity: 1,
-    y: 0,
-    transition: {
-      delay: index * 0.06,
-      duration: 0.5,
-      ease: [0.22, 1, 0.36, 1] as const,
-    },
-  }),
-};
+const appleEase = [0.25, 0.1, 0.25, 1] as const;
 
 export default function Specialties() {
+  const navigate = useNavigate();
   const { lang } = useLanguage();
-  const content = getLandingContent(lang);
-  const { specialties, isLoading, isError, hasLoadedEmptySpecialties } = usePublicSpecialties();
+  const previewData = useHomepagePreviewData(lang);
 
   return (
-    <div className="homepage-shell-gradient min-h-screen bg-homepage-shell text-homepage-ink">
-      <header className="sticky top-0 z-40 border-b border-homepage-border bg-white/90 backdrop-blur-md">
-        <div className="container flex h-20 items-center justify-between gap-4">
-          <SmartLink href="/" className="flex min-w-0 items-center gap-3">
-            <span className="flex h-11 w-11 items-center justify-center rounded-full border border-homepage-border bg-homepage-brand-deep text-white">
-              <Stethoscope className="h-5 w-5" />
-            </span>
-            <span className="min-w-0">
-              <span className="block truncate font-display text-[1.7rem] leading-none tracking-tight text-homepage-ink">
-                {content.brand.name}
-              </span>
-              <span className="mt-1 block truncate text-[0.68rem] uppercase tracking-[0.22em] text-homepage-soft">
-                {content.brand.label}
-              </span>
-            </span>
-          </SmartLink>
+    <motion.div
+      initial={{ opacity: 0, x: -30 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: -30 }}
+      transition={{ duration: 0.3, ease: "easeOut" }}
+      className="min-h-screen bg-[#f4f8fd] text-[#1a2e3b]"
+    >
+      <LandingNav />
 
-          <div className="flex items-center gap-3">
-            <SmartLink
-              href="/"
-              className="homepage-focus hidden rounded-full px-4 py-2 text-sm font-medium text-homepage-muted transition-colors duration-200 hover:text-homepage-ink md:inline-flex"
+      <main className="pt-20">
+        <section className="mx-auto max-w-[1200px] px-6 pb-8 pt-10 md:px-10 md:pb-12 md:pt-16 lg:px-20 lg:pb-12 lg:pt-20">
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.2 }}
+            transition={{ duration: 0.6, ease: appleEase }}
+          >
+            <p
+              className="text-[11px] font-medium uppercase tracking-[2px] text-[#5a7a8a]"
+              style={{ fontFamily: "Inter, sans-serif" }}
             >
-              {lang === "tr" ? "Anasayfa" : "Home"}
-            </SmartLink>
-            <SmartLink
-              href="/doctors"
-              className="homepage-focus hidden rounded-full px-4 py-2 text-sm font-medium text-homepage-muted transition-colors duration-200 hover:text-homepage-ink md:inline-flex"
+              UZMANLIK ALANLARI
+            </p>
+            <h1
+              className="mt-2 text-[34px] font-bold leading-tight text-[#1a2e3b] md:text-[42px]"
+              style={{ fontFamily: "Manrope, sans-serif" }}
             >
-              {lang === "tr" ? "Doktorlar" : "Doctors"}
-            </SmartLink>
-            <LanguageSwitcher className="h-11 w-11 rounded-full border border-homepage-border text-homepage-muted hover:border-homepage-border-strong hover:bg-homepage-shell" />
-            <Button
-              asChild
-              className="homepage-focus rounded-full border border-homepage-brand bg-homepage-brand px-5 text-sm font-medium text-white hover:bg-homepage-brand-deep"
+              Uzmanlık Alanlarımız
+            </h1>
+            <p
+              className="mt-3 max-w-[560px] text-[16px] leading-7 text-[#5a7a8a]"
+              style={{ fontFamily: "Inter, sans-serif" }}
             >
-              <SmartLink href="/request-appointment">
-                {lang === "tr" ? "Randevu Talebi Olustur" : "Create Appointment Request"}
-              </SmartLink>
-            </Button>
-          </div>
-        </div>
-      </header>
+              Kliniğimizin uzmanlık alanlarını ve bu alanlarda görev yapan hekimlerimizi inceleyin.
+            </p>
+          </motion.div>
+        </section>
 
-      <main className="pb-16 pt-10 md:pb-20 md:pt-14">
-        <div className="container">
-          <motion.section initial="hidden" animate="visible">
-            <motion.div custom={0} variants={fadeUp} className="max-w-3xl">
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-homepage-soft">
-                {lang === "tr" ? "Uzmanlik Alanlari" : "Specialties"}
-              </p>
-              <h1 className="mt-3 font-display text-5xl leading-[0.95] tracking-tight text-homepage-ink md:text-6xl">
-                {lang === "tr"
-                  ? "Klinigin guncel uzmanlik alanlarini ve bu alanlarda calisan hekimleri birlikte inceleyin."
-                  : "Review the clinic's current specialties together with the doctors working in them."}
-              </h1>
-              <p className="mt-6 max-w-2xl text-base leading-7 text-homepage-text md:text-lg">
-                {lang === "tr"
-                  ? "Bu yuzey, gercek klinik uzmanlik kayitlarini ve o alanlarda aktif olan hekimleri gosterir. Anlik uygunluk veya aninda rezervasyon vaadi sunmaz."
-                  : "This surface shows real clinic specialization records and the active doctors connected to them. It does not promise instant availability or instant booking."}
-              </p>
-            </motion.div>
-
-            <div className="mt-10 grid gap-6 lg:grid-cols-2">
-              {isLoading
-                ? Array.from({ length: 6 }).map((_, index) => (
-                    <motion.article
-                      key={`specialty-loading-${index}`}
-                      custom={index + 1}
-                      variants={fadeUp}
-                      className="homepage-shadow-card overflow-hidden rounded-[1.7rem] border border-homepage-border bg-white"
-                    >
-                      <div className="h-[220px] animate-pulse bg-homepage-shell-cool" />
-                      <div className="space-y-3 p-5">
-                        <div className="h-8 w-40 rounded bg-homepage-shell-cool" />
-                        <div className="h-4 w-full rounded bg-homepage-shell-cool" />
-                        <div className="h-4 w-2/3 rounded bg-homepage-shell-cool" />
-                      </div>
-                    </motion.article>
-                  ))
-                : null}
-
-              {!isLoading && isError ? (
-                <motion.article
-                  custom={1}
-                  variants={fadeUp}
-                  className="homepage-shadow-card rounded-[1.7rem] border border-homepage-border bg-white p-8 text-center lg:col-span-2"
+        <section className="mx-auto max-w-[1200px] px-6 pb-12 md:px-10 md:pb-16 lg:px-20 lg:pb-20">
+          {previewData.isLoading ? (
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+              {Array.from({ length: 6 }).map((_, index) => (
+                <div
+                  key={`specialty-skeleton-${index}`}
+                  className="flex flex-col"
+                  style={{ borderRadius: "18px", overflow: "visible", background: "transparent" }}
                 >
-                  <h2 className="font-display text-2xl tracking-tight text-homepage-ink">
-                    {lang === "tr"
-                      ? "Uzmanlik verileri su anda yuklenemiyor."
-                      : "Specialty data could not be loaded right now."}
-                  </h2>
-                  <p className="mt-3 text-sm leading-7 text-homepage-text">
-                    {lang === "tr"
-                      ? "Lutfen biraz sonra tekrar deneyin."
-                      : "Please try again shortly."}
-                  </p>
-                </motion.article>
-              ) : null}
-
-              {!isLoading && !isError && hasLoadedEmptySpecialties ? (
-                <motion.article
-                  custom={1}
-                  variants={fadeUp}
-                  className="homepage-shadow-card rounded-[1.7rem] border border-homepage-border bg-white p-8 text-center lg:col-span-2"
-                >
-                  <h2 className="font-display text-2xl tracking-tight text-homepage-ink">
-                    {lang === "tr"
-                      ? "Goruntulenecek aktif uzmanlik alani bulunamadi."
-                      : "No active specialties found."}
-                  </h2>
-                </motion.article>
-              ) : null}
-
-              {!isLoading && !isError
-                ? specialties.map((specialty, index) => (
-                    <motion.article
-                      key={specialty.id}
-                      custom={index + 1}
-                      variants={fadeUp}
-                      className="homepage-shadow-card overflow-hidden rounded-[1.7rem] border border-homepage-border bg-white"
-                    >
-                      <div className="relative h-[220px] overflow-hidden bg-homepage-shell-cool">
-                        <img
-                          src={specialty.imageSrc}
-                          alt={specialty.name}
-                          className="h-full w-full object-cover transition-transform duration-700 hover:scale-[1.03]"
-                        />
-                        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(16,42,67,0.08)_0%,rgba(16,42,67,0.76)_100%)]" />
-                        <div className="absolute inset-x-0 bottom-0 p-5 text-white">
-                          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/72">
-                            {lang === "tr" ? "Uzmanlik" : "Specialty"}
-                          </p>
-                          <h2 className="mt-2 font-display text-[1.9rem] leading-none tracking-tight">
-                            {specialty.name}
-                          </h2>
-                          {specialty.previewText ? (
-                            <p className="mt-3 text-sm leading-6 text-white/88">{specialty.previewText}</p>
-                          ) : null}
-                        </div>
-                      </div>
-
-                      <div className="p-5">
-                        <p className="text-sm leading-7 text-homepage-text">{specialty.description}</p>
-                        <div className="mt-5 flex flex-wrap gap-2">
-                          <Badge
-                            variant="secondary"
-                            className="rounded-full border border-homepage-border bg-homepage-shell px-3 py-1 text-xs font-medium text-homepage-muted"
-                          >
-                            {lang === "tr"
-                              ? `${specialty.doctorCount} aktif doktor`
-                              : `${specialty.doctorCount} active doctor${specialty.doctorCount === 1 ? "" : "s"}`}
-                          </Badge>
-                          {specialty.relatedDoctors.map((doctor) => (
-                            <Badge
-                              key={`${specialty.id}-${doctor.id}`}
-                              variant="secondary"
-                              className="rounded-full border border-homepage-border bg-homepage-shell px-3 py-1 text-xs font-medium text-homepage-muted"
-                            >
-                              {doctor.fullName}
-                            </Badge>
-                          ))}
-                        </div>
-
-                        <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-                          {specialty.doctorCount > 0 ? (
-                            <Button asChild className="rounded-full">
-                              <SmartLink href={`/doctors?specialty=${specialty.slug}`}>
-                                {lang === "tr" ? "Ilgili Doktorlari Gor" : "View Related Doctors"}
-                                <ArrowRight className="h-4 w-4" />
-                              </SmartLink>
-                            </Button>
-                          ) : (
-                            <Button type="button" disabled className="rounded-full">
-                              {lang === "tr" ? "Aktif doktor henuz gorunmuyor" : "No active doctor yet"}
-                            </Button>
-                          )}
-                          <Button asChild variant="outline" className="rounded-full">
-                            <SmartLink href="/request-appointment">
-                              {lang === "tr" ? "Randevu Talebi Olustur" : "Create Appointment Request"}
-                            </SmartLink>
-                          </Button>
-                        </div>
-                      </div>
-                    </motion.article>
-                  ))
-                : null}
+                  <div
+                    className="animate-pulse"
+                    style={{
+                      height: "240px",
+                      width: "100%",
+                      borderRadius: "18px",
+                      background: "linear-gradient(160deg, #eaf5ff 0%, #c8e6f5 55%, #b5d1cc 100%)",
+                    }}
+                  />
+                  <div style={{ height: "16px" }} />
+                  <div className="px-2 pb-2 text-center">
+                    <div className="mx-auto h-7 w-40 rounded-full bg-[#dfeaf7]" />
+                    <div className="mx-auto mt-3 h-4 w-56 rounded-full bg-[#e7eff9]" />
+                    <div className="mx-auto mt-2 h-4 w-44 rounded-full bg-[#eef4fb]" />
+                  </div>
+                </div>
+              ))}
             </div>
-          </motion.section>
-        </div>
+          ) : null}
+
+          {!previewData.isLoading && previewData.isError ? (
+            <div
+              className="rounded-[24px] border border-[#d9e6f3] bg-[#eaf5ff] px-6 py-10 text-center text-[#5a7a8a]"
+              style={{ fontFamily: "Inter, sans-serif" }}
+            >
+              Uzmanlık verileri şu anda yüklenemiyor. Lütfen biraz sonra tekrar deneyin.
+            </div>
+          ) : null}
+
+          {!previewData.isLoading && !previewData.isError && previewData.hasLoadedEmptySpecialties ? (
+            <div
+              className="rounded-[24px] border border-[#d9e6f3] bg-[#eaf5ff] px-6 py-10 text-center text-[#5a7a8a]"
+              style={{ fontFamily: "Inter, sans-serif" }}
+            >
+              Görüntülenecek aktif uzmanlık alanı bulunamadı.
+            </div>
+          ) : null}
+
+          {!previewData.isLoading && !previewData.isError ? (
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+              {previewData.specialties.map((spec, index) => (
+                <motion.article
+                  key={spec.id}
+                  initial={{ opacity: 0, y: 40, x: -30 }}
+                  whileInView={{ opacity: 1, y: 0, x: 0 }}
+                  viewport={{ once: true, amount: 0.1 }}
+                  transition={{ duration: 0.65, delay: index * 0.08, ease: appleEase }}
+                  whileHover={{ scale: 1.02 }}
+                  className="flex flex-col items-stretch"
+                  style={{
+                    borderRadius: "18px",
+                    overflow: "visible",
+                    background: "transparent",
+                  }}
+                >
+                  <div
+                    style={{
+                      height: "240px",
+                      width: "100%",
+                      borderRadius: "18px",
+                      overflow: "hidden",
+                      flexShrink: 0,
+                    }}
+                  >
+                    {spec.imageSrc ? (
+                      <img
+                        src={spec.imageSrc}
+                        alt={spec.name}
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "cover",
+                          objectPosition: "center",
+                          display: "block",
+                        }}
+                      />
+                    ) : (
+                      <div
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          background: "linear-gradient(160deg, #eaf5ff 0%, #c8e6f5 55%, #b5d1cc 100%)",
+                        }}
+                      />
+                    )}
+                  </div>
+
+                  <div style={{ height: "16px" }} />
+
+                  <div
+                    className="flex flex-col items-center px-2 pb-2 text-center"
+                    style={{ fontFamily: "Inter, sans-serif" }}
+                  >
+                    <h2
+                      className="mb-[6px] text-[22px] font-bold text-[#1a2e3b]"
+                      style={{ fontFamily: "Manrope, sans-serif" }}
+                    >
+                      {spec.name}
+                    </h2>
+
+                    <p
+                      className="mb-0 max-w-[220px] text-[14px] leading-[1.5] text-[#5a7a8a]"
+                    >
+                      {spec.description}
+                    </p>
+
+                    <div className="mt-5 flex items-center justify-center gap-4">
+                      <button
+                        type="button"
+                        onClick={() => navigate("/request-appointment")}
+                        style={{
+                          borderRadius: "980px",
+                          background: "#4f8fe6",
+                          color: "white",
+                          padding: "9px 22px",
+                          border: "none",
+                          fontFamily: "Inter, sans-serif",
+                          fontWeight: 600,
+                          fontSize: "14px",
+                          cursor: "pointer",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        Randevu Al
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/doctors?specialty=${spec.id}`)}
+                        style={{
+                          borderRadius: "980px",
+                          background: "transparent",
+                          border: "none",
+                          color: "#4f8fe6",
+                          fontFamily: "Inter, sans-serif",
+                          fontWeight: 500,
+                          fontSize: "14px",
+                          cursor: "pointer",
+                          padding: "9px 8px",
+                        }}
+                      >
+                        Doktorları Gör ›
+                      </button>
+                    </div>
+                  </div>
+                </motion.article>
+              ))}
+            </div>
+          ) : null}
+        </section>
       </main>
 
       <LandingFooter />
-    </div>
+    </motion.div>
   );
 }
