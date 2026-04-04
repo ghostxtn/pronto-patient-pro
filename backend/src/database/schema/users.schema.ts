@@ -33,6 +33,8 @@ export const users = pgTable(
     kvkk_consent_ip: varchar('kvkk_consent_ip', { length: 45 }),
     failed_login_attempts: integer('failed_login_attempts').default(0).notNull(),
     locked_until: timestamp('locked_until'),
+    password_reset_token_hash: varchar('password_reset_token_hash', { length: 255 }),
+    password_reset_expires_at: timestamp('password_reset_expires_at'),
   },
   (table) => ({
     usersEmailClinicUnique: unique('users_email_clinic_id_unique').on(

@@ -7,6 +7,9 @@ export default function AuthCallback() {
   const [searchParams] = useSearchParams();
 
   useEffect(() => {
+    const requiresOtp = searchParams.get("requiresOtp") === "true";
+    const flowToken = searchParams.get("flowToken");
+    const email = searchParams.get("email");
     const accessToken = searchParams.get("accessToken");
     const refreshToken = searchParams.get("refreshToken");
     const role = searchParams.get("role") || "patient";
@@ -16,6 +19,17 @@ export default function AuthCallback() {
       hasRefreshToken: Boolean(refreshToken),
       role,
     });
+
+    if (requiresOtp && flowToken) {
+      const nextUrl = new URL("/auth", window.location.origin);
+      nextUrl.searchParams.set("mode", "otp");
+      nextUrl.searchParams.set("flowToken", flowToken);
+      if (email) {
+        nextUrl.searchParams.set("email", email);
+      }
+      window.location.replace(nextUrl.toString());
+      return;
+    }
 
     if (!accessToken) {
       console.debug("[auth][callback] missing access token, redirecting to /auth");

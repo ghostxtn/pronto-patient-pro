@@ -1,8 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { motion } from "framer-motion";
 import { Loader2 } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import { DoctorCalendar } from "@/components/calendar/DoctorCalendar";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import api from "@/services/api";
@@ -20,18 +22,35 @@ export default function DoctorSchedule() {
   const { user } = useAuth();
   const { t } = useLanguage();
 
-  const { data: doctorRecord } = useQuery({
+  useEffect(() => {
+    console.debug("[doctor][schedule] mounted", {
+      userId: user?.id,
+      role: user?.role,
+    });
+  }, [user?.id, user?.role]);
+
+  const {
+    data: doctorRecord,
+    isLoading,
+    isError,
+    error,
+  } = useQuery({
     queryKey: ["my-doctor-record", user?.id],
-    queryFn: async () => {
-      const doctors = await api.doctors.list();
-      const doctor = doctors.find((item: any) => item.user_id === user!.id);
-      if (!doctor) {
-        throw new Error("Doctor record not found");
-      }
-      return doctor;
-    },
+    queryFn: async () => api.doctors.me(),
     enabled: !!user,
   });
+
+  useEffect(() => {
+    console.debug("[doctor][schedule] query state", {
+      userId: user?.id,
+      role: user?.role,
+      hasDoctorRecord: Boolean(doctorRecord),
+      doctorRecordId: doctorRecord?.id,
+      isLoading,
+      isError,
+      error: error instanceof Error ? error.message : error,
+    });
+  }, [doctorRecord, error, isError, isLoading, user?.id, user?.role]);
 
   return (
     <AppLayout>
@@ -43,6 +62,13 @@ export default function DoctorSchedule() {
 
         {doctorRecord ? (
           <DoctorCalendar doctorId={doctorRecord.id} />
+        ) : isError ? (
+          <Alert className="rounded-2xl">
+            <AlertTitle>Doctor schedule could not be loaded</AlertTitle>
+            <AlertDescription>
+              {error instanceof Error ? error.message : "Unknown error"}
+            </AlertDescription>
+          </Alert>
         ) : (
           <div className="flex min-h-[320px] items-center justify-center">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />

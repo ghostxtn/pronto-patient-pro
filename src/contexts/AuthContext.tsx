@@ -1,6 +1,13 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
-import api, { ApiError, clearTokens, getAccessToken, setTokens } from "@/services/api";
+import api, {
+  ApiError,
+  type AuthOtpChallengeResponse,
+  type AuthSuccessResponse,
+  clearTokens,
+  getAccessToken,
+  setTokens,
+} from "@/services/api";
 import type { AppRole } from "@/lib/auth-routing";
 
 export interface User {
@@ -16,9 +23,11 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   error: string | null;
-  login: (email: string, pass: string) => Promise<void>;
-  register: (data: { email: string; password: string; firstName: string; lastName: string }) => Promise<void>;
+  login: (email: string, pass: string) => Promise<AuthOtpChallengeResponse | void>;
+  register: (data: { email: string; password: string; firstName: string; lastName: string }) => Promise<AuthOtpChallengeResponse | void>;
   googleLogin: (idToken: string) => Promise<void>;
+  verifyOtp: (flowToken: string, code: string) => Promise<void>;
+  resendOtp: (flowToken: string) => Promise<AuthOtpChallengeResponse>;
   logout: () => Promise<void>;
   clearError: () => void;
 }
@@ -41,6 +50,23 @@ function normalizeUser(input: any): User {
     clinic_id: input.clinic_id ?? input.clinicId ?? null,
     avatar_url: input.avatar_url ?? input.avatarUrl ?? null,
   };
+}
+
+function isOtpChallenge(result: unknown): result is AuthOtpChallengeResponse {
+  return Boolean(
+    result &&
+      typeof result === "object" &&
+      "requiresOtp" in result &&
+      (result as { requiresOtp?: unknown }).requiresOtp === true &&
+      "flowToken" in result,
+  );
+}
+
+function applyAuthSuccess(result: AuthSuccessResponse, setUser: (user: User) => void) {
+  setTokens(result.accessToken ?? null, result.refreshToken ?? null);
+  const normalizedUser = normalizeUser(result.user);
+  setUser(normalizedUser);
+  return normalizedUser;
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -96,13 +122,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.debug("[auth][context] login start", { email });
         try {
           const result = await api.auth.login(email, pass);
-          setTokens(result.accessToken ?? null, result.refreshToken ?? null);
-          const normalizedUser = normalizeUser(result.user);
+          if (isOtpChallenge(result)) {
+            console.debug("[auth][context] login otp challenge issued", { email });
+            return result;
+          }
+
+          const normalizedUser = applyAuthSuccess(result, setUser);
           console.debug("[auth][context] login success", {
             userId: normalizedUser.id,
             role: normalizedUser.role,
           });
-          setUser(normalizedUser);
         } catch (err) {
           console.debug("[auth][context] login failed", err);
           setError(err instanceof Error ? err.message : "Login failed");
@@ -117,13 +146,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.debug("[auth][context] register start", { email: data.email });
         try {
           const result = await api.auth.register(data);
-          setTokens(result.accessToken ?? null, result.refreshToken ?? null);
-          const normalizedUser = normalizeUser(result.user);
+          if (isOtpChallenge(result)) {
+            console.debug("[auth][context] register otp challenge issued", { email: data.email });
+            return result;
+          }
+
+          const normalizedUser = applyAuthSuccess(result, setUser);
           console.debug("[auth][context] register success", {
             userId: normalizedUser.id,
             role: normalizedUser.role,
           });
-          setUser(normalizedUser);
         } catch (err) {
           console.debug("[auth][context] register failed", err);
           setError(err instanceof Error ? err.message : "Registration failed");
@@ -148,6 +180,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } catch (err) {
           console.debug("[auth][context] googleLogin failed", err);
           setError(err instanceof Error ? err.message : "Google login failed");
+          throw err;
+        } finally {
+          setLoading(false);
+        }
+      },
+      verifyOtp: async (flowToken: string, code: string) => {
+        setLoading(true);
+        setError(null);
+        try {
+          const result = await api.auth.verifyOtp(flowToken, code);
+          const normalizedUser = applyAuthSuccess(result, setUser);
+          console.debug("[auth][context] otp verification success", {
+            userId: normalizedUser.id,
+            role: normalizedUser.role,
+          });
+        } catch (err) {
+          console.debug("[auth][context] otp verification failed", err);
+          setError(err instanceof Error ? err.message : "OTP verification failed");
+          throw err;
+        } finally {
+          setLoading(false);
+        }
+      },
+      resendOtp: async (flowToken: string) => {
+        setLoading(true);
+        setError(null);
+        try {
+          return await api.auth.resendOtp(flowToken);
+        } catch (err) {
+          console.debug("[auth][context] resend otp failed", err);
+          setError(err instanceof Error ? err.message : "Resend OTP failed");
           throw err;
         } finally {
           setLoading(false);

@@ -73,6 +73,8 @@ const localizer = dateFnsLocalizer({
   locales,
 });
 
+console.debug("[doctor][calendar] module loaded");
+
 const calendarMessages = {
   today: "Bugun",
   previous: "Geri",
@@ -288,6 +290,12 @@ export function DoctorCalendar({ doctorId }: DoctorCalendarProps) {
     date?: Date;
   }>({ open: false, x: 0, y: 0 });
 
+  console.debug("[doctor][calendar] render", {
+    doctorId,
+    currentDate: currentDate.toISOString(),
+    view,
+  });
+
   const { rangeStart, rangeEnd } = useMemo(
     () => getDateRange(currentDate, view),
     [currentDate, view],
@@ -496,6 +504,16 @@ export function DoctorCalendar({ doctorId }: DoctorCalendarProps) {
   const isLoading = isAvailabilityLoading || isCalendarLoading;
   const isError = isAvailabilityError || isCalendarError;
   const error = availabilityError ?? calendarError;
+
+  console.debug("[doctor][calendar] query state", {
+    doctorId,
+    availabilityCount: availabilitySlots.length,
+    eventCount: events.length,
+    overrideCount: overrideList.length,
+    isLoading,
+    isError,
+    error: error instanceof Error ? error.message : error,
+  });
 
   if (isLoading) {
     return (

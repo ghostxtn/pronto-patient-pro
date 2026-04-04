@@ -22,6 +22,7 @@ import { TenantMiddleware } from './common/middleware/tenant.middleware';
 import { TenantResolverService } from './common/services/tenant-resolver.service';
 import { DatabaseModule } from './database/database.module';
 import { DoctorsModule } from './doctors/doctors.module';
+import { EmailModule } from './email/email.module';
 import { EncryptionModule } from './encryption/encryption.module';
 import { HealthModule } from './health/health.module';
 import { HomepagePreviewModule } from './homepage-preview/homepage-preview.module';
@@ -46,6 +47,7 @@ import { StorageModule } from './storage/storage.module';
     HomepagePreviewModule,
     DatabaseModule,
     AuditModule,
+    EmailModule,
     EncryptionModule,
     RedisModule,
     AuthModule,
