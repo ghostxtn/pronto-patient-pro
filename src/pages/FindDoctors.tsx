@@ -31,6 +31,10 @@ export default function FindDoctors() {
   const { doctors, specialties, isLoading, isError, hasLoadedEmptyDoctors } = usePublicDoctors();
   const [searchParams, setSearchParams] = useSearchParams();
 
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
   const selectedSlug = searchParams.get("doctor");
   const selectedSpecialtySlug = searchParams.get("specialty");
 
@@ -149,7 +153,13 @@ export default function FindDoctors() {
   }
 
   const pageContent = (
-    <div className="min-h-screen bg-[#f4f8fd] text-[#1a2e3b]">
+    <motion.div
+      initial={{ opacity: 0, x: -30 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: -30 }}
+      transition={{ duration: 0.3, ease: "easeOut" }}
+      className="min-h-screen bg-[rgb(var(--homepage-shell))] text-[rgb(var(--homepage-ink))]"
+    >
       {!isPatientDoctorsRoute ? <LandingNav /> : null}
 
       <main className={isPatientDoctorsRoute ? "pb-12 pt-6" : "pt-20"}>
@@ -161,19 +171,19 @@ export default function FindDoctors() {
             transition={{ duration: 0.6, ease: appleEase }}
           >
             <p
-              className="text-[11px] font-medium uppercase tracking-[2px] text-[#5a7a8a]"
+              className="text-[11px] font-medium uppercase tracking-[2px] text-[rgb(var(--homepage-muted))]"
               style={{ fontFamily: "Inter, sans-serif" }}
             >
               DOKTORLARIMIZ
             </p>
             <h1
-              className="mt-2 text-[34px] font-bold leading-tight text-[#1a2e3b] md:text-[42px]"
+              className="mt-2 text-[34px] font-bold leading-tight text-[rgb(var(--homepage-ink))] md:text-[42px]"
               style={{ fontFamily: "Manrope, sans-serif" }}
             >
               Doktorlarımız
             </h1>
             <p
-              className="mt-3 max-w-[520px] text-[16px] leading-7 text-[#5a7a8a]"
+              className="mt-3 max-w-[520px] text-[16px] leading-7 text-[rgb(var(--homepage-muted))]"
               style={{ fontFamily: "Inter, sans-serif" }}
             >
               Kliniğimizin uzman hekim kadrosunu inceleyin ve randevu alın.
@@ -187,14 +197,14 @@ export default function FindDoctors() {
               type="button"
               onClick={() => setSpecialtyFilter("all")}
               style={{
-                background: activeSpecialty === "all" ? "#4f8fe6" : "white",
-                color: activeSpecialty === "all" ? "white" : "#5a7a8a",
+                background: activeSpecialty === "all" ? "rgb(var(--homepage-brand))" : "rgb(var(--homepage-card))",
+                color: activeSpecialty === "all" ? "white" : "rgb(var(--homepage-muted))",
                 borderRadius: "980px",
                 padding: "7px 18px",
                 fontFamily: "Inter, sans-serif",
                 fontWeight: activeSpecialty === "all" ? 600 : 500,
                 fontSize: "13px",
-                border: activeSpecialty === "all" ? "none" : "1px solid #b5d1cc",
+                border: activeSpecialty === "all" ? "none" : "1px solid rgb(var(--homepage-border))",
                 cursor: "pointer",
               }}
             >
@@ -210,14 +220,14 @@ export default function FindDoctors() {
                   type="button"
                   onClick={() => setSpecialtyFilter(specialty.key)}
                   style={{
-                    background: isActive ? "#4f8fe6" : "white",
-                    color: isActive ? "white" : "#5a7a8a",
+                    background: isActive ? "rgb(var(--homepage-brand))" : "rgb(var(--homepage-card))",
+                    color: isActive ? "white" : "rgb(var(--homepage-muted))",
                     borderRadius: "980px",
                     padding: "7px 18px",
                     fontFamily: "Inter, sans-serif",
                     fontWeight: isActive ? 600 : 500,
                     fontSize: "13px",
-                    border: isActive ? "none" : "1px solid #b5d1cc",
+                    border: isActive ? "none" : "1px solid rgb(var(--homepage-border))",
                     cursor: "pointer",
                   }}
                 >
@@ -243,15 +253,16 @@ export default function FindDoctors() {
                       height: "280px",
                       width: "100%",
                       borderRadius: "18px",
-                      background: "linear-gradient(160deg, #eaf5ff 0%, #c8e6f5 55%, #b5d1cc 100%)",
+                      background:
+                        "linear-gradient(160deg, rgb(var(--homepage-shell-cool)) 0%, rgb(var(--homepage-footer-bg-from)) 55%, rgb(var(--homepage-border)) 100%)",
                       flexShrink: 0,
                     }}
                   />
                   <div style={{ height: "16px" }} />
                   <div className="px-2 pb-2 text-center">
-                    <div className="mx-auto h-7 w-48 rounded-full bg-[#dfeaf7]" />
-                    <div className="mx-auto mt-3 h-4 w-32 rounded-full bg-[#e7eff9]" />
-                    <div className="mx-auto mt-5 h-10 w-56 rounded-full bg-[#eef4fb]" />
+                    <div className="mx-auto h-7 w-48 rounded-full bg-[rgb(var(--homepage-skeleton-1))]" />
+                    <div className="mx-auto mt-3 h-4 w-32 rounded-full bg-[rgb(var(--homepage-skeleton-2))]" />
+                    <div className="mx-auto mt-5 h-10 w-56 rounded-full bg-[rgb(var(--homepage-skeleton-3))]" />
                   </div>
                 </div>
               ))}
@@ -260,7 +271,7 @@ export default function FindDoctors() {
 
           {!isLoading && isError ? (
             <div
-              className="rounded-[24px] border border-[#d9e6f3] bg-[#eaf5ff] px-6 py-10 text-center text-[#5a7a8a]"
+              className="rounded-[24px] border border-[rgb(var(--homepage-info-border))] bg-[rgb(var(--homepage-shell-cool))] px-6 py-10 text-center text-[rgb(var(--homepage-muted))]"
               style={{ fontFamily: "Inter, sans-serif" }}
             >
               Doktor verileri şu anda yüklenemiyor. Lütfen biraz sonra tekrar deneyin.
@@ -269,7 +280,7 @@ export default function FindDoctors() {
 
           {!isLoading && !isError && filteredDoctors.length === 0 ? (
             <div
-              className="rounded-[24px] border border-[#d9e6f3] bg-[#eaf5ff] px-6 py-10 text-center text-[#5a7a8a]"
+              className="rounded-[24px] border border-[rgb(var(--homepage-info-border))] bg-[rgb(var(--homepage-shell-cool))] px-6 py-10 text-center text-[rgb(var(--homepage-muted))]"
               style={{ fontFamily: "Inter, sans-serif" }}
             >
               {hasLoadedEmptyDoctors
@@ -283,10 +294,10 @@ export default function FindDoctors() {
               {filteredDoctors.map((doctor, index) => (
                 <motion.article
                   key={doctor.id}
-                  initial={{ opacity: 0, y: 40, x: -30 }}
+                  initial={{ opacity: 0, y: 20, x: -20 }}
                   whileInView={{ opacity: 1, y: 0, x: 0 }}
-                  viewport={{ once: true, amount: 0.1 }}
-                  transition={{ duration: 0.65, delay: index * 0.08, ease: appleEase }}
+                  viewport={{ once: true, amount: 0.15 }}
+                  transition={{ duration: 0.45, delay: (index % 5) * 0.07, ease: appleEase }}
                   whileHover={{ scale: 1.02 }}
                   className="flex flex-col items-stretch"
                   style={{
@@ -307,7 +318,7 @@ export default function FindDoctors() {
                       flexShrink: 0,
                       background: doctor.imageSrc
                         ? undefined
-                        : "linear-gradient(160deg, #eaf5ff 0%, #c8e6f5 55%, #b5d1cc 100%)",
+                        : "linear-gradient(160deg, rgb(var(--homepage-shell-cool)) 0%, rgb(var(--homepage-footer-bg-from)) 55%, rgb(var(--homepage-border)) 100%)",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
@@ -338,7 +349,7 @@ export default function FindDoctors() {
                           fontFamily: "Manrope, sans-serif",
                           fontWeight: 700,
                           fontSize: "28px",
-                          color: "#005cae",
+                          color: "rgb(var(--homepage-brand-strong))",
                         }}
                       >
                         {getDoctorInitials(doctor.fullName)}
@@ -362,7 +373,7 @@ export default function FindDoctors() {
                         fontFamily: "Manrope, sans-serif",
                         fontWeight: 700,
                         fontSize: "20px",
-                        color: "#1a2e3b",
+                        color: "rgb(var(--homepage-ink))",
                         marginBottom: "4px",
                         lineHeight: 1.3,
                       }}
@@ -375,7 +386,7 @@ export default function FindDoctors() {
                         fontFamily: "Inter, sans-serif",
                         fontWeight: 400,
                         fontSize: "14px",
-                        color: "#5a7a8a",
+                        color: "rgb(var(--homepage-muted))",
                         marginBottom: 0,
                       }}
                     >
@@ -393,10 +404,10 @@ export default function FindDoctors() {
                     >
                       <button
                         type="button"
-                        onClick={() => navigate("/request-appointment")}
+                        onClick={() => navigate(`/patient/doctors/${doctor.id}`)}
                         style={{
                           borderRadius: "980px",
-                          background: "#4f8fe6",
+                          background: "rgb(var(--homepage-brand))",
                           color: "white",
                           padding: "9px 22px",
                           border: "none",
@@ -408,24 +419,6 @@ export default function FindDoctors() {
                         }}
                       >
                         Randevu Al
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => handleProfileClick(doctor)}
-                        style={{
-                          borderRadius: "0",
-                          background: "transparent",
-                          border: "none",
-                          color: "#4f8fe6",
-                          fontFamily: "Inter, sans-serif",
-                          fontWeight: 500,
-                          fontSize: "14px",
-                          cursor: "pointer",
-                          padding: "9px 8px",
-                        }}
-                      >
-                        Profili Gör ›
                       </button>
                     </div>
                   </div>
@@ -439,7 +432,7 @@ export default function FindDoctors() {
               initial={{ opacity: 0, y: 24 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.45, ease: appleEase }}
-              className="mt-10 rounded-[24px] border border-[#d9e6f3] bg-white p-6 md:p-8"
+              className="mt-10 rounded-[24px] border border-[rgb(var(--homepage-info-border))] bg-[rgb(var(--homepage-card))] p-6 md:p-8"
             >
               <div className="grid gap-8 lg:grid-cols-[280px_minmax(0,1fr)] lg:items-start">
                 <div
@@ -451,7 +444,7 @@ export default function FindDoctors() {
                     flexShrink: 0,
                     background: selectedDoctor.imageSrc
                       ? undefined
-                      : "linear-gradient(160deg, #eaf5ff 0%, #c8e6f5 55%, #b5d1cc 100%)",
+                      : "linear-gradient(160deg, rgb(var(--homepage-shell-cool)) 0%, rgb(var(--homepage-footer-bg-from)) 55%, rgb(var(--homepage-border)) 100%)",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
@@ -482,7 +475,7 @@ export default function FindDoctors() {
                         fontFamily: "Manrope, sans-serif",
                         fontWeight: 700,
                         fontSize: "28px",
-                        color: "#005cae",
+                        color: "rgb(var(--homepage-brand-strong))",
                       }}
                     >
                       {getDoctorInitials(selectedDoctor.fullName)}
@@ -497,21 +490,21 @@ export default function FindDoctors() {
                       fontWeight: 700,
                       fontSize: "32px",
                       lineHeight: 1.2,
-                      color: "#1a2e3b",
+                      color: "rgb(var(--homepage-ink))",
                     }}
                   >
                     {[selectedDoctor.title, selectedDoctor.fullName].filter(Boolean).join(" ")}
                   </h3>
                   <p
                     className="mt-3"
-                    style={{ fontFamily: "Inter, sans-serif", fontSize: "15px", color: "#5a7a8a" }}
+                    style={{ fontFamily: "Inter, sans-serif", fontSize: "15px", color: "rgb(var(--homepage-muted))" }}
                   >
                     {selectedDoctor.specialtyName}
                   </p>
 
                   <p
                     className="mt-6"
-                    style={{ fontFamily: "Inter, sans-serif", fontSize: "15px", lineHeight: 1.8, color: "#5a7a8a" }}
+                    style={{ fontFamily: "Inter, sans-serif", fontSize: "15px", lineHeight: 1.8, color: "rgb(var(--homepage-muted))" }}
                   >
                     {selectedDoctor.biography || selectedDoctor.previewText}
                   </p>
@@ -522,8 +515,8 @@ export default function FindDoctors() {
                         key={`${selectedDoctor.id}-${tag}`}
                         style={{
                           borderRadius: "980px",
-                          background: "#eaf5ff",
-                          color: "#005cae",
+                          background: "rgb(var(--homepage-shell-cool))",
+                          color: "rgb(var(--homepage-brand-strong))",
                           padding: "4px 10px",
                           fontFamily: "Inter, sans-serif",
                           fontSize: "12px",
@@ -541,7 +534,7 @@ export default function FindDoctors() {
                       onClick={() => navigate("/request-appointment")}
                       style={{
                         borderRadius: "980px",
-                        background: "#4f8fe6",
+                        background: "rgb(var(--homepage-brand))",
                         color: "white",
                         padding: "9px 22px",
                         border: "none",
@@ -560,10 +553,10 @@ export default function FindDoctors() {
                       onClick={closeDoctorDetail}
                       style={{
                         borderRadius: "980px",
-                        background: "white",
-                        color: "#5a7a8a",
+                        background: "rgb(var(--homepage-card))",
+                        color: "rgb(var(--homepage-muted))",
                         padding: "9px 18px",
-                        border: "1px solid #b5d1cc",
+                        border: "1px solid rgb(var(--homepage-border))",
                         fontFamily: "Inter, sans-serif",
                         fontWeight: 500,
                         fontSize: "14px",
@@ -581,7 +574,7 @@ export default function FindDoctors() {
       </main>
 
       {!isPatientDoctorsRoute ? <LandingFooter /> : null}
-    </div>
+    </motion.div>
   );
 
   if (isPatientDoctorsRoute) {

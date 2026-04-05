@@ -18,7 +18,7 @@ export default function Specialties() {
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: -30 }}
       transition={{ duration: 0.3, ease: "easeOut" }}
-      className="min-h-screen bg-[#f4f8fd] text-[#1a2e3b]"
+      className="min-h-screen bg-homepage-shell text-homepage-ink"
     >
       <LandingNav />
 
@@ -31,20 +31,15 @@ export default function Specialties() {
             transition={{ duration: 0.6, ease: appleEase }}
           >
             <p
-              className="text-[11px] font-medium uppercase tracking-[2px] text-[#5a7a8a]"
-              style={{ fontFamily: "Inter, sans-serif" }}
+              className="text-[11px] font-medium uppercase tracking-[2px] text-homepage-muted"
             >
               UZMANLIK ALANLARI
             </p>
-            <h1
-              className="mt-2 text-[34px] font-bold leading-tight text-[#1a2e3b] md:text-[42px]"
-              style={{ fontFamily: "Manrope, sans-serif" }}
-            >
+            <h1 className="font-display mt-2 text-[34px] font-bold leading-tight text-homepage-ink md:text-[42px]">
               Uzmanlık Alanlarımız
             </h1>
             <p
-              className="mt-3 max-w-[560px] text-[16px] leading-7 text-[#5a7a8a]"
-              style={{ fontFamily: "Inter, sans-serif" }}
+              className="mt-3 max-w-[560px] text-[16px] leading-7 text-homepage-muted"
             >
               Kliniğimizin uzmanlık alanlarını ve bu alanlarda görev yapan hekimlerimizi inceleyin.
             </p>
@@ -66,14 +61,15 @@ export default function Specialties() {
                       height: "240px",
                       width: "100%",
                       borderRadius: "18px",
-                      background: "linear-gradient(160deg, #eaf5ff 0%, #c8e6f5 55%, #b5d1cc 100%)",
+                      background:
+                        "linear-gradient(160deg, rgb(var(--homepage-shell-cool)) 0%, rgb(var(--homepage-support-tint)) 55%, rgb(var(--homepage-border)) 100%)",
                     }}
                   />
                   <div style={{ height: "16px" }} />
                   <div className="px-2 pb-2 text-center">
-                    <div className="mx-auto h-7 w-40 rounded-full bg-[#dfeaf7]" />
-                    <div className="mx-auto mt-3 h-4 w-56 rounded-full bg-[#e7eff9]" />
-                    <div className="mx-auto mt-2 h-4 w-44 rounded-full bg-[#eef4fb]" />
+                    <div className="mx-auto h-7 w-40 rounded-full bg-homepage-shell-cool" />
+                    <div className="mx-auto mt-3 h-4 w-56 rounded-full bg-homepage-support-tint" />
+                    <div className="mx-auto mt-2 h-4 w-44 rounded-full bg-homepage-shell-cool" />
                   </div>
                 </div>
               ))}
@@ -82,8 +78,7 @@ export default function Specialties() {
 
           {!previewData.isLoading && previewData.isError ? (
             <div
-              className="rounded-[24px] border border-[#d9e6f3] bg-[#eaf5ff] px-6 py-10 text-center text-[#5a7a8a]"
-              style={{ fontFamily: "Inter, sans-serif" }}
+              className="rounded-[24px] border border-homepage-border bg-homepage-shell-cool px-6 py-10 text-center text-homepage-muted"
             >
               Uzmanlık verileri şu anda yüklenemiyor. Lütfen biraz sonra tekrar deneyin.
             </div>
@@ -91,8 +86,7 @@ export default function Specialties() {
 
           {!previewData.isLoading && !previewData.isError && previewData.hasLoadedEmptySpecialties ? (
             <div
-              className="rounded-[24px] border border-[#d9e6f3] bg-[#eaf5ff] px-6 py-10 text-center text-[#5a7a8a]"
-              style={{ fontFamily: "Inter, sans-serif" }}
+              className="rounded-[24px] border border-homepage-border bg-homepage-shell-cool px-6 py-10 text-center text-homepage-muted"
             >
               Görüntülenecek aktif uzmanlık alanı bulunamadı.
             </div>
@@ -103,10 +97,10 @@ export default function Specialties() {
               {previewData.specialties.map((spec, index) => (
                 <motion.article
                   key={spec.id}
-                  initial={{ opacity: 0, y: 40, x: -30 }}
+                  initial={{ opacity: 0, y: 20, x: -20 }}
                   whileInView={{ opacity: 1, y: 0, x: 0 }}
-                  viewport={{ once: true, amount: 0.1 }}
-                  transition={{ duration: 0.65, delay: index * 0.08, ease: appleEase }}
+                  viewport={{ once: true, amount: 0.15 }}
+                  transition={{ duration: 0.45, delay: (index % 5) * 0.07, ease: appleEase }}
                   whileHover={{ scale: 1.02 }}
                   className="flex flex-col items-stretch"
                   style={{
@@ -141,7 +135,8 @@ export default function Specialties() {
                         style={{
                           width: "100%",
                           height: "100%",
-                          background: "linear-gradient(160deg, #eaf5ff 0%, #c8e6f5 55%, #b5d1cc 100%)",
+                          background:
+                            "linear-gradient(160deg, rgb(var(--homepage-shell-cool)) 0%, rgb(var(--homepage-support-tint)) 55%, rgb(var(--homepage-border)) 100%)",
                         }}
                       />
                     )}
@@ -170,18 +165,7 @@ export default function Specialties() {
                       <button
                         type="button"
                         onClick={() => navigate("/request-appointment")}
-                        style={{
-                          borderRadius: "980px",
-                          background: "#4f8fe6",
-                          color: "white",
-                          padding: "9px 22px",
-                          border: "none",
-                          fontFamily: "Inter, sans-serif",
-                          fontWeight: 600,
-                          fontSize: "14px",
-                          cursor: "pointer",
-                          whiteSpace: "nowrap",
-                        }}
+                        className="homepage-focus-soft rounded-full border border-homepage-brand bg-homepage-brand px-[22px] py-[9px] text-[14px] font-semibold text-white transition-colors hover:bg-homepage-brand-deep"
                       >
                         Randevu Al
                       </button>
@@ -189,17 +173,7 @@ export default function Specialties() {
                       <button
                         type="button"
                         onClick={() => navigate(`/doctors?specialty=${spec.id}`)}
-                        style={{
-                          borderRadius: "980px",
-                          background: "transparent",
-                          border: "none",
-                          color: "#4f8fe6",
-                          fontFamily: "Inter, sans-serif",
-                          fontWeight: 500,
-                          fontSize: "14px",
-                          cursor: "pointer",
-                          padding: "9px 8px",
-                        }}
+                        className="homepage-focus-soft rounded-full px-2 py-[9px] text-[14px] font-medium text-homepage-brand transition-colors hover:text-homepage-brand-deep"
                       >
                         Doktorları Gör ›
                       </button>

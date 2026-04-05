@@ -3,11 +3,13 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
+import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import SmartLink from "./SmartLink";
 import { getLandingContent } from "./content";
 
 export default function LandingNav() {
+  const { user, logout } = useAuth();
   const { lang } = useLanguage();
   const content = getLandingContent(lang);
   const [isScrolled, setIsScrolled] = useState(false);
@@ -71,20 +73,60 @@ export default function LandingNav() {
             {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
 
-          <Button
-            variant="ghost"
-            asChild
-            className="homepage-focus hidden rounded-full px-5 text-sm font-medium text-homepage-muted hover:bg-homepage-shell hover:text-homepage-ink md:inline-flex"
-          >
-            <SmartLink href="/auth">{content.auth.signInLabel}</SmartLink>
-          </Button>
+          {user ? (
+            <div className="hidden md:flex items-center gap-2">
+              <SmartLink
+                href={
+                  user.role === "admin" || user.role === "owner" ? "/admin/dashboard"
+                  : user.role === "doctor" ? "/doctor/dashboard"
+                  : user.role === "staff" ? "/staff/dashboard"
+                  : "/patient/dashboard"
+                }
+                className="flex items-center gap-2 rounded-full border border-homepage-border px-4 py-2 text-sm font-medium text-homepage-ink hover:bg-homepage-shell transition-colors"
+              >
+                <div style={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: "50%",
+                  background: "#eaf5ff",
+                  border: "1.5px solid #b5d1cc",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: "0.75rem",
+                  fontWeight: 700,
+                  color: "#4f8fe6",
+                  flexShrink: 0,
+                }}>
+                  {user.email?.[0]?.toUpperCase() ?? "U"}
+                </div>
+                <span className="max-w-[140px] truncate text-sm">{user.email}</span>
+              </SmartLink>
+              <button
+                onClick={logout}
+                className="rounded-full border border-homepage-border px-4 py-2 text-sm font-medium text-homepage-muted hover:bg-homepage-shell hover:text-homepage-ink transition-colors"
+              >
+                Çıkış
+              </button>
+            </div>
+          ) : (
+            <>
+              <Button
+                variant="ghost"
+                asChild
+                className="homepage-focus hidden rounded-full px-5 text-sm font-medium text-homepage-muted hover:bg-homepage-shell hover:text-homepage-ink md:inline-flex"
+              >
+                <SmartLink href="/auth">{content.auth.signInLabel}</SmartLink>
+              </Button>
 
-          <Button
-            asChild
-            className="homepage-focus rounded-full border border-homepage-brand bg-homepage-brand px-5 text-sm font-medium text-white hover:bg-homepage-brand-deep"
-          >
-            <SmartLink href="/request-appointment">{content.auth.requestLabel}</SmartLink>
-          </Button>
+              <Button
+                asChild
+                className="homepage-focus rounded-full border border-homepage-brand bg-homepage-brand px-5 text-sm font-medium text-white hover:bg-homepage-brand-deep"
+              >
+                <SmartLink href="/request-appointment">{content.auth.requestLabel}</SmartLink>
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
@@ -109,13 +151,36 @@ export default function LandingNav() {
                 </SmartLink>
               ))}
               <div className="mt-3 flex flex-col gap-2 border-t border-homepage-border pt-3">
-                <SmartLink
-                  href="/auth"
-                  onClick={() => setMenuOpen(false)}
-                  className="px-4 py-3 rounded-xl text-sm font-medium text-homepage-muted hover:bg-homepage-shell text-center"
-                >
-                  {content.auth.signInLabel}
-                </SmartLink>
+                {user ? (
+                  <>
+                    <SmartLink
+                      href={
+                        user.role === "admin" || user.role === "owner" ? "/admin/dashboard"
+                        : user.role === "doctor" ? "/doctor/dashboard"
+                        : user.role === "staff" ? "/staff/dashboard"
+                        : "/patient/dashboard"
+                      }
+                      onClick={() => setMenuOpen(false)}
+                      className="px-4 py-3 rounded-xl text-sm font-medium text-homepage-ink hover:bg-homepage-shell text-center"
+                    >
+                      Panelim
+                    </SmartLink>
+                    <button
+                      onClick={() => { setMenuOpen(false); logout(); }}
+                      className="px-4 py-3 rounded-xl text-sm font-medium text-homepage-muted hover:bg-homepage-shell text-center"
+                    >
+                      Çıkış Yap
+                    </button>
+                  </>
+                ) : (
+                  <SmartLink
+                    href="/auth"
+                    onClick={() => setMenuOpen(false)}
+                    className="px-4 py-3 rounded-xl text-sm font-medium text-homepage-muted hover:bg-homepage-shell text-center"
+                  >
+                    {content.auth.signInLabel}
+                  </SmartLink>
+                )}
               </div>
             </div>
           </motion.div>

@@ -80,45 +80,64 @@ export default function ClinicSettings() {
     <AppLayout>
       <motion.div initial="hidden" animate="visible" className="space-y-6">
         <motion.div custom={0} variants={fadeUp}>
-          <h1 className="text-3xl font-display font-bold">{t.clinicSettings}</h1>
-          <p className="text-muted-foreground mt-1">{t.clinicSettingsDesc}</p>
+          <h1 className="text-3xl font-display font-bold" style={{ color: "#1a2e3b", fontFamily: "Manrope, sans-serif", fontWeight: 700 }}>{t.clinicSettings}</h1>
+          <p className="text-muted-foreground mt-1" style={{ color: "#5a7a8a" }}>{t.clinicSettingsDesc}</p>
         </motion.div>
 
         {(isOwner || user?.role === "admin") && (
           <motion.div custom={1} variants={fadeUp}>
-            <Card className="shadow-card">
+            <Card style={{ background: "white", border: "1px solid #b5d1cc", borderRadius: "16px", boxShadow: "0 2px 12px rgba(79,143,230,0.08)" }}>
               <CardHeader className="flex flex-row items-center justify-between">
                 <div>
-                  <CardTitle className="flex items-center gap-2 text-lg">
-                    <Shield className="h-5 w-5 text-primary" />
+                  <CardTitle className="flex items-center gap-2 text-lg" style={{ color: "#1a2e3b", fontFamily: "Manrope, sans-serif", fontWeight: 700 }}>
+                    <Shield className="h-5 w-5" style={{ color: "#4f8fe6" }} />
                     {t.ownerControls}
                   </CardTitle>
-                  <CardDescription>{t.ownerControlsDesc}</CardDescription>
+                  <CardDescription style={{ color: "#5a7a8a" }}>{t.ownerControlsDesc}</CardDescription>
                 </div>
-                <Badge variant="outline">{t.ownerOnly}</Badge>
+                <Badge variant="outline" style={{ background: "#eaf5ff", color: "#4f8fe6", border: "1.5px solid #b5d1cc", borderRadius: "8px", fontSize: "0.75rem" }}>{t.ownerOnly}</Badge>
               </CardHeader>
               <CardContent>
                 <div className="flex items-center justify-between mb-4">
                   <div>
-                    <h3 className="font-medium">{t.specializations}</h3>
-                    <p className="text-sm text-muted-foreground">{t.specManageDesc}</p>
+                    <h3 className="font-medium" style={{ color: "#1a2e3b", fontWeight: 600 }}>{t.specializations}</h3>
+                    <p className="text-sm text-muted-foreground" style={{ color: "#5a7a8a", fontSize: "0.875rem" }}>{t.specManageDesc}</p>
                   </div>
-                  <Button size="sm" onClick={() => setShowAddSpec(true)}>
-                    <Plus className="h-4 w-4 mr-1" /> {t.add}
-                  </Button>
+                  <button
+                    onClick={() => setShowAddSpec(true)}
+                    className="flex items-center gap-1 rounded-xl px-4 py-2 text-sm font-semibold text-white transition-colors"
+                    style={{ background: "#4f8fe6" }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = "#2f75ca"}
+                    onMouseLeave={(e) => e.currentTarget.style.background = "#4f8fe6"}
+                  >
+                    <Plus className="h-4 w-4" /> {t.add}
+                  </button>
                 </div>
                 {!specializations?.length ? (
                   <p className="text-muted-foreground text-sm text-center py-4">—</p>
                 ) : (
                   <div className="space-y-2">
                     {specializations.map((s) => (
-                      <div key={s.id} className="flex items-center justify-between p-3 rounded-xl bg-muted/40 hover:bg-muted/60 transition-colors">
+                      <div
+                        key={s.id}
+                        className="flex items-center justify-between p-3 rounded-xl transition-colors"
+                        style={{ background: "#f4f8fd", border: "1px solid #f0f4f8" }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = "#eaf5ff"}
+                        onMouseLeave={(e) => e.currentTarget.style.background = "#f4f8fd"}
+                      >
                         <div className="flex items-center gap-3">
                           {s.imageUrl ? (
                             <img
                               src={s.imageUrl}
                               alt={s.name}
-                              className="h-[52px] w-[52px] rounded-lg object-cover"
+                              style={{
+                                width: 52,
+                                height: 52,
+                                borderRadius: "12px",
+                                objectFit: "cover",
+                                objectPosition: "center",
+                                border: "2px solid #b5d1cc",
+                              }}
                             />
                           ) : (
                             <div
@@ -132,8 +151,8 @@ export default function ClinicSettings() {
                             </div>
                           )}
                           <div>
-                            <p className="font-medium text-sm">{s.name}</p>
-                            {s.description && <p className="text-xs text-muted-foreground">{s.description}</p>}
+                            <p className="font-medium text-sm" style={{ color: "#1a2e3b", fontWeight: 600, fontSize: "0.9rem" }}>{s.name}</p>
+                            {s.description && <p className="text-xs text-muted-foreground" style={{ color: "#5a7a8a", fontSize: "0.78rem" }}>{s.description}</p>}
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
@@ -155,11 +174,20 @@ export default function ClinicSettings() {
                             size="sm"
                             onClick={() => fileInputRefs.current[s.id]?.click()}
                             disabled={!!uploadingSpecIds[s.id]}
+                            style={{
+                              border: "1.5px solid #b5d1cc",
+                              borderRadius: "8px",
+                              padding: "3px 10px",
+                              fontSize: "0.75rem",
+                              color: "#5a7a8a",
+                              background: "white",
+                              cursor: "pointer",
+                            }}
                           >
                             {uploadingSpecIds[s.id] ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                             Görsel Yükle
                           </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteSpec.mutate(s.id)}>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" style={{ color: "#e05252" }} onClick={() => deleteSpec.mutate(s.id)}>
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
@@ -189,8 +217,8 @@ export default function ClinicSettings() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddSpec(false)}>{t.cancel}</Button>
-            <Button onClick={() => addSpec.mutate()} disabled={!specName.trim() || addSpec.isPending}>{t.addSpecialization}</Button>
+            <Button variant="outline" onClick={() => setShowAddSpec(false)} style={{ border: "1.5px solid #b5d1cc", color: "#5a7a8a", borderRadius: "10px" }}>{t.cancel}</Button>
+            <Button onClick={() => addSpec.mutate()} disabled={!specName.trim() || addSpec.isPending} style={{ background: "#4f8fe6", color: "white", borderRadius: "10px" }}>{t.addSpecialization}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

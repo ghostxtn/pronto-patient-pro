@@ -41,7 +41,7 @@ export default function DoctorsSection({
   const isInView = useInView(sectionRef, { once: true, amount: 0.2 });
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
-  const useGridMode = doctors.length <= 4;
+  const useGridMode = false;
 
   const updateScrollState = () => {
     const el = scrollRef.current;
@@ -192,6 +192,7 @@ export default function DoctorsSection({
                       startX.current = e.pageX - scrollRef.current.offsetLeft;
                       scrollLeft.current = scrollRef.current.scrollLeft;
                       scrollRef.current.style.cursor = "grabbing";
+                      scrollRef.current.style.userSelect = "none";
                     }
               }
               onMouseLeave={
@@ -199,7 +200,10 @@ export default function DoctorsSection({
                   ? undefined
                   : () => {
                       isDragging.current = false;
-                      if (scrollRef.current) scrollRef.current.style.cursor = "grab";
+                      if (scrollRef.current) {
+                        scrollRef.current.style.cursor = "grab";
+                        scrollRef.current.style.userSelect = "";
+                      }
                     }
               }
               onMouseUp={
@@ -207,7 +211,10 @@ export default function DoctorsSection({
                   ? undefined
                   : () => {
                       isDragging.current = false;
-                      if (scrollRef.current) scrollRef.current.style.cursor = "grab";
+                      if (scrollRef.current) {
+                        scrollRef.current.style.cursor = "grab";
+                        scrollRef.current.style.userSelect = "";
+                      }
                     }
               }
               onMouseMove={
@@ -222,7 +229,7 @@ export default function DoctorsSection({
                     }
               }
               className={[
-                "doctor-scroll-container",
+                "doctor-scroll-container scroll-smooth",
                 useGridMode
                   ? "grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-4"
                   : "flex snap-x snap-mandatory gap-5 overflow-x-auto px-2 py-2",
@@ -234,16 +241,17 @@ export default function DoctorsSection({
                       scrollbarWidth: "none",
                       msOverflowStyle: "none",
                       cursor: "grab",
+                      paddingRight: "24px",
                     }
               }
             >
               {doctors.map((doctor, index) => (
                 <motion.div
                   key={doctor.id}
-                  initial={{ opacity: 0, y: 40, x: -30 }}
+                  initial={{ opacity: 0, y: 20, x: -30 }}
                   whileInView={{ opacity: 1, y: 0, x: 0 }}
                   viewport={{ once: true, amount: 0.1 }}
-                  transition={{ duration: 0.65, delay: index * 0.1, ease: appleEase }}
+                  transition={{ duration: 0.5, delay: (index % 5) * 0.08, ease: appleEase }}
                   whileHover={{ scale: 1.02 }}
                   className={["min-h-[420px]", useGridMode ? "w-full" : "w-[300px] shrink-0 snap-start"].join(" ")}
                   style={{
@@ -275,7 +283,7 @@ export default function DoctorsSection({
                       <img
                         src={doctor.imageSrc}
                         alt={doctor.name}
-                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                        style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "top center" }}
                       />
                     ) : (
                       <div
@@ -347,7 +355,7 @@ export default function DoctorsSection({
                     >
                       <button
                         type="button"
-                        onClick={() => navigate("/request-appointment")}
+                        onClick={() => navigate(`/patient/doctors/${doctor.id}`)}
                         className="transition-colors duration-200 hover:bg-[#2f75ca]"
                         style={{
                           borderRadius: "980px",
@@ -364,29 +372,12 @@ export default function DoctorsSection({
                       >
                         Randevu Al
                       </button>
-
-                      <button
-                        type="button"
-                        onClick={() => navigate("/doctors")}
-                        className="transition-colors duration-200 hover:text-[#2f75ca] hover:underline"
-                        style={{
-                          background: "transparent",
-                          border: "none",
-                          color: "#4f8fe6",
-                          fontFamily: "Inter, sans-serif",
-                          fontWeight: 500,
-                          fontSize: "14px",
-                          padding: "9px 8px",
-                          cursor: "pointer",
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        Profili Gör ›
-                      </button>
                     </div>
                   </div>
                 </motion.div>
               ))}
+              {/* spacer to prevent last card from being clipped */}
+              <div style={{ minWidth: "32px", flexShrink: 0 }} />
             </div>
           </div>
         )}

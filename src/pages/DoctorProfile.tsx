@@ -8,14 +8,13 @@ import AppLayout from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Calendar } from "@/components/ui/calendar";
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { format, addMinutes, parse, isBefore, isToday } from "date-fns";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import {
   Stethoscope, HeartPulse, Brain, Eye, Baby, Bone, ScanFace, Smile,
-  Clock, DollarSign, Star, GraduationCap, FileText, CalendarCheck, Loader2, ArrowLeft,
+  Clock, FileText, CalendarCheck, Loader2, ArrowLeft,
 } from "lucide-react";
 
 const iconMap: Record<string, React.ElementType> = {
@@ -111,35 +110,51 @@ export default function DoctorProfile() {
     <AppLayout>
       <motion.div initial="hidden" animate="visible">
         <motion.div custom={0} variants={fadeUp}>
-          <Button variant="ghost" size="sm" className="mb-4" onClick={() => navigate("/patient/doctors")}><ArrowLeft className="h-4 w-4 mr-1" /> {t.backToDoctors}</Button>
+          <Button variant="ghost" size="sm" className="mb-4" style={{ color: "#5a7a8a" }} onClick={() => navigate("/patient/doctors")}><ArrowLeft className="h-4 w-4 mr-1" /> {t.backToDoctors}</Button>
         </motion.div>
 
         <div className="grid lg:grid-cols-3 gap-6">
           <motion.div className="lg:col-span-1 space-y-4" custom={1} variants={fadeUp}>
-            <div className="glass rounded-2xl p-6 shadow-card">
+            <div style={{ background: "white", border: "1px solid #b5d1cc", borderRadius: "16px", padding: "24px", boxShadow: "0 2px 12px rgba(79,143,230,0.08)" }}>
               <div className="flex flex-col items-center text-center">
-                <div className="h-24 w-24 rounded-3xl bg-gradient-to-br from-primary to-info flex items-center justify-center mb-4">
-                  <span className="text-primary-foreground font-display font-bold text-3xl">{profile?.full_name?.[0] || "D"}</span>
-                </div>
-                <h1 className="text-xl font-display font-bold">Dr. {profile?.full_name || "Unknown"}</h1>
-                <Badge variant="secondary" className="mt-2 rounded-full"><Icon className="h-3.5 w-3.5 mr-1" />{spec?.name || "General"}</Badge>
-                <div className="grid grid-cols-3 gap-3 mt-6 w-full">
-                  <div className="text-center p-3 rounded-xl bg-muted"><GraduationCap className="h-4 w-4 mx-auto mb-1 text-muted-foreground" /><div className="text-sm font-bold">{doctor.title || "-"}</div><div className="text-xs text-muted-foreground">{t.experience}</div></div>
-                  <div className="text-center p-3 rounded-xl bg-muted"><Star className="h-4 w-4 mx-auto mb-1 fill-warning text-warning" /><div className="text-sm font-bold">4.8</div><div className="text-xs text-muted-foreground">{t.rating}</div></div>
-                  <div className="text-center p-3 rounded-xl bg-muted"><DollarSign className="h-4 w-4 mx-auto mb-1 text-muted-foreground" /><div className="text-sm font-bold">{doctor.phone || "-"}</div><div className="text-xs text-muted-foreground">{t.fee}</div></div>
-                </div>
+                {(doctor.avatar_url || doctor.avatarUrl || doctor.profiles?.avatar_url) ? (
+                  <img
+                    src={doctor.avatar_url ?? doctor.avatarUrl ?? doctor.profiles?.avatar_url}
+                    alt={profile.full_name}
+                    style={{
+                      width: 140,
+                      height: 140,
+                      borderRadius: "28px",
+                      objectFit: "cover",
+                      objectPosition: "top center",
+                      marginBottom: "16px",
+                      border: "2px solid #b5d1cc",
+                    }}
+                  />
+                ) : (
+                  <div className="h-[140px] w-[140px] rounded-[28px] bg-gradient-to-br from-primary to-info flex items-center justify-center mb-4">
+                    <span className="text-primary-foreground font-display font-bold text-4xl">
+                      {profile?.full_name?.[0] || "D"}
+                    </span>
+                  </div>
+                )}
+                <h1 className="text-xl font-display font-bold" style={{ color: "#1a2e3b", fontFamily: "Manrope, sans-serif", fontWeight: 700 }}>Dr. {profile?.full_name || "Unknown"}</h1>
+                <span style={{ background: "#e6f4ef", color: "#65a98f", border: "1.5px solid #b5d1cc", borderRadius: "999px", padding: "4px 14px", fontSize: "0.82rem", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: "6px", marginTop: "8px" }}>
+                  <Icon style={{ width: 14, height: 14 }} />
+                  {spec?.name || "General"}
+                </span>
               </div>
             </div>
-            {doctor.bio && (<div className="glass rounded-2xl p-6 shadow-card"><h3 className="font-display font-semibold mb-2 flex items-center gap-2"><FileText className="h-4 w-4" /> {t.about}</h3><p className="text-sm text-muted-foreground">{doctor.bio}</p></div>)}
-            <div className="glass rounded-2xl p-6 shadow-card">
-              <h3 className="font-display font-semibold mb-3 flex items-center gap-2"><Clock className="h-4 w-4" /> {t.weeklySchedule}</h3>
+            {doctor.bio && (<div style={{ background: "white", border: "1px solid #b5d1cc", borderRadius: "16px", padding: "24px", boxShadow: "0 2px 12px rgba(79,143,230,0.08)" }}><h3 className="font-display font-semibold mb-2 flex items-center gap-2" style={{ color: "#1a2e3b", fontFamily: "Manrope, sans-serif", fontWeight: 600, marginBottom: "8px", display: "flex", alignItems: "center", gap: "8px" }}><FileText style={{ color: "#4f8fe6", width: 16, height: 16 }} /> {t.about}</h3><p className="text-sm text-muted-foreground" style={{ color: "#5a7a8a", fontSize: "0.875rem" }}>{doctor.bio}</p></div>)}
+            <div style={{ background: "white", border: "1px solid #b5d1cc", borderRadius: "16px", padding: "24px", boxShadow: "0 2px 12px rgba(79,143,230,0.08)" }}>
+              <h3 className="font-display font-semibold mb-3 flex items-center gap-2" style={{ color: "#1a2e3b", fontFamily: "Manrope, sans-serif", fontWeight: 600, marginBottom: "8px", display: "flex", alignItems: "center", gap: "8px" }}><Clock style={{ color: "#4f8fe6", width: 16, height: 16 }} /> {t.weeklySchedule}</h3>
               <div className="space-y-2">
                 {dayNames.map((day, idx) => {
                   const daySlots = availability?.filter((a) => a.day_of_week === idx);
                   return (
                     <div key={day} className="flex items-center justify-between text-sm">
-                      <span className={cn("font-medium", daySlots && daySlots.length > 0 ? "text-foreground" : "text-muted-foreground")}>{day}</span>
-                      {daySlots && daySlots.length > 0 ? <span className="text-muted-foreground">{daySlots.map((s) => `${s.start_time.slice(0, 5)} - ${s.end_time.slice(0, 5)}`).join(", ")}</span> : <span className="text-muted-foreground/50 text-xs">{t.unavailable}</span>}
+                      <span className={cn("font-medium", daySlots && daySlots.length > 0 ? "text-foreground" : "text-muted-foreground")} style={daySlots && daySlots.length > 0 ? { color: "#1a2e3b", fontWeight: 600 } : { color: "#b5d1cc" }}>{day}</span>
+                      {daySlots && daySlots.length > 0 ? <span className="text-muted-foreground" style={{ color: "#65a98f", fontSize: "0.85rem" }}>{daySlots.map((s) => `${s.start_time.slice(0, 5)} - ${s.end_time.slice(0, 5)}`).join(", ")}</span> : <span className="text-muted-foreground/50 text-xs" style={{ color: "#b5d1cc", fontSize: "0.75rem" }}>{t.unavailable}</span>}
                     </div>
                   );
                 })}
@@ -148,36 +163,70 @@ export default function DoctorProfile() {
           </motion.div>
 
           <motion.div className="lg:col-span-2 space-y-4" custom={2} variants={fadeUp}>
-            <div className="glass rounded-2xl p-6 shadow-card">
-              <h2 className="text-xl font-display font-bold mb-1 flex items-center gap-2"><CalendarCheck className="h-5 w-5" /> {t.bookAnAppointment}</h2>
-              <p className="text-sm text-muted-foreground mb-6">{t.selectDateAndTime}</p>
+            <div style={{ background: "white", border: "1px solid #b5d1cc", borderRadius: "16px", padding: "24px", boxShadow: "0 2px 12px rgba(79,143,230,0.08)" }}>
+              <h2 className="text-xl font-display font-bold mb-1 flex items-center gap-2" style={{ color: "#1a2e3b", fontFamily: "Manrope, sans-serif", fontWeight: 700, display: "flex", alignItems: "center", gap: "8px" }}><CalendarCheck style={{ color: "#4f8fe6", width: 20, height: 20 }} /> {t.bookAnAppointment}</h2>
+              <p className="text-sm text-muted-foreground mb-6" style={{ color: "#5a7a8a", fontSize: "0.875rem", marginBottom: "24px" }}>{t.selectDateAndTime}</p>
               <div className="grid md:grid-cols-2 gap-6">
                 <div>
-                  <h3 className="text-sm font-semibold mb-3">{t.selectDate}</h3>
-                  <Calendar mode="single" selected={selectedDate} onSelect={(date) => { setSelectedDate(date); setSelectedSlot(null); }} disabled={isDateDisabled} className={cn("p-3 pointer-events-auto rounded-xl border")} fromDate={new Date()} />
+                  <h3 className="text-sm font-semibold mb-3" style={{ color: "#1a2e3b", fontWeight: 600, fontSize: "0.875rem", marginBottom: "12px" }}>{t.selectDate}</h3>
+                  <div className="calendar-wrapper">
+                    <style>{`
+                      .calendar-wrapper button.rdp-day_selected,
+                      .calendar-wrapper button.rdp-day_selected:hover,
+                      .calendar-wrapper button.rdp-day_selected:focus {
+                        background-color: #4f8fe6 !important;
+                        color: white !important;
+                        border-radius: 10px !important;
+                      }
+                      .calendar-wrapper button.rdp-day:not(.rdp-day_selected):hover {
+                        background-color: #eaf5ff !important;
+                        border-radius: 10px !important;
+                      }
+                    `}</style>
+                    <Calendar
+                      mode="single"
+                      selected={selectedDate}
+                      onSelect={(date) => { setSelectedDate(date); setSelectedSlot(null); }}
+                      disabled={isDateDisabled}
+                      fromDate={new Date()}
+                      className="p-3 pointer-events-auto rounded-xl border w-full"
+                      classNames={{
+                        months: "flex flex-col w-full",
+                        month: "space-y-4 w-full",
+                        table: "w-full border-collapse space-y-1",
+                        head_row: "flex justify-between",
+                        row: "flex w-full mt-2 justify-between",
+                        head_cell: "text-muted-foreground rounded-md flex-1 text-center font-normal text-[0.8rem]",
+                        cell: "flex-1 h-9 text-center text-sm p-0 relative focus-within:relative focus-within:z-20",
+                        day: "h-9 w-full p-0 font-normal aria-selected:opacity-100 rounded-[10px]",
+                        day_selected: "bg-[#4f8fe6] text-white rounded-[10px]",
+                        day_today: "border border-[#b5d1cc] text-[#4f8fe6] font-bold rounded-[10px]",
+                      }}
+                    />
+                  </div>
                 </div>
                 <div>
-                  <h3 className="text-sm font-semibold mb-3">{selectedDate ? `${t.availableSlots} — ${format(selectedDate, "EEE, MMM d")}` : t.selectDateFirst}</h3>
-                  {selectedDate ? (availableSlots.length > 0 ? (<div className="grid grid-cols-3 gap-2">{availableSlots.map((slot) => (<Button key={slot} variant={selectedSlot === slot ? "default" : "outline"} size="sm" className="rounded-xl text-sm" onClick={() => setSelectedSlot(slot)}>{slot}</Button>))}</div>) : (<div className="text-center py-8 text-muted-foreground text-sm">{t.noSlotsAvailable}</div>)) : (<div className="text-center py-8 text-muted-foreground text-sm">{t.pickDate}</div>)}
+                  <h3 className="text-sm font-semibold mb-3" style={{ color: "#1a2e3b", fontWeight: 600, fontSize: "0.875rem", marginBottom: "12px" }}>{selectedDate ? `${t.availableSlots} — ${format(selectedDate, "EEE, MMM d")}` : t.selectDateFirst}</h3>
+                  {selectedDate ? (availableSlots.length > 0 ? (<div className="grid grid-cols-3 gap-2">{availableSlots.map((slot) => (<button key={slot} onClick={() => setSelectedSlot(slot)} style={{ padding: "8px", borderRadius: "10px", fontSize: "0.85rem", fontWeight: 500, border: `1.5px solid ${selectedSlot === slot ? "#4f8fe6" : "#b5d1cc"}`, background: selectedSlot === slot ? "#eaf5ff" : "white", color: selectedSlot === slot ? "#4f8fe6" : "#1a2e3b", cursor: "pointer", transition: "all 0.15s" }}>{slot}</button>))}</div>) : (<div className="text-center py-8 text-muted-foreground text-sm">{t.noSlotsAvailable}</div>)) : (<div className="text-center py-8 text-muted-foreground text-sm">{t.pickDate}</div>)}
                 </div>
               </div>
             </div>
 
             {selectedSlot && selectedDate && (
-              <motion.div className="glass rounded-2xl p-6 shadow-card" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
+              <motion.div style={{ background: "white", border: "1px solid #b5d1cc", borderRadius: "16px", padding: "24px", boxShadow: "0 2px 12px rgba(79,143,230,0.08)" }} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
                 <h3 className="font-display font-semibold mb-3">{t.additionalNotes}</h3>
                 <Textarea placeholder={t.symptomsPlaceholder} value={notes} onChange={(e) => setNotes(e.target.value)} className="rounded-xl mb-4" rows={3} />
-                <div className="glass rounded-xl p-4 mb-4">
+                <div style={{ background: "white", border: "1px solid #b5d1cc", borderRadius: "16px", padding: "24px", boxShadow: "0 2px 12px rgba(79,143,230,0.08)", marginBottom: "16px" }}>
                   <h4 className="text-sm font-semibold mb-2">{t.bookingSummary}</h4>
                   <div className="grid grid-cols-2 gap-2 text-sm">
-                    <span className="text-muted-foreground">{t.doctor}</span><span className="font-medium">Dr. {profile?.full_name}</span>
-                    <span className="text-muted-foreground">{t.specialty}</span><span className="font-medium">{spec?.name}</span>
-                    <span className="text-muted-foreground">{t.date}</span><span className="font-medium">{format(selectedDate, "EEEE, MMMM d, yyyy")}</span>
-                    <span className="text-muted-foreground">{t.time}</span><span className="font-medium">{selectedSlot} — {format(addMinutes(parse(selectedSlot, "HH:mm", new Date()), 30), "HH:mm")}</span>
-                    <span className="text-muted-foreground">{t.fee}</span><span className="font-medium">{doctor.phone || "-"}</span>
+                    <span className="text-muted-foreground" style={{ color: "#5a7a8a", fontSize: "0.875rem" }}>{t.doctor}</span><span className="font-medium" style={{ color: "#1a2e3b", fontWeight: 600, fontSize: "0.875rem" }}>Dr. {profile?.full_name}</span>
+                    <span className="text-muted-foreground" style={{ color: "#5a7a8a", fontSize: "0.875rem" }}>{t.specialty}</span><span className="font-medium" style={{ color: "#1a2e3b", fontWeight: 600, fontSize: "0.875rem" }}>{spec?.name}</span>
+                    <span className="text-muted-foreground" style={{ color: "#5a7a8a", fontSize: "0.875rem" }}>{t.date}</span><span className="font-medium" style={{ color: "#1a2e3b", fontWeight: 600, fontSize: "0.875rem" }}>{format(selectedDate, "EEEE, MMMM d, yyyy")}</span>
+                    <span className="text-muted-foreground" style={{ color: "#5a7a8a", fontSize: "0.875rem" }}>{t.time}</span><span className="font-medium" style={{ color: "#1a2e3b", fontWeight: 600, fontSize: "0.875rem" }}>{selectedSlot} — {format(addMinutes(parse(selectedSlot, "HH:mm", new Date()), 30), "HH:mm")}</span>
+                    <span className="text-muted-foreground" style={{ color: "#5a7a8a", fontSize: "0.875rem" }}>{t.fee}</span><span className="font-medium" style={{ color: "#1a2e3b", fontWeight: 600, fontSize: "0.875rem" }}>{doctor.consultation_fee ?? doctor.consultationFee ?? "-"}</span>
                   </div>
                 </div>
-                <Button className="w-full rounded-xl h-11 shadow-soft" onClick={() => bookMutation.mutate()} disabled={bookMutation.isPending}>
+                <Button className="w-full rounded-xl h-11 shadow-soft" style={{ background: "#4f8fe6", color: "white", borderRadius: "12px", height: "44px", width: "100%", fontWeight: 600, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }} onClick={() => bookMutation.mutate()} disabled={bookMutation.isPending}>
                   {bookMutation.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> {t.booking}</> : <><CalendarCheck className="mr-2 h-4 w-4" /> {t.confirmBooking}</>}
                 </Button>
               </motion.div>

@@ -61,48 +61,133 @@ export default function AdminDashboard() {
   });
 
   const statCards = [
-    { label: t.totalPatients, value: stats?.patients ?? 0, icon: Users, color: "from-primary to-info", to: "/admin/patients" },
-    { label: t.activeDoctors, value: stats?.doctors ?? 0, icon: Stethoscope, color: "from-secondary to-success", to: "/admin/doctors" },
-    { label: t.appointments, value: stats?.appointments ?? 0, icon: CalendarDays, color: "from-warning to-destructive", to: "/admin/appointments" },
-    { label: t.confirmedAppointments, value: stats?.confirmed ?? 0, icon: Clock, color: "from-info to-primary", to: "/admin/appointments?status=confirmed" },
+    { label: t.totalPatients, value: stats?.patients ?? 0, icon: Users, iconBg: "#eaf5ff", iconColor: "#4f8fe6", to: "/admin/patients" },
+    { label: t.activeDoctors, value: stats?.doctors ?? 0, icon: Stethoscope, iconBg: "#e6f4ef", iconColor: "#65a98f", to: "/admin/doctors" },
+    { label: t.appointments, value: stats?.appointments ?? 0, icon: CalendarDays, iconBg: "#fff8e6", iconColor: "#f5a623", to: "/admin/appointments" },
+    { label: t.confirmedAppointments, value: stats?.confirmed ?? 0, icon: Clock, iconBg: "#eaf5ff", iconColor: "#2f75ca", to: "/admin/appointments?status=confirmed" },
   ];
 
-  const statusColor: Record<string, string> = { pending: "bg-warning/15 text-warning border-warning/30", confirmed: "bg-primary/15 text-primary border-primary/30", completed: "bg-success/15 text-success border-success/30", cancelled: "bg-destructive/15 text-destructive border-destructive/30" };
+  const statusColor: Record<string, string> = {
+    pending: "border-[rgba(245,166,35,0.3)] bg-[#fff8e6] text-[#f5a623]",
+    confirmed: "border-[#b5d1cc] bg-[#eaf5ff] text-[#4f8fe6]",
+    completed: "border-[#b5d1cc] bg-[#e6f4ef] text-[#65a98f]",
+    cancelled: "border-[rgba(252,165,165,0.3)] bg-[#fef2f2] text-[#e05252]",
+  };
 
   return (
     <AppLayout>
-      <motion.div initial="hidden" animate="visible" className="space-y-8">
-        <motion.div custom={0} variants={fadeUp}><h1 className="text-3xl font-display font-bold">{t.adminDashboard}</h1><p className="text-muted-foreground mt-1">{t.adminDashboardDesc}</p></motion.div>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <motion.div initial="hidden" animate="visible" className="space-y-8 rounded-[28px] bg-[#f4f8fd] p-1">
+        <motion.div custom={0} variants={fadeUp}>
+          <h1 className="text-3xl font-bold tracking-tight text-[#1a2e3b]" style={{ fontFamily: "Manrope, sans-serif" }}>
+            {t.adminDashboard}
+          </h1>
+          <p className="mt-2 text-sm text-[#5a7a8a]" style={{ fontFamily: "Inter, sans-serif" }}>
+            {t.adminDashboardDesc}
+          </p>
+        </motion.div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {statCards.map((s, i) => (
-            <motion.div key={s.label} custom={i + 1} variants={fadeUp}><Card className="shadow-card hover:shadow-elevated transition-shadow cursor-pointer" onClick={() => navigate(s.to)}><CardContent className="p-5"><div className="flex items-center justify-between mb-3"><div className={`h-10 w-10 rounded-xl bg-gradient-to-br ${s.color} flex items-center justify-center`}><s.icon className="h-5 w-5 text-primary-foreground" /></div><TrendingUp className="h-4 w-4 text-muted-foreground" /></div><div className="text-2xl font-display font-bold">{s.value}</div><div className="text-sm text-muted-foreground">{s.label}</div></CardContent></Card></motion.div>
+            <motion.div key={s.label} custom={i + 1} variants={fadeUp}>
+              <Card
+                className="cursor-pointer rounded-2xl border border-[#b5d1cc] bg-white shadow-[0_2px_12px_rgba(79,143,230,0.08)] transition-all duration-200 hover:border-[#4f8fe6] hover:shadow-[0_8px_22px_rgba(79,143,230,0.14)]"
+                onClick={() => navigate(s.to)}
+              >
+                <CardContent className="p-5">
+                  <div className="mb-4 flex items-start justify-between gap-3">
+                    <div
+                      className="flex h-12 w-12 items-center justify-center rounded-xl"
+                      style={{ backgroundColor: s.iconBg }}
+                    >
+                      <s.icon className="h-5 w-5" style={{ color: s.iconColor }} />
+                    </div>
+                    <TrendingUp className="h-4 w-4 shrink-0 text-[#65a98f]" />
+                  </div>
+                  <div className="text-[2rem] font-bold leading-none text-[#1a2e3b]" style={{ fontFamily: "Manrope, sans-serif" }}>
+                    {s.value}
+                  </div>
+                  <div className="mt-3 text-[0.85rem] text-[#5a7a8a]" style={{ fontFamily: "Inter, sans-serif" }}>
+                    {s.label}
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
           ))}
         </div>
         {hasActiveDoctorProfile(myDoctorProfile) && (
           <motion.div custom={5} variants={fadeUp}>
-            <Card className="shadow-card">
+            <Card className="rounded-2xl border border-[#b5d1cc] bg-white shadow-[0_2px_12px_rgba(79,143,230,0.08)]">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <Stethoscope className="h-5 w-5 text-primary" />
+                <CardTitle className="flex items-center gap-2 text-lg text-[#1a2e3b]" style={{ fontFamily: "Manrope, sans-serif" }}>
+                  <Stethoscope className="h-5 w-5 text-[#4f8fe6]" />
                   You also have an active doctor profile
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <p className="text-sm text-muted-foreground">You can quickly access your doctor tools from here.</p>
+                <p className="text-sm text-[#5a7a8a]" style={{ fontFamily: "Inter, sans-serif" }}>
+                  You can quickly access your doctor tools from here.
+                </p>
                 <div className="flex flex-col sm:flex-row gap-3">
-                  <Button onClick={() => navigate("/doctor/schedule")}>Go to My Doctor Schedule</Button>
-                  <Button variant="outline" onClick={() => navigate("/doctor/appointments")}>View My Doctor Appointments</Button>
+                  <Button
+                    className="rounded-[10px] border border-[#4f8fe6] bg-[#4f8fe6] text-white hover:bg-[#2f75ca]"
+                    style={{ fontFamily: "Inter, sans-serif" }}
+                    onClick={() => navigate("/doctor/schedule")}
+                  >
+                    Go to My Doctor Schedule
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="rounded-[10px] border-[#b5d1cc] bg-white text-[#4f8fe6] hover:bg-[#eaf5ff] hover:text-[#2f75ca]"
+                    style={{ fontFamily: "Inter, sans-serif" }}
+                    onClick={() => navigate("/doctor/appointments")}
+                  >
+                    View My Doctor Appointments
+                  </Button>
                 </div>
               </CardContent>
             </Card>
           </motion.div>
         )}
         <motion.div custom={6} variants={fadeUp}>
-          <Card className="shadow-card"><CardHeader><CardTitle className="flex items-center gap-2 text-lg"><Activity className="h-5 w-5 text-primary" />{t.recentAppointments}</CardTitle></CardHeader><CardContent>
-            {!recentAppointments?.length ? <p className="text-muted-foreground text-sm py-4 text-center">{t.noAppointmentsYetAdmin}</p> : (
-              <div className="space-y-3">{recentAppointments.map((apt: any) => (<div key={apt.id} className="flex items-center justify-between p-3 rounded-xl bg-muted/40 hover:bg-muted/60 transition-colors"><div className="min-w-0"><p className="font-medium text-sm truncate">{apt.patientDisplayName || t.patient} → {apt.doctorDisplayName || t.doctor}</p><p className="text-xs text-muted-foreground">{format(new Date(apt.appointment_date), "MMM d, yyyy")} · {apt.start_time?.slice(0, 5)}</p></div><Badge variant="outline" className={statusColor[apt.status] ?? ""}>{apt.status}</Badge></div>))}</div>
-            )}
-          </CardContent></Card>
+          <Card className="rounded-2xl border border-[#b5d1cc] bg-white shadow-[0_2px_12px_rgba(79,143,230,0.08)]">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg text-[#1a2e3b]" style={{ fontFamily: "Manrope, sans-serif" }}>
+                <Activity className="h-5 w-5 text-[#4f8fe6]" />
+                {t.recentAppointments}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {!recentAppointments?.length ? (
+                <p className="py-4 text-center text-sm text-[#5a7a8a]" style={{ fontFamily: "Inter, sans-serif" }}>
+                  {t.noAppointmentsYetAdmin}
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {recentAppointments.map((apt: any) => (
+                    <div
+                      key={apt.id}
+                      className="flex items-center justify-between gap-3 rounded-xl border border-transparent bg-[#f4f8fd] p-4 transition-colors hover:bg-[#eaf5ff]"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-[#1a2e3b]" style={{ fontFamily: "Inter, sans-serif" }}>
+                          {apt.patientDisplayName || t.patient} → {apt.doctorDisplayName || t.doctor}
+                        </p>
+                        <p className="mt-1 text-xs text-[#5a7a8a]" style={{ fontFamily: "Inter, sans-serif" }}>
+                          {format(new Date(apt.appointment_date), "MMM d, yyyy")} · {apt.start_time?.slice(0, 5)}
+                        </p>
+                      </div>
+                      <Badge
+                        variant="outline"
+                        className={`shrink-0 rounded-full border px-3 py-1 capitalize ${statusColor[apt.status] ?? ""}`}
+                        style={{ fontFamily: "Inter, sans-serif" }}
+                      >
+                        {apt.status}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </motion.div>
       </motion.div>
     </AppLayout>

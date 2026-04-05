@@ -39,6 +39,7 @@ export default function Landing() {
           specialties={previewData.specialties.map((specialty) => ({
             id: specialty.id,
             name: specialty.name,
+            slug: specialty.slug,
             imageSrc: specialty.imageSrc,
           }))}
           isLoading={previewData.isLoading}

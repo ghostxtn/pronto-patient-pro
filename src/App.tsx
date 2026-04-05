@@ -7,13 +7,16 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import RequireAuth from "@/components/auth/RequireAuth";
 import RequireDoctorAccess from "@/components/auth/RequireDoctorAccess";
 import RequireRole from "@/components/auth/RequireRole";
+import { ScrollToTop } from "@/components/ScrollToTop";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { getDefaultRouteByRole } from "@/lib/auth-routing";
 import Landing from "./pages/Landing";
+import AppointmentProcessPage from "./pages/AppointmentProcessPage";
 import Auth from "./pages/Auth";
 import AuthCallback from "./pages/AuthCallback";
+import ContactPage from "./pages/ContactPage";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import Dashboard from "./pages/Dashboard";
@@ -40,8 +43,6 @@ import NotFound from "./pages/NotFound";
 
 // Public pages
 import WhyMedibook from "./pages/public/WhyMedibook";
-import AppointmentProcess from "./pages/public/AppointmentProcess";
-import Contact from "./pages/public/Contact";
 import LocationPage from "./pages/public/Location";
 import About from "./pages/public/About";
 import Faq from "./pages/public/Faq";
@@ -83,8 +84,8 @@ function AppRoutes() {
 
         {/* Public information pages */}
         <Route path="/why-medibook" element={<WhyMedibook />} />
-        <Route path="/appointment-process" element={<AppointmentProcess />} />
-        <Route path="/contact" element={<Contact />} />
+        <Route path="/appointment-process" element={<AppointmentProcessPage />} />
+        <Route path="/contact" element={<ContactPage />} />
         <Route path="/location" element={<LocationPage />} />
         <Route path="/about" element={<About />} />
         <Route path="/faq" element={<Faq />} />
@@ -153,6 +154,7 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
+        <ScrollToTop />
         <LanguageProvider>
           <AuthProvider>
             <AppRoutes />

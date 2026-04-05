@@ -36,10 +36,10 @@ export default function MyAppointments() {
   const [detailId, setDetailId] = useState<string | null>(null);
 
   const statusConfig: Record<string, { color: string; icon: React.ElementType; label: string }> = {
-    pending: { color: "bg-warning/10 text-warning border-warning/20", icon: AlertCircle, label: t.pending },
-    confirmed: { color: "bg-success/10 text-success border-success/20", icon: CheckCircle2, label: t.confirmed },
-    completed: { color: "bg-primary/10 text-primary border-primary/20", icon: CheckCircle2, label: t.completed },
-    cancelled: { color: "bg-destructive/10 text-destructive border-destructive/20", icon: XCircle, label: t.cancelled },
+    pending: { color: "bg-[#fff8e6] text-[#f5a623] border-[#f5a623]/30", icon: AlertCircle, label: t.pending },
+    confirmed: { color: "bg-[#eaf5ff] text-[#4f8fe6] border-[#b5d1cc]", icon: CheckCircle2, label: t.confirmed },
+    completed: { color: "bg-[#e6f4ef] text-[#65a98f] border-[#b5d1cc]", icon: CheckCircle2, label: t.completed },
+    cancelled: { color: "bg-[#fef2f2] text-[#e05252] border-[#fca5a5]/30", icon: XCircle, label: t.cancelled },
   };
 
   const { data: appointments, isLoading } = useQuery({
@@ -64,8 +64,8 @@ export default function MyAppointments() {
     <AppLayout>
       <motion.div initial="hidden" animate="visible">
         <motion.div className="mb-8" custom={0} variants={fadeUp}>
-          <h1 className="text-3xl font-display font-bold mb-2">{t.myAppointments}</h1>
-          <p className="text-muted-foreground">{t.myAppointmentsDesc}</p>
+          <h1 className="text-3xl font-display font-bold mb-2" style={{ color: "#1a2e3b", fontFamily: "Manrope, sans-serif", fontWeight: 700 }}>{t.myAppointments}</h1>
+          <p className="text-muted-foreground" style={{ color: "#5a7a8a" }}>{t.myAppointmentsDesc}</p>
         </motion.div>
 
         {isLoading ? (
@@ -74,21 +74,21 @@ export default function MyAppointments() {
           <div className="space-y-8">
             {upcoming.length > 0 && (
               <div>
-                <motion.h2 className="font-display font-semibold text-lg mb-4" custom={1} variants={fadeUp}>{t.upcoming} ({upcoming.length})</motion.h2>
+                <motion.h2 className="font-display font-semibold text-lg mb-4" custom={1} variants={fadeUp} style={{ color: "#1a2e3b", fontFamily: "Manrope, sans-serif", fontWeight: 600 }}>{t.upcoming} ({upcoming.length})</motion.h2>
                 <div className="space-y-3">
                   {upcoming.map((apt, i) => {
                     const doc = apt.doctor as any;
                     const status = statusConfig[apt.status]; const StatusIcon = status.icon;
                     return (
-                      <motion.div key={apt.id} className="glass rounded-2xl p-5 shadow-card hover:shadow-elevated transition-all cursor-pointer" custom={i + 2} variants={fadeUp} onClick={() => setDetailId(apt.id)}>
+                      <motion.div key={apt.id} className="cursor-pointer transition-all" custom={i + 2} variants={fadeUp} onClick={() => setDetailId(apt.id)} style={{ background: "white", border: "1px solid #b5d1cc", borderRadius: "16px", padding: "20px", boxShadow: "0 2px 12px rgba(79,143,230,0.08)" }} onMouseEnter={(e) => e.currentTarget.style.boxShadow = "0 4px 20px rgba(79,143,230,0.16)"} onMouseLeave={(e) => e.currentTarget.style.boxShadow = "0 2px 12px rgba(79,143,230,0.08)"}>
                         <div className="flex items-center justify-between gap-4">
                           <div className="flex items-center gap-4 min-w-0">
-                            <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-primary to-info flex items-center justify-center flex-shrink-0"><span className="text-primary-foreground font-display font-bold">{doc?.firstName?.[0] || "D"}</span></div>
+                            <div style={{ width: 48, height: 48, borderRadius: "12px", background: "#eaf5ff", border: "2px solid #b5d1cc", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><span style={{ color: "#4f8fe6", fontWeight: 700, fontSize: "1.1rem" }}>{doc?.firstName?.[0] || "D"}</span></div>
                             <div className="min-w-0">
-                              <div className="font-display font-semibold truncate">Dr. {[doc?.firstName, doc?.lastName].filter(Boolean).join(" ")}</div>
+                              <div className="font-display font-semibold truncate" style={{ color: "#1a2e3b", fontWeight: 600 }}>Dr. {[doc?.firstName, doc?.lastName].filter(Boolean).join(" ")}</div>
                               <div className="flex items-center gap-3 text-sm text-muted-foreground mt-0.5">
-                                <span className="flex items-center gap-1"><CalendarDays className="h-3 w-3" />{format(parseISO(apt.appointment_date), "MMM d")}</span>
-                                <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{apt.start_time.slice(0, 5)}</span>
+                                <span className="flex items-center gap-1" style={{ color: "#5a7a8a" }}><CalendarDays className="h-3 w-3" style={{ color: "#b5d1cc" }} />{format(parseISO(apt.appointment_date), "MMM d")}</span>
+                                <span className="flex items-center gap-1" style={{ color: "#5a7a8a" }}><Clock className="h-3 w-3" style={{ color: "#b5d1cc" }} />{apt.start_time.slice(0, 5)}</span>
                               </div>
                             </div>
                           </div>
@@ -102,20 +102,20 @@ export default function MyAppointments() {
             )}
             {past.length > 0 && (
               <div>
-                <motion.h2 className="font-display font-semibold text-lg mb-4" custom={upcoming.length + 2} variants={fadeUp}>{t.past} ({past.length})</motion.h2>
+                <motion.h2 className="font-display font-semibold text-lg mb-4" custom={upcoming.length + 2} variants={fadeUp} style={{ color: "#1a2e3b", fontFamily: "Manrope, sans-serif", fontWeight: 600 }}>{t.past} ({past.length})</motion.h2>
                 <div className="space-y-3">
                   {past.map((apt, i) => {
                     const doc = apt.doctor as any;
                     const status = statusConfig[apt.status]; const StatusIcon = status.icon;
                     return (
-                      <motion.div key={apt.id} className="glass rounded-2xl p-5 shadow-card hover:shadow-elevated transition-all cursor-pointer" custom={i + upcoming.length + 3} variants={fadeUp} onClick={() => setDetailId(apt.id)}>
+                      <motion.div key={apt.id} className="cursor-pointer transition-all" custom={i + upcoming.length + 3} variants={fadeUp} onClick={() => setDetailId(apt.id)} style={{ background: "white", border: "1px solid #b5d1cc", borderRadius: "16px", padding: "20px", boxShadow: "0 2px 12px rgba(79,143,230,0.08)" }} onMouseEnter={(e) => e.currentTarget.style.boxShadow = "0 4px 20px rgba(79,143,230,0.16)"} onMouseLeave={(e) => e.currentTarget.style.boxShadow = "0 2px 12px rgba(79,143,230,0.08)"}>
                         <div className="flex items-center justify-between gap-4">
                           <div className="flex items-center gap-4 min-w-0">
-                            <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-primary to-info flex items-center justify-center flex-shrink-0"><span className="text-primary-foreground font-display font-bold">{doc?.firstName?.[0] || "D"}</span></div>
+                            <div style={{ width: 48, height: 48, borderRadius: "12px", background: "#eaf5ff", border: "2px solid #b5d1cc", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><span style={{ color: "#4f8fe6", fontWeight: 700, fontSize: "1.1rem" }}>{doc?.firstName?.[0] || "D"}</span></div>
                             <div className="min-w-0">
-                              <div className="font-display font-semibold truncate">Dr. {[doc?.firstName, doc?.lastName].filter(Boolean).join(" ")}</div>
+                              <div className="font-display font-semibold truncate" style={{ color: "#1a2e3b", fontWeight: 600 }}>Dr. {[doc?.firstName, doc?.lastName].filter(Boolean).join(" ")}</div>
                               <div className="flex items-center gap-3 text-sm text-muted-foreground mt-0.5">
-                                <span className="flex items-center gap-1"><CalendarDays className="h-3 w-3" />{format(parseISO(apt.appointment_date), "MMM d")}</span>
+                                <span className="flex items-center gap-1" style={{ color: "#5a7a8a" }}><CalendarDays className="h-3 w-3" style={{ color: "#b5d1cc" }} />{format(parseISO(apt.appointment_date), "MMM d")}</span>
                               </div>
                             </div>
                           </div>
@@ -133,7 +133,7 @@ export default function MyAppointments() {
             <CalendarDays className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" />
             <h3 className="font-display font-semibold text-lg mb-2">{t.noAppointmentsYet}</h3>
             <p className="text-muted-foreground text-sm mb-4">{t.noAppointmentsDesc}</p>
-            <Button className="rounded-full px-6 shadow-soft" onClick={() => window.location.href = "/patient/doctors"}>{t.findDoctor}</Button>
+            <Button className="rounded-full px-6 shadow-soft" style={{ background: "#4f8fe6", color: "white", borderRadius: "999px", padding: "8px 24px", fontWeight: 600, border: "none", cursor: "pointer" }} onClick={() => window.location.href = "/patient/doctors"}>{t.findDoctor}</Button>
           </motion.div>
         )}
       </motion.div>
@@ -162,7 +162,7 @@ export default function MyAppointments() {
                   </div>
                   {selectedAppointment.notes && (<div className="p-3 rounded-xl bg-muted"><div className="text-muted-foreground text-sm mb-1 flex items-center gap-1"><FileText className="h-3 w-3" /> {t.notes}</div><p className="text-sm">{selectedAppointment.notes}</p></div>)}
                   {(selectedAppointment.status === "pending" || selectedAppointment.status === "confirmed") && (
-                    <Button variant="destructive" className="w-full rounded-xl" onClick={() => cancelMutation.mutate(selectedAppointment.id)} disabled={cancelMutation.isPending}>
+                    <Button variant="destructive" className="w-full rounded-xl" style={{ background: "#e05252", color: "white", borderRadius: "12px", width: "100%", padding: "10px", fontWeight: 600, border: "none", cursor: "pointer" }} onClick={() => cancelMutation.mutate(selectedAppointment.id)} disabled={cancelMutation.isPending}>
                       {cancelMutation.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> {t.cancelling}</> : <><X className="mr-2 h-4 w-4" /> {t.cancelAppointment}</>}
                     </Button>
                   )}
