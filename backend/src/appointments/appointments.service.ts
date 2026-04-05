@@ -32,6 +32,46 @@ export class AppointmentsService {
       dto.patientId = patient.id;
     }
 
+    if (dto.startTime >= dto.endTime) {
+      throw new ForbiddenException('Appointment end time must be after start time');
+    }
+
+    const existingAppointments = await this.db
+      .select({
+        id: appointments.id,
+        start_time: appointments.start_time,
+        end_time: appointments.end_time,
+        status: appointments.status,
+      })
+      .from(appointments)
+      .where(
+        and(
+          eq(appointments.clinic_id, clinicId),
+          eq(appointments.doctor_id, dto.doctorId),
+          eq(appointments.appointment_date, dto.appointmentDate),
+        ),
+      );
+
+    const hasOverlap = existingAppointments.some((appointment: {
+      id: string;
+      start_time: string;
+      end_time: string;
+      status: string;
+    }) => {
+      if (appointment.status === 'cancelled') {
+        return false;
+      }
+
+      return (
+        appointment.start_time.slice(0, 5) < dto.endTime &&
+        appointment.end_time.slice(0, 5) > dto.startTime
+      );
+    });
+
+    if (hasOverlap) {
+      throw new ForbiddenException('Doctor already has an appointment in this time range');
+    }
+
     const [appointment] = await this.db
       .insert(appointments)
       .values({

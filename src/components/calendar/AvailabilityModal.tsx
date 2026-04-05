@@ -41,6 +41,12 @@ export interface AvailabilityModalProps {
   initialStartTime?: string;
   initialEndTime?: string;
   slot?: AvailabilitySlot;
+  onDraftChange?: (draft: {
+    dayOfWeek: number;
+    startTime: string;
+    endTime: string;
+    slotDuration: number;
+  } | null) => void;
   onSaved: () => void;
 }
 
@@ -54,10 +60,26 @@ const dayOptions = [
   { value: "0", label: "Pazar" },
 ] as const;
 
-const slotDurationOptions = ["15", "20", "30", "45", "60"] as const;
+const slotDurationOptions = ["15", "20", "30", "45", "60", "90"] as const;
 
 function to24Hour(time?: string | null) {
   return time ? time.slice(0, 5) : "";
+}
+
+function addMinutesToTime(time: string, minutesToAdd: number) {
+  const [hours, minutes] = time.split(":").map(Number);
+  const totalMinutes = hours * 60 + minutes + minutesToAdd;
+  const normalizedMinutes = ((totalMinutes % (24 * 60)) + 24 * 60) % (24 * 60);
+  const nextHours = Math.floor(normalizedMinutes / 60);
+  const nextMinutes = normalizedMinutes % 60;
+
+  return `${String(nextHours).padStart(2, "0")}:${String(nextMinutes).padStart(2, "0")}`;
+}
+
+function getMinutesBetween(startTime: string, endTime: string) {
+  const [startHours, startMinutes] = startTime.split(":").map(Number);
+  const [endHours, endMinutes] = endTime.split(":").map(Number);
+  return endHours * 60 + endMinutes - (startHours * 60 + startMinutes);
 }
 
 export function AvailabilityModal({
@@ -69,6 +91,7 @@ export function AvailabilityModal({
   initialStartTime,
   initialEndTime,
   slot,
+  onDraftChange,
   onSaved,
 }: AvailabilityModalProps) {
   const [dayOfWeek, setDayOfWeek] = useState("1");
@@ -76,6 +99,7 @@ export function AvailabilityModal({
   const [endTime, setEndTime] = useState("");
   const [slotDuration, setSlotDuration] = useState("30");
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [isEndTimeLinked, setIsEndTimeLinked] = useState(true);
 
   useEffect(() => {
     if (!open) {
@@ -83,18 +107,65 @@ export function AvailabilityModal({
     }
 
     if (mode === "edit" && slot) {
+      const nextStartTime = to24Hour(slot.start_time);
+      const nextEndTime = to24Hour(slot.end_time);
+      const nextSlotDuration = String(slot.slot_duration);
+
       setDayOfWeek(String(slot.day_of_week));
-      setStartTime(to24Hour(slot.start_time));
-      setEndTime(to24Hour(slot.end_time));
-      setSlotDuration(String(slot.slot_duration));
+      setStartTime(nextStartTime);
+      setEndTime(nextEndTime);
+      setSlotDuration(nextSlotDuration);
+      setIsEndTimeLinked(addMinutesToTime(nextStartTime, slot.slot_duration) === nextEndTime);
       return;
     }
 
+    const nextStartTime = initialStartTime ?? "";
+    const nextSlotDuration = "30";
+    const nextSelectionDuration =
+      nextStartTime && initialEndTime ? getMinutesBetween(nextStartTime, initialEndTime) : 0;
+    const nextEndTime =
+      initialEndTime ??
+      (nextStartTime ? addMinutesToTime(nextStartTime, Number(nextSlotDuration)) : "");
+
     setDayOfWeek(String(initialDayOfWeek ?? 1));
-    setStartTime(initialStartTime ?? "");
-    setEndTime(initialEndTime ?? "");
+    setStartTime(nextStartTime);
+    setEndTime(nextEndTime);
     setSlotDuration("30");
+    setIsEndTimeLinked(Boolean(nextStartTime) && nextSelectionDuration === Number(nextSlotDuration));
   }, [initialDayOfWeek, initialEndTime, initialStartTime, mode, open, slot]);
+
+  useEffect(() => {
+    if (!open || !isEndTimeLinked || !startTime || !slotDuration) {
+      return;
+    }
+
+    const syncedEndTime = addMinutesToTime(startTime, Number(slotDuration));
+    if (endTime !== syncedEndTime) {
+      setEndTime(syncedEndTime);
+    }
+  }, [endTime, isEndTimeLinked, open, slotDuration, startTime]);
+
+  useEffect(() => {
+    if (!onDraftChange) {
+      return;
+    }
+
+    if (!open || !dayOfWeek || !startTime || !slotDuration) {
+      onDraftChange(null);
+      return;
+    }
+
+    onDraftChange({
+      dayOfWeek: Number(dayOfWeek),
+      startTime,
+      endTime: endTime || addMinutesToTime(startTime, Number(slotDuration)),
+      slotDuration: Number(slotDuration),
+    });
+
+    return () => {
+      onDraftChange(null);
+    };
+  }, [dayOfWeek, endTime, onDraftChange, open, slotDuration, startTime]);
 
   const timeError = useMemo(() => {
     if (!startTime || !endTime) {
@@ -216,7 +287,10 @@ export function AvailabilityModal({
                   id="availability-end"
                   type="time"
                   value={endTime}
-                  onChange={(event) => setEndTime(event.target.value)}
+                  onChange={(event) => {
+                    setEndTime(event.target.value);
+                    setIsEndTimeLinked(false);
+                  }}
                   className="rounded-xl"
                 />
               </div>

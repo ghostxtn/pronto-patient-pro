@@ -10,23 +10,23 @@ import {
   XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { cn } from "@/lib/utils";
 import api from "@/services/api";
 import type { Appointment, ClinicalNote } from "@/types/calendar";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 
 export interface AppointmentDetailSheetProps {
   appointment: Appointment | null;
@@ -126,47 +126,57 @@ export function AppointmentDetailSheet({
   const StatusIcon = status?.icon;
 
   return (
-    <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
-      <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto rounded-2xl">
+    <Sheet open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
+      <SheetContent
+        side="right"
+        overlayClassName="bg-foreground/8 backdrop-blur-[1px] data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
+        className="w-full overflow-y-auto border-border/60 bg-background/98 px-0 shadow-elevated sm:max-w-[32rem]"
+      >
         {appointment && status && StatusIcon ? (
           <>
-            <DialogHeader>
-              <DialogTitle className="font-display">{t.appointmentDetails}</DialogTitle>
-              <DialogDescription asChild>
+            <SheetHeader className="border-b border-border/50 px-6 pb-5 pt-8">
+              <div className="flex items-center justify-between gap-3">
                 <div>
-                  <Badge className={cn("mt-2 rounded-full border", status.color)} variant="outline">
-                    <StatusIcon className="mr-1 h-3 w-3" /> {status.label}
-                  </Badge>
+                  <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                    Takvim ayrintisi
+                  </p>
+                  <SheetTitle className="mt-2 font-display text-[1.45rem]">{t.appointmentDetails}</SheetTitle>
                 </div>
-              </DialogDescription>
-            </DialogHeader>
+                <Badge className={cn("shrink-0 rounded-full border", status.color)} variant="outline">
+                  <StatusIcon className="mr-1 h-3 w-3" /> {status.label}
+                </Badge>
+              </div>
+              <SheetDescription className="text-sm">
+                Secili randevu takvim baglamindan kopmadan sag panelde acilir.
+              </SheetDescription>
+            </SheetHeader>
 
-            <div className="space-y-4">
-              <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-secondary to-success">
-                  <span className="font-display font-bold text-secondary-foreground">
+            <div className="space-y-5 px-6 py-6">
+              <div className="rounded-[24px] border border-border/60 bg-card/90 p-4 shadow-soft">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] bg-primary/10 text-lg font-display font-bold text-primary">
                     {patientName[0] || "P"}
-                  </span>
-                </div>
-                <div>
-                  <div className="font-semibold">{patientName}</div>
-                  {appointment.patient.email ? (
-                    <div className="text-sm text-muted-foreground">{appointment.patient.email}</div>
-                  ) : null}
-                  {appointment.patient.phone ? (
-                    <div className="text-sm text-muted-foreground">{appointment.patient.phone}</div>
-                  ) : null}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="font-semibold text-foreground">{patientName}</div>
+                    {appointment.patient.email ? (
+                      <div className="truncate text-sm text-muted-foreground">{appointment.patient.email}</div>
+                    ) : null}
+                    {appointment.patient.phone ? (
+                      <div className="text-sm text-muted-foreground">{appointment.patient.phone}</div>
+                    ) : null}
+                  </div>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3 text-sm">
-                <div className="rounded-xl bg-muted p-3">
+                <div className="rounded-[20px] border border-border/60 bg-background/70 p-3">
                   <div className="mb-1 text-muted-foreground">{t.date}</div>
                   <div className="font-medium">
                     {format(parseISO(appointment.appointment_date), "EEE, MMM d, yyyy")}
                   </div>
                 </div>
-                <div className="rounded-xl bg-muted p-3">
+                <div className="rounded-[20px] border border-border/60 bg-background/70 p-3">
                   <div className="mb-1 text-muted-foreground">{t.time}</div>
                   <div className="font-medium">
                     {appointment.start_time.slice(0, 5)} - {appointment.end_time.slice(0, 5)}
@@ -175,7 +185,7 @@ export function AppointmentDetailSheet({
               </div>
 
               {appointment.notes ? (
-                <div className="rounded-xl bg-muted p-3">
+                <div className="rounded-[20px] border border-border/60 bg-background/70 p-3">
                   <div className="mb-1 flex items-center gap-1 text-sm text-muted-foreground">
                     <FileText className="h-3 w-3" /> {t.patientNotes}
                   </div>
@@ -192,20 +202,20 @@ export function AppointmentDetailSheet({
                 </Button>
               ) : null}
 
-              {!isStaff && (
-                <div className="border-t pt-4">
+              {!isStaff ? (
+                <div className="border-t border-border/50 pt-4">
                   <div className="space-y-4">
                     <div>
-                      <h4 className="font-display font-semibold">Geçmiş Notlar</h4>
+                      <h4 className="font-display font-semibold">Gecmis Notlar</h4>
                       <p className="mt-1 text-sm text-muted-foreground">
-                        Hastaya ait önceki klinik notlar burada listelenir.
+                        Hastaya ait onceki klinik notlar burada listelenir.
                       </p>
                     </div>
 
                     {isClinicalNotesLoading ? (
-                      <div className="flex items-center gap-2 rounded-xl bg-muted p-3 text-sm text-muted-foreground">
+                      <div className="flex items-center gap-2 rounded-xl border border-border/60 bg-background/70 p-3 text-sm text-muted-foreground">
                         <Loader2 className="h-4 w-4 animate-spin" />
-                        Klinik notlar yükleniyor...
+                        Klinik notlar yukleniyor...
                       </div>
                     ) : clinicalNotes && clinicalNotes.length > 0 ? (
                       <div className="space-y-3">
@@ -226,9 +236,9 @@ export function AppointmentDetailSheet({
                               </div>
                             </CardHeader>
                             <CardContent className="space-y-2 text-sm">
-                              {note.diagnosis ? <p><span className="font-medium">Tanı:</span> {note.diagnosis}</p> : null}
+                              {note.diagnosis ? <p><span className="font-medium">Tani:</span> {note.diagnosis}</p> : null}
                               {note.treatment ? <p><span className="font-medium">Tedavi:</span> {note.treatment}</p> : null}
-                              {note.prescription ? <p><span className="font-medium">Reçete:</span> {note.prescription}</p> : null}
+                              {note.prescription ? <p><span className="font-medium">Recete:</span> {note.prescription}</p> : null}
                               {note.notes ? <p><span className="font-medium">Not:</span> {note.notes}</p> : null}
                             </CardContent>
                           </Card>
@@ -236,16 +246,16 @@ export function AppointmentDetailSheet({
                       </div>
                     ) : (
                       <p className="text-sm text-muted-foreground">
-                        Henüz klinik not eklenmemiş.
+                        Henuz klinik not eklenmemis.
                       </p>
                     )}
 
-                    <div className="space-y-3 rounded-2xl bg-muted/40 p-4">
+                    <div className="space-y-3 rounded-[24px] border border-border/60 bg-background/70 p-4">
                       <div className="flex items-center justify-between gap-3">
                         <div>
                           <h4 className="font-display font-semibold">Yeni Not Ekle</h4>
                           <p className="mt-1 text-sm text-muted-foreground">
-                            Tanı, tedavi, reçete veya genel not bilgisi ekleyin.
+                            Tani, tedavi, recete veya genel not bilgisi ekleyin.
                           </p>
                         </div>
                         <Button
@@ -254,14 +264,14 @@ export function AppointmentDetailSheet({
                           className="rounded-xl"
                           onClick={() => setIsNoteFormOpen((current) => !current)}
                         >
-                          ＋ Yeni Klinik Not Ekle
+                          + Yeni Klinik Not Ekle
                         </Button>
                       </div>
 
                       {isNoteFormOpen ? (
                         <div className="space-y-4">
                           <div className="space-y-2">
-                            <Label htmlFor="clinical-note-diagnosis">Tanı</Label>
+                            <Label htmlFor="clinical-note-diagnosis">Tani</Label>
                             <Textarea
                               id="clinical-note-diagnosis"
                               value={diagnosis}
@@ -283,7 +293,7 @@ export function AppointmentDetailSheet({
                           </div>
 
                           <div className="space-y-2">
-                            <Label htmlFor="clinical-note-prescription">Reçete</Label>
+                            <Label htmlFor="clinical-note-prescription">Recete</Label>
                             <Textarea
                               id="clinical-note-prescription"
                               value={prescription}
@@ -320,11 +330,11 @@ export function AppointmentDetailSheet({
                     </div>
                   </div>
                 </div>
-              )}
+              ) : null}
             </div>
           </>
         ) : null}
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   );
 }

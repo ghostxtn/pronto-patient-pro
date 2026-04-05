@@ -6,7 +6,6 @@ import {
   timestamp,
   uuid,
   varchar,
-  unique,
 } from 'drizzle-orm/pg-core';
 import { clinics } from './clinics.schema';
 import { doctors } from './doctors.schema';
@@ -29,11 +28,6 @@ export const doctorAvailabilityOverrides = pgTable(
     created_at: timestamp('created_at').defaultNow().notNull(),
     updated_at: timestamp('updated_at').defaultNow().notNull(),
   },
-  (table) => ({
-    doctorDateTypeUnique: unique(
-      'doctor_availability_overrides_doctor_date_type_unique',
-    ).on(table.doctor_id, table.date, table.type),
-  }),
 );
 
 export type DoctorAvailabilityOverride = InferSelectModel<
