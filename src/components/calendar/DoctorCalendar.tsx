@@ -580,11 +580,19 @@ const CalendarHeader = ({ date, onContextMenu }: CalendarHeaderProps) => {
   );
 };
 
-function CalendarEventContent({ event, title }: { event: SchedulerEvent; title: string }) {
+function CalendarEventContent({ event, title, view }: { event: SchedulerEvent; title: string; view?: string }) {
   const timeRange = `${format(event.start, "HH:mm")} - ${format(event.end, "HH:mm")}`;
 
   if (event.type === "availability-surface") {
     return null;
+  }
+
+  if (view === Views.MONTH) {
+    return (
+      <div className="truncate text-[11px] leading-tight">
+        <span className="font-bold opacity-80">{format(event.start, "HH:mm")}</span> <span className="font-semibold">{title}</span>
+      </div>
+    );
   }
 
   if (event.type === "draft") {
@@ -2130,10 +2138,9 @@ export function DoctorCalendar({
                       variant="destructive"
                       className="rounded-xl"
                       onClick={handleQuickActionRemoveOverride}
-                      disabled={reopenQuickBlock.isPending}
                     >
                       <Trash2 className="mr-2 h-4 w-4" />
-                      {quickActionSlot.override?.type === "custom_hours" ? "Secili zamani ac" : "Istisnayi kaldir"}
+                      Istisnayi kaldir
                     </Button>
                   </>
                 ) : null}

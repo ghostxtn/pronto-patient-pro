@@ -59,22 +59,16 @@ export class AvailabilityService {
       return [];
     }
 
-    const blockedRanges = overrides
-      .filter(
-        (override: {
-          type: string;
-          start_time: string | null;
-          end_time: string | null;
-        }) =>
-          override.type === 'custom_hours' &&
-          override.start_time &&
-          override.end_time,
-      )
-      .map((override) => ({
-        start: this.timeToMinutes(override.start_time as string),
-        end: this.timeToMinutes(override.end_time as string),
-      }))
-      .sort((left, right) => left.start - right.start);
+    const customHoursOverride = overrides.find(
+      (override: {
+        type: string;
+        start_time: string | null;
+        end_time: string | null;
+      }) =>
+        override.type === 'custom_hours' &&
+        override.start_time &&
+        override.end_time,
+    );
 
     const rawSlots = availabilityBlocks.flatMap((block: DoctorAvailability) => {
       let segments = [
@@ -84,11 +78,11 @@ export class AvailabilityService {
         },
       ];
 
-      for (const blockedRange of blockedRanges) {
+      if (customHoursOverride) {
         segments = this.subtractBlockedRange(
           segments,
-          blockedRange.start,
-          blockedRange.end,
+          this.timeToMinutes(customHoursOverride.start_time as string),
+          this.timeToMinutes(customHoursOverride.end_time as string),
         );
       }
 
@@ -161,39 +155,23 @@ export class AvailabilityService {
         ),
       );
 
-    const mergePlan = this.buildAvailabilityMergePlan(existing, {
-      id: null,
-      dayOfWeek: dto.dayOfWeek,
-      startTime: dto.startTime,
-      endTime: dto.endTime,
-      slotDuration: dto.slotDuration ?? 30,
+    const candidateRange = {
+      start: this.timeToMinutes(dto.startTime),
+      end: this.timeToMinutes(dto.endTime),
+    };
+
+    const hasOverlap = existing.some((slot: DoctorAvailability) => {
+      const existingRange = {
+        start: this.timeToMinutes(slot.start_time),
+        end: this.timeToMinutes(slot.end_time),
+      };
+      return this.rangesOverlap(candidateRange, existingRange);
     });
 
-    if (mergePlan.conflict) {
+    if (hasOverlap) {
       throw new ConflictException(
         'Bu gun ve saat araliginda zaten aktif bir musaitlik slotu mevcut.',
       );
-    }
-
-    if (mergePlan.mergedSlot) {
-      const [availability] = await this.db
-        .update(doctorAvailability)
-        .set({
-          start_time: mergePlan.mergedSlot.startTime,
-          end_time: mergePlan.mergedSlot.endTime,
-          slot_duration: mergePlan.mergedSlot.slotDuration,
-          updated_at: new Date(),
-        })
-        .where(eq(doctorAvailability.id, mergePlan.mergedSlot.keepId))
-        .returning();
-
-      for (const deleteId of mergePlan.mergedSlot.deleteIds) {
-        await this.db
-          .delete(doctorAvailability)
-          .where(eq(doctorAvailability.id, deleteId));
-      }
-
-      return availability;
     }
 
     const [availability] = await this.db
@@ -249,8 +227,6 @@ export class AvailabilityService {
     const nextStartTime =
       dto.startTime ?? currentAvailability.start_time.slice(0, 5);
     const nextEndTime = dto.endTime ?? currentAvailability.end_time.slice(0, 5);
-    const nextSlotDuration =
-      dto.slotDuration ?? currentAvailability.slot_duration;
     const nextIsActive = dto.isActive ?? currentAvailability.is_active;
 
     if (nextIsActive) {
@@ -263,44 +239,27 @@ export class AvailabilityService {
             eq(doctorAvailability.clinic_id, clinicId),
             eq(doctorAvailability.day_of_week, nextDayOfWeek),
             eq(doctorAvailability.is_active, true),
+            ne(doctorAvailability.id, id),
           ),
         );
 
-      const mergePlan = this.buildAvailabilityMergePlan(existing, {
-        id,
-        dayOfWeek: nextDayOfWeek,
-        startTime: nextStartTime,
-        endTime: nextEndTime,
-        slotDuration: nextSlotDuration,
+      const candidateRange = {
+        start: this.timeToMinutes(nextStartTime),
+        end: this.timeToMinutes(nextEndTime),
+      };
+
+      const hasOverlap = existing.some((slot: DoctorAvailability) => {
+        const existingRange = {
+          start: this.timeToMinutes(slot.start_time),
+          end: this.timeToMinutes(slot.end_time),
+        };
+        return this.rangesOverlap(candidateRange, existingRange);
       });
 
-      if (mergePlan.conflict) {
+      if (hasOverlap) {
         throw new ConflictException(
           'Bu gun ve saat araliginda zaten aktif bir musaitlik slotu mevcut.',
         );
-      }
-
-      if (mergePlan.mergedSlot) {
-        const [availability] = await this.db
-          .update(doctorAvailability)
-          .set({
-            day_of_week: nextDayOfWeek,
-            start_time: mergePlan.mergedSlot.startTime,
-            end_time: mergePlan.mergedSlot.endTime,
-            slot_duration: mergePlan.mergedSlot.slotDuration,
-            is_active: nextIsActive,
-            updated_at: new Date(),
-          })
-          .where(eq(doctorAvailability.id, id))
-          .returning();
-
-        for (const deleteId of mergePlan.mergedSlot.deleteIds) {
-          await this.db
-            .delete(doctorAvailability)
-            .where(eq(doctorAvailability.id, deleteId));
-        }
-
-        return availability;
       }
     }
 
@@ -410,108 +369,11 @@ export class AvailabilityService {
     });
   }
 
-  private buildAvailabilityMergePlan(
-    existing: DoctorAvailability[],
-    candidate: {
-      id: string | null;
-      dayOfWeek: number;
-      startTime: string;
-      endTime: string;
-      slotDuration: number;
-    },
-  ) {
-    const sameDaySlots = existing.filter(
-      (slot) =>
-        slot.day_of_week === candidate.dayOfWeek &&
-        slot.is_active &&
-        slot.id !== candidate.id,
-    );
-
-    const candidateRange = {
-      start: this.timeToMinutes(candidate.startTime),
-      end: this.timeToMinutes(candidate.endTime),
-    };
-
-    const conflictingSlots = sameDaySlots.filter((slot) => {
-      const existingRange = {
-        start: this.timeToMinutes(slot.start_time),
-        end: this.timeToMinutes(slot.end_time),
-      };
-
-      return this.rangesOverlap(candidateRange, existingRange);
-    });
-
-    const hasDifferentDurationOverlap = conflictingSlots.some(
-      (slot) => (slot.slot_duration ?? 30) !== candidate.slotDuration,
-    );
-
-    if (hasDifferentDurationOverlap) {
-      return { conflict: true as const, mergedSlot: null };
-    }
-
-    let expandedRange = candidateRange;
-    const mergeableSlots: DoctorAvailability[] = [];
-    let didExpand = true;
-
-    while (didExpand) {
-      didExpand = false;
-
-      for (const slot of sameDaySlots) {
-        if (
-          (slot.slot_duration ?? 30) !== candidate.slotDuration ||
-          mergeableSlots.some((mergeableSlot) => mergeableSlot.id === slot.id)
-        ) {
-          continue;
-        }
-
-        const existingRange = {
-          start: this.timeToMinutes(slot.start_time),
-          end: this.timeToMinutes(slot.end_time),
-        };
-
-        if (!this.rangesOverlapOrTouch(expandedRange, existingRange)) {
-          continue;
-        }
-
-        mergeableSlots.push(slot);
-        expandedRange = {
-          start: Math.min(expandedRange.start, existingRange.start),
-          end: Math.max(expandedRange.end, existingRange.end),
-        };
-        didExpand = true;
-      }
-    }
-
-    if (mergeableSlots.length === 0) {
-      return { conflict: false as const, mergedSlot: null };
-    }
-
-    return {
-      conflict: false as const,
-      mergedSlot: {
-        keepId: candidate.id ?? mergeableSlots[0].id,
-        deleteIds: mergeableSlots
-          .map((slot) => slot.id)
-          .filter((slotId) => slotId !== (candidate.id ?? mergeableSlots[0].id)),
-        startTime: this.minutesToTime(expandedRange.start),
-        endTime: this.minutesToTime(expandedRange.end),
-        slotDuration: candidate.slotDuration,
-      },
-    };
-  }
-
   private rangesOverlap(
     left: { start: number; end: number },
     right: { start: number; end: number },
   ) {
     return left.start < right.end && right.start < left.end;
-  }
-
-  private rangesOverlapOrTouch(
-    left: { start: number; end: number },
-    right: { start: number; end: number },
-  ) {
-    return left.start <= right.end && right.start <= left.end;
   }
 
   private timeToMinutes(time: string): number {
@@ -525,3 +387,4 @@ export class AvailabilityService {
     return `${hours}:${minutes}`;
   }
 }
+

@@ -73,11 +73,17 @@ export default function DoctorProfile() {
       .catch(() => setSlots([]));
   }, [id, selectedDate]);
 
+  const activeSlotDuration = (() => {
+    if (!selectedDate || !availability) return 30;
+    const daySlot = availability.find((a: any) => a.day_of_week === selectedDate.getDay());
+    return daySlot?.slot_duration ?? 30;
+  })();
+
   const bookMutation = useMutation({
     mutationFn: async () => {
       if (!user || !selectedDate || !selectedSlot || !id) throw new Error("Missing data");
       const startTime = selectedSlot;
-      const endParsed = addMinutes(parse(selectedSlot, "HH:mm", new Date()), 30);
+      const endParsed = addMinutes(parse(selectedSlot, "HH:mm", new Date()), activeSlotDuration);
       const endTime = format(endParsed, "HH:mm");
       return api.appointments.create({
         patientId: user.id,

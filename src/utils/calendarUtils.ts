@@ -84,7 +84,7 @@ export function overridesToEvents(
 
     return {
       id: override.id,
-      title: override.reason ?? "Özel Mesai",
+      title: override.reason ?? "Mola / Blok",
       start,
       end,
       type: override.type,

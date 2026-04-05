@@ -519,7 +519,12 @@
   }
 
   .scheduler-calendar-shell .rbc-event {
-    @apply rounded-[18px] border px-2.5 py-2 text-xs font-medium shadow-none;
+    @apply rounded-xl border px-2 py-1 text-xs font-medium shadow-none;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .scheduler-calendar-shell .rbc-month-row {
     overflow: hidden;
   }
 

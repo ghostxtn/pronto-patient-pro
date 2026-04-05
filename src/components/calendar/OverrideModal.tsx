@@ -84,7 +84,7 @@ export function OverrideModal({
     }
 
     if (!startTime || !endTime) {
-      return "Özel saat için başlangıç ve bitiş saati zorunludur.";
+      return "Blok için başlangıç ve bitiş saati zorunludur.";
     }
 
     if (endTime <= startTime) {

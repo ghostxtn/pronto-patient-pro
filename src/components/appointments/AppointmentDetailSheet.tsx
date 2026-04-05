@@ -129,8 +129,8 @@ export function AppointmentDetailSheet({
     <Sheet open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
       <SheetContent
         side="right"
-        overlayClassName="bg-foreground/8 backdrop-blur-[1px] data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
-        className="w-full overflow-y-auto border-border/60 bg-background/98 px-0 shadow-elevated sm:max-w-[32rem]"
+        overlayClassName="bg-foreground/10 backdrop-blur-sm data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
+        className="w-full overflow-y-auto border-l border-border/40 bg-background/95 backdrop-blur-2xl px-0 shadow-2xl sm:max-w-[32rem]"
       >
         {appointment && status && StatusIcon ? (
           <>
