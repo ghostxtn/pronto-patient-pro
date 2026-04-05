@@ -55,8 +55,8 @@ export type HomepageSpecialtyPreviewItem = {
   previewText?: string;
 };
 
-const MAX_DOCTOR_PREVIEW = 3;
-const MAX_SPECIALTY_PREVIEW = 6;
+const MAX_DOCTOR_PREVIEW = 50;
+const MAX_SPECIALTY_PREVIEW = 50;
 const SPECIALTY_FALLBACK_IMAGE = null;
 
 export function toHomepageSlug(value: string) {
