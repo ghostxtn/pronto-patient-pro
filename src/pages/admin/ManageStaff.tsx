@@ -101,26 +101,47 @@ export default function ManageStaff() {
         <motion.div custom={0} variants={fadeUp}>
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-display font-bold">{t.manageStaff}</h1>
-              <p className="text-muted-foreground mt-1">{staff.length} {t.registeredStaff}</p>
+              <h1
+                className="text-3xl font-display font-bold"
+                style={{ color: "#1a2e3b", fontFamily: "Manrope, sans-serif", fontWeight: 700 }}
+              >
+                {t.manageStaff}
+              </h1>
+              <p className="text-muted-foreground mt-1" style={{ color: "#5a7a8a" }}>{staff.length} {t.registeredStaff}</p>
             </div>
-            <Button onClick={() => { setNewStaff(emptyStaffForm); setAddOpen(true); }}>
-              <UserPlus className="h-4 w-4 mr-2" />
+            <button
+              onClick={() => { setNewStaff(emptyStaffForm); setAddOpen(true); }}
+              className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-white transition-colors"
+              style={{ background: "#4f8fe6" }}
+              onMouseEnter={(e) => e.currentTarget.style.background = "#2f75ca"}
+              onMouseLeave={(e) => e.currentTarget.style.background = "#4f8fe6"}
+            >
+              <UserPlus className="h-4 w-4" />
               {t.addStaff}
-            </Button>
+            </button>
           </div>
         </motion.div>
 
         <motion.div custom={1} variants={fadeUp} className="flex gap-2 mb-4">
-          <Button variant={statusFilter === "active" ? "default" : "outline"} onClick={() => setStatusFilter("active")}>
-            {t.active}
-          </Button>
-          <Button variant={statusFilter === "inactive" ? "default" : "outline"} onClick={() => setStatusFilter("inactive")}>
-            {t.inactive}
-          </Button>
-          <Button variant={statusFilter === "all" ? "default" : "outline"} onClick={() => setStatusFilter("all")}>
-            {t.all}
-          </Button>
+          {(["active", "inactive", "all"] as const).map((f) => (
+            <button
+              key={f}
+              onClick={() => setStatusFilter(f)}
+              style={{
+                background: statusFilter === f ? "#4f8fe6" : "white",
+                color: statusFilter === f ? "white" : "#5a7a8a",
+                border: `1.5px solid ${statusFilter === f ? "#4f8fe6" : "#b5d1cc"}`,
+                borderRadius: "10px",
+                padding: "6px 18px",
+                fontSize: "0.875rem",
+                fontWeight: 500,
+                cursor: "pointer",
+                transition: "all 0.15s",
+              }}
+            >
+              {f === "active" ? t.active : f === "inactive" ? t.inactive : t.all}
+            </button>
+          ))}
         </motion.div>
 
         <motion.div custom={2} variants={fadeUp} className="relative">
@@ -134,32 +155,59 @@ export default function ManageStaff() {
         </motion.div>
 
         <motion.div custom={3} variants={fadeUp}>
-          <Card className="shadow-card">
+          <Card
+            style={{
+              background: "white",
+              border: "1px solid #b5d1cc",
+              borderRadius: "16px",
+              boxShadow: "0 2px 12px rgba(79,143,230,0.08)",
+              overflow: "hidden",
+            }}
+          >
             <CardContent className="p-0">
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
-                    <tr className="border-b text-left">
-                      <th className="p-4 text-sm font-medium text-muted-foreground">{t.name}</th>
-                      <th className="p-4 text-sm font-medium text-muted-foreground hidden md:table-cell">{t.email}</th>
-                      <th className="p-4 text-sm font-medium text-muted-foreground hidden lg:table-cell">{t.phone}</th>
-                      <th className="p-4 text-sm font-medium text-muted-foreground">{t.status}</th>
-                      <th className="p-4 text-sm font-medium text-muted-foreground text-right">{t.actions}</th>
+                    <tr className="text-left" style={{ background: "#f4f8fd", borderBottom: "1px solid #b5d1cc" }}>
+                      <th className="p-4 text-sm font-medium text-muted-foreground" style={{ color: "#5a7a8a", fontSize: "0.8rem", fontWeight: 600, padding: "12px 16px" }}>{t.name}</th>
+                      <th className="p-4 text-sm font-medium text-muted-foreground hidden md:table-cell" style={{ color: "#5a7a8a", fontSize: "0.8rem", fontWeight: 600, padding: "12px 16px" }}>{t.email}</th>
+                      <th className="p-4 text-sm font-medium text-muted-foreground hidden lg:table-cell" style={{ color: "#5a7a8a", fontSize: "0.8rem", fontWeight: 600, padding: "12px 16px" }}>{t.phone}</th>
+                      <th className="p-4 text-sm font-medium text-muted-foreground" style={{ color: "#5a7a8a", fontSize: "0.8rem", fontWeight: 600, padding: "12px 16px" }}>{t.status}</th>
+                      <th className="p-4 text-sm font-medium text-muted-foreground text-right" style={{ color: "#5a7a8a", fontSize: "0.8rem", fontWeight: 600, padding: "12px 16px" }}>{t.actions}</th>
                     </tr>
                   </thead>
                   <tbody>
                     {staff.map((member: any) => {
                       const fullName = `${member.firstName ?? ""} ${member.lastName ?? ""}`.trim() || "Unknown";
                       return (
-                        <tr key={member.id} className="border-b last:border-0 hover:bg-muted/40 transition-colors">
+                        <tr
+                          key={member.id}
+                          className="last:border-0 transition-colors"
+                          style={{ borderBottom: "1px solid #f0f4f8" }}
+                          onMouseEnter={(e) => e.currentTarget.style.background = "#f4f8fd"}
+                          onMouseLeave={(e) => e.currentTarget.style.background = "white"}
+                        >
                           <td className="p-4">
                             <div className="flex items-center gap-3">
-                              <div className="h-9 w-9 rounded-full bg-gradient-to-br from-primary to-info flex items-center justify-center text-primary-foreground font-bold text-sm">
+                              <div style={{
+                                width: 36,
+                                height: 36,
+                                borderRadius: "10px",
+                                background: "#eaf5ff",
+                                color: "#4f8fe6",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                fontSize: "0.875rem",
+                                fontWeight: 700,
+                                border: "2px solid #b5d1cc",
+                                flexShrink: 0,
+                              }}>
                                 {fullName[0] ?? "S"}
                               </div>
                               <div>
-                                <p className="font-medium text-sm">{fullName}</p>
-                                <p className="text-xs text-muted-foreground md:hidden">{member.email ?? "—"}</p>
+                                <p className="font-medium text-sm" style={{ color: "#1a2e3b", fontWeight: 600, fontSize: "0.9rem" }}>{fullName}</p>
+                                <p className="text-xs text-muted-foreground md:hidden" style={{ color: "#5a7a8a", fontSize: "0.78rem" }}>{member.email ?? "—"}</p>
                               </div>
                             </div>
                           </td>
@@ -170,8 +218,8 @@ export default function ManageStaff() {
                               variant="outline"
                               className={
                                 member.isActive
-                                  ? "bg-success/15 text-success border-success/30"
-                                  : "bg-destructive/15 text-destructive border-destructive/30"
+                                  ? "border-[#b5d1cc] bg-[#e6f4ef] text-[#65a98f]"
+                                  : "border-[#fca5a5]/30 bg-[#fef2f2] text-[#e05252]"
                               }
                             >
                               {member.isActive ? t.active : t.inactive}

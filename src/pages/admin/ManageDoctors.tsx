@@ -215,8 +215,13 @@ export default function ManageDoctors() {
         <motion.div custom={0} variants={fadeUp}>
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-display font-bold">{t.manageDoctors}</h1>
-              <p className="mt-1 text-muted-foreground">
+              <h1
+                className="text-3xl font-display font-bold"
+                style={{ color: "#1a2e3b", fontFamily: "Manrope, sans-serif", fontWeight: 700 }}
+              >
+                {t.manageDoctors}
+              </h1>
+              <p className="mt-1 text-muted-foreground" style={{ color: "#5a7a8a" }}>
                 {doctors?.length ?? 0} {t.registeredDoctors}
               </p>
             </div>
@@ -226,7 +231,14 @@ export default function ManageDoctors() {
                 setNewDoctor(emptyNewDoctor);
                 setAddOpen(true);
               }}
-              className="rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
+              className="rounded-xl px-5 py-2.5 text-sm font-semibold text-white transition-colors"
+              style={{ background: "#4f8fe6" }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = "#2f75ca";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "#4f8fe6";
+              }}
             >
               Add Doctor
             </button>
@@ -234,26 +246,56 @@ export default function ManageDoctors() {
         </motion.div>
 
         <div className="mb-4 flex gap-2">
-          <Button
-            variant={statusFilter === "active" ? "default" : "outline"}
+          <button
             onClick={() => setStatusFilter("active")}
+            style={{
+              background: statusFilter === "active" ? "#4f8fe6" : "white",
+              color: statusFilter === "active" ? "white" : "#5a7a8a",
+              border: `1.5px solid ${statusFilter === "active" ? "#4f8fe6" : "#b5d1cc"}`,
+              borderRadius: "10px",
+              padding: "6px 18px",
+              fontSize: "0.875rem",
+              fontWeight: 500,
+              cursor: "pointer",
+              transition: "all 0.15s",
+            }}
           >
-            Active
-          </Button>
+            {t.active}
+          </button>
 
-          <Button
-            variant={statusFilter === "inactive" ? "default" : "outline"}
+          <button
             onClick={() => setStatusFilter("inactive")}
+            style={{
+              background: statusFilter === "inactive" ? "#4f8fe6" : "white",
+              color: statusFilter === "inactive" ? "white" : "#5a7a8a",
+              border: `1.5px solid ${statusFilter === "inactive" ? "#4f8fe6" : "#b5d1cc"}`,
+              borderRadius: "10px",
+              padding: "6px 18px",
+              fontSize: "0.875rem",
+              fontWeight: 500,
+              cursor: "pointer",
+              transition: "all 0.15s",
+            }}
           >
-            Inactive
-          </Button>
+            {t.inactive}
+          </button>
 
-          <Button
-            variant={statusFilter === "all" ? "default" : "outline"}
+          <button
             onClick={() => setStatusFilter("all")}
+            style={{
+              background: statusFilter === "all" ? "#4f8fe6" : "white",
+              color: statusFilter === "all" ? "white" : "#5a7a8a",
+              border: `1.5px solid ${statusFilter === "all" ? "#4f8fe6" : "#b5d1cc"}`,
+              borderRadius: "10px",
+              padding: "6px 18px",
+              fontSize: "0.875rem",
+              fontWeight: 500,
+              cursor: "pointer",
+              transition: "all 0.15s",
+            }}
           >
             All
-          </Button>
+          </button>
         </div>
 
         <motion.div custom={1} variants={fadeUp} className="relative">
@@ -267,24 +309,54 @@ export default function ManageDoctors() {
         </motion.div>
 
         <motion.div custom={2} variants={fadeUp}>
-          <Card className="shadow-card">
+          <Card
+            style={{
+              background: "white",
+              border: "1px solid #b5d1cc",
+              borderRadius: "16px",
+              boxShadow: "0 2px 12px rgba(79,143,230,0.08)",
+              overflow: "hidden",
+            }}
+          >
             <CardContent className="p-0">
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
-                    <tr className="border-b text-left">
-                      <th className="p-4 text-sm font-medium text-muted-foreground">{t.doctor}</th>
-                      <th className="hidden p-4 text-sm font-medium text-muted-foreground md:table-cell">
+                    <tr className="text-left" style={{ background: "#f4f8fd", borderBottom: "1px solid #b5d1cc" }}>
+                      <th
+                        className="p-4 text-sm font-medium text-muted-foreground"
+                        style={{ color: "#5a7a8a", fontSize: "0.8rem", fontWeight: 600, padding: "12px 16px" }}
+                      >
+                        {t.doctor}
+                      </th>
+                      <th
+                        className="hidden p-4 text-sm font-medium text-muted-foreground md:table-cell"
+                        style={{ color: "#5a7a8a", fontSize: "0.8rem", fontWeight: 600, padding: "12px 16px" }}
+                      >
                         {t.specialization}
                       </th>
-                      <th className="hidden p-4 text-sm font-medium text-muted-foreground lg:table-cell">
+                      <th
+                        className="hidden p-4 text-sm font-medium text-muted-foreground lg:table-cell"
+                        style={{ color: "#5a7a8a", fontSize: "0.8rem", fontWeight: 600, padding: "12px 16px" }}
+                      >
                         {t.experience}
                       </th>
-                      <th className="hidden p-4 text-sm font-medium text-muted-foreground lg:table-cell">
+                      <th
+                        className="hidden p-4 text-sm font-medium text-muted-foreground lg:table-cell"
+                        style={{ color: "#5a7a8a", fontSize: "0.8rem", fontWeight: 600, padding: "12px 16px" }}
+                      >
                         {t.fee}
                       </th>
-                      <th className="p-4 text-sm font-medium text-muted-foreground">{t.status}</th>
-                      <th className="p-4 text-right text-sm font-medium text-muted-foreground">
+                      <th
+                        className="p-4 text-sm font-medium text-muted-foreground"
+                        style={{ color: "#5a7a8a", fontSize: "0.8rem", fontWeight: 600, padding: "12px 16px" }}
+                      >
+                        {t.status}
+                      </th>
+                      <th
+                        className="p-4 text-right text-sm font-medium text-muted-foreground"
+                        style={{ color: "#5a7a8a", fontSize: "0.8rem", fontWeight: 600, padding: "12px 16px" }}
+                      >
                         {t.actions}
                       </th>
                     </tr>
@@ -300,7 +372,14 @@ export default function ManageDoctors() {
                       return (
                         <tr
                           key={doc.id}
-                          className="border-b transition-colors last:border-0 hover:bg-muted/40"
+                          className="transition-colors last:border-0"
+                          style={{ borderBottom: "1px solid #f0f4f8", background: "white" }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = "#f4f8fd";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = "white";
+                          }}
                         >
                           <td className="p-4">
                             <div className="flex items-center gap-3">
@@ -308,17 +387,40 @@ export default function ManageDoctors() {
                                 <img
                                   src={avatarUrl}
                                   alt={name}
-                                  className="h-[52px] w-[52px] rounded-full object-cover"
+                                  style={{
+                                    width: 52,
+                                    height: 52,
+                                    borderRadius: "12px",
+                                    objectFit: "cover",
+                                    objectPosition: "top center",
+                                    border: "2px solid #b5d1cc",
+                                  }}
                                 />
                               ) : (
-                                <div className="flex h-[52px] w-[52px] items-center justify-center rounded-full bg-gradient-to-br from-primary to-info text-sm font-bold text-primary-foreground">
+                                <div
+                                  style={{
+                                    width: 52,
+                                    height: 52,
+                                    borderRadius: "12px",
+                                    background: "#eaf5ff",
+                                    color: "#4f8fe6",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    fontSize: "0.875rem",
+                                    fontWeight: 700,
+                                    border: "2px solid #b5d1cc",
+                                  }}
+                                >
                                   {getDoctorInitials(doc)}
                                 </div>
                               )}
 
                               <div className="min-w-0">
-                                <p className="font-medium text-sm">{name}</p>
-                                <p className="text-xs text-muted-foreground">
+                                <p className="font-medium text-sm" style={{ color: "#1a2e3b", fontWeight: 600, fontSize: "0.9rem" }}>
+                                  {name}
+                                </p>
+                                <p className="text-xs text-muted-foreground" style={{ color: "#5a7a8a", fontSize: "0.78rem" }}>
                                   {doc.email ?? doc.profiles?.email ?? ""}
                                 </p>
                                 <div className="mt-2">
@@ -341,6 +443,15 @@ export default function ManageDoctors() {
                                     size="sm"
                                     disabled={isUploading || !userId}
                                     onClick={() => fileInputRefs.current[userId]?.click()}
+                                    style={{
+                                      border: "1.5px solid #b5d1cc",
+                                      borderRadius: "8px",
+                                      padding: "3px 10px",
+                                      fontSize: "0.75rem",
+                                      color: "#5a7a8a",
+                                      background: "white",
+                                      cursor: "pointer",
+                                    }}
                                   >
                                     {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                                     Fotoğraf Yükle
@@ -367,8 +478,8 @@ export default function ManageDoctors() {
                               variant="outline"
                               className={
                                 doc.is_active
-                                  ? "border-success/30 bg-success/15 text-success"
-                                  : "border-destructive/30 bg-destructive/15 text-destructive"
+                                  ? "border-[#b5d1cc] bg-[#e6f4ef] text-[#65a98f]"
+                                  : "border-[#fca5a5]/30 bg-[#fef2f2] text-[#e05252]"
                               }
                             >
                               {doc.is_active ? t.active : t.inactive}

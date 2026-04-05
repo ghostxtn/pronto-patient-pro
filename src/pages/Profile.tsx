@@ -106,23 +106,23 @@ export default function Profile() {
     <AppLayout>
       <div className="max-w-2xl mx-auto space-y-6">
         <motion.div {...fadeUp}>
-          <h1 className="text-3xl font-display font-bold">{t.myProfile}</h1>
-          <p className="text-muted-foreground mt-1">{t.profileDesc}</p>
+          <h1 className="text-3xl font-display font-bold" style={{ color: "#1a2e3b", fontFamily: "Manrope, sans-serif", fontWeight: 700 }}>{t.myProfile}</h1>
+          <p className="text-muted-foreground mt-1" style={{ color: "#5a7a8a" }}>{t.profileDesc}</p>
         </motion.div>
 
         <motion.div {...fadeUp} transition={{ delay: 0.1, duration: 0.4 } as any}>
-          <Card>
+          <Card style={{ background: "white", border: "1px solid #b5d1cc", borderRadius: "16px", boxShadow: "0 2px 12px rgba(79,143,230,0.08)" }}>
             <CardHeader>
-              <CardTitle className="text-lg">{t.personalInfo}</CardTitle>
-              <CardDescription>{t.personalInfoDesc}</CardDescription>
+              <CardTitle className="text-lg" style={{ color: "#1a2e3b", fontFamily: "Manrope, sans-serif", fontWeight: 600 }}>{t.personalInfo}</CardTitle>
+              <CardDescription style={{ color: "#5a7a8a" }}>{t.personalInfoDesc}</CardDescription>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="flex items-center gap-6">
                   <div className="relative group">
-                    <Avatar className="h-20 w-20 border-2 border-border">
+                    <Avatar className="h-20 w-20" style={{ border: "2px solid #b5d1cc", borderRadius: "50%" }}>
                       <AvatarImage src={displayAvatar} />
-                      <AvatarFallback className="text-lg bg-accent text-accent-foreground">{initials}</AvatarFallback>
+                      <AvatarFallback style={{ background: "#eaf5ff", color: "#4f8fe6", fontSize: "1.1rem", fontWeight: 700 }}>{initials}</AvatarFallback>
                     </Avatar>
                     <label htmlFor="avatar-upload" className="absolute inset-0 flex items-center justify-center rounded-full bg-foreground/40 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
                       <Camera className="h-5 w-5 text-primary-foreground" />
@@ -130,11 +130,11 @@ export default function Profile() {
                     <input id="avatar-upload" type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
                   </div>
                   <div>
-                    <p className="font-medium">{[firstName, lastName].filter(Boolean).join(" ") || t.yourName}</p>
-                    <p className="text-sm text-muted-foreground">{user?.email}</p>
+                    <p className="font-medium" style={{ color: "#1a2e3b", fontWeight: 600 }}>{[firstName, lastName].filter(Boolean).join(" ") || t.yourName}</p>
+                    <p className="text-sm text-muted-foreground" style={{ color: "#5a7a8a", fontSize: "0.875rem" }}>{user?.email}</p>
                     <div className="flex gap-1 mt-1">
                       {roles.map((role) => (
-                        <span key={role} className="text-xs font-medium px-2 py-0.5 rounded-full bg-accent text-accent-foreground capitalize">{role}</span>
+                        <span key={role} style={{ background: "#eaf5ff", color: "#4f8fe6", fontSize: "0.75rem", fontWeight: 600, padding: "2px 10px", borderRadius: "999px" }}>{role}</span>
                       ))}
                     </div>
                   </div>
@@ -144,34 +144,34 @@ export default function Profile() {
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="firstName" className="flex items-center gap-2"><User className="h-3.5 w-3.5 text-muted-foreground" /> {t.firstName || "Ad"}</Label>
+                    <Label htmlFor="firstName" className="flex items-center gap-2"><User className="h-3.5 w-3.5 text-muted-foreground" style={{ color: "#b5d1cc", width: 14, height: 14 }} /> {t.firstName || "Ad"}</Label>
                     <Input id="firstName" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="Ad" className="rounded-xl" />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="lastName" className="flex items-center gap-2"><Phone className="h-3.5 w-3.5 text-muted-foreground" /> {t.lastName || "Soyad"}</Label>
+                    <Label htmlFor="lastName" className="flex items-center gap-2"><Phone className="h-3.5 w-3.5 text-muted-foreground" style={{ color: "#b5d1cc", width: 14, height: 14 }} /> {t.lastName || "Soyad"}</Label>
                     <Input id="lastName" value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Soyad" className="rounded-xl" />
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="flex items-center gap-2"><Mail className="h-3.5 w-3.5 text-muted-foreground" /> {t.email}</Label>
+                  <Label className="flex items-center gap-2"><Mail className="h-3.5 w-3.5 text-muted-foreground" style={{ color: "#b5d1cc", width: 14, height: 14 }} /> {t.email}</Label>
                   <Input value={user?.email || ""} disabled className="rounded-xl bg-muted" />
                   <p className="text-xs text-muted-foreground">{t.emailCantChange}</p>
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="flex items-center gap-2"><Shield className="h-3.5 w-3.5 text-muted-foreground" /> {t.roles}</Label>
+                  <Label className="flex items-center gap-2"><Shield className="h-3.5 w-3.5 text-muted-foreground" style={{ color: "#b5d1cc", width: 14, height: 14 }} /> {t.roles}</Label>
                   <div className="flex gap-2">
                     {roles.map((role) => (
-                      <span key={role} className="text-sm font-medium px-3 py-1 rounded-lg bg-accent text-accent-foreground capitalize">{role}</span>
+                      <span key={role} style={{ background: "#eaf5ff", color: "#4f8fe6", fontSize: "0.75rem", fontWeight: 600, padding: "2px 10px", borderRadius: "999px" }}>{role}</span>
                     ))}
                   </div>
                 </div>
 
-                <Button type="submit" className="w-full sm:w-auto rounded-xl shadow-soft" disabled={updateMutation.isPending || uploading}>
+                <button type="submit" disabled={updateMutation.isPending || uploading} style={{ background: "#4f8fe6", color: "white", borderRadius: "12px", padding: "10px 24px", fontWeight: 600, border: "none", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "8px", opacity: (updateMutation.isPending || uploading) ? 0.7 : 1 }}>
                   {(updateMutation.isPending || uploading) ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                   {t.saveChanges}
-                </Button>
+                </button>
               </form>
             </CardContent>
           </Card>

@@ -6,6 +6,7 @@ import SmartLink from "./SmartLink";
 type SpecialtyItem = {
   id: string;
   name: string;
+  slug?: string;
   imageSrc?: string | null;
 };
 
@@ -157,6 +158,7 @@ export default function SpecialtiesSection({
                       startX.current = e.pageX - scrollRef.current.offsetLeft;
                       scrollLeft.current = scrollRef.current.scrollLeft;
                       scrollRef.current.style.cursor = "grabbing";
+                      scrollRef.current.style.userSelect = "none";
                     }
               }
               onMouseLeave={
@@ -164,7 +166,10 @@ export default function SpecialtiesSection({
                   ? undefined
                   : () => {
                       isDragging.current = false;
-                      if (scrollRef.current) scrollRef.current.style.cursor = "grab";
+                      if (scrollRef.current) {
+                        scrollRef.current.style.cursor = "grab";
+                        scrollRef.current.style.userSelect = "";
+                      }
                     }
               }
               onMouseUp={
@@ -172,7 +177,10 @@ export default function SpecialtiesSection({
                   ? undefined
                   : () => {
                       isDragging.current = false;
-                      if (scrollRef.current) scrollRef.current.style.cursor = "grab";
+                      if (scrollRef.current) {
+                        scrollRef.current.style.cursor = "grab";
+                        scrollRef.current.style.userSelect = "";
+                      }
                     }
               }
               onMouseMove={
@@ -200,16 +208,17 @@ export default function SpecialtiesSection({
                       msOverflowStyle: "none",
                       cursor: "grab",
                       scrollBehavior: "smooth",
+                      paddingRight: "24px",
                     }
               }
             >
               {specialties.map((specialty, index) => (
                 <motion.div
                   key={specialty.id}
-                  initial={{ opacity: 0, y: 40, x: -30 }}
+                  initial={{ opacity: 0, y: 20, x: -30 }}
                   whileInView={{ opacity: 1, y: 0, x: 0 }}
                   viewport={{ once: true, amount: 0.1 }}
-                  transition={{ duration: 0.65, delay: index * 0.1, ease: [0.25, 0.1, 0.25, 1] }}
+                  transition={{ duration: 0.5, delay: (index % 5) * 0.08, ease: appleEase }}
                   whileHover={{
                     scale: 1.02,
                     boxShadow: "0 8px 32px rgba(79,143,230,0.18)",
@@ -313,7 +322,7 @@ export default function SpecialtiesSection({
                     >
                       <button
                         type="button"
-                        onClick={() => navigate("/request-appointment")}
+                        onClick={() => navigate(`/patient/doctors?specialty=${encodeURIComponent(specialty.slug ?? specialty.name.toLowerCase())}`)}
                         className="transition-colors duration-200 hover:bg-[#2f75ca]"
                         style={{
                           borderRadius: "980px",
@@ -330,29 +339,12 @@ export default function SpecialtiesSection({
                       >
                         Randevu Al
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => navigate("/specialties")}
-                        className="transition-colors duration-200 hover:text-[#2f75ca] hover:underline"
-                        style={{
-                          borderRadius: "0",
-                          background: "transparent",
-                          border: "none",
-                          color: "#4f8fe6",
-                          fontWeight: 500,
-                          fontSize: "14px",
-                          cursor: "pointer",
-                          padding: "9px 8px",
-                          whiteSpace: "nowrap",
-                          fontFamily: "Inter, sans-serif",
-                        }}
-                      >
-                        Daha Fazla Bilgi ›
-                      </button>
                     </div>
                   </div>
                 </motion.div>
               ))}
+              {/* spacer to prevent last card from being clipped */}
+              <div style={{ minWidth: "32px", flexShrink: 0 }} />
             </div>
           </div>
         )}

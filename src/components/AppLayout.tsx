@@ -1,6 +1,7 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "react-router-dom";
+import { AnimatePresence, motion } from "framer-motion";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Button } from "@/components/ui/button";
@@ -11,6 +12,7 @@ import { hasActiveDoctorProfile } from "@/lib/doctor-access";
 import {
   Stethoscope, LogOut, LayoutDashboard, Search, CalendarDays, User, Clock, ClipboardList,
   Users, Settings,
+  Menu, X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -18,6 +20,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
   const { t } = useLanguage();
   const location = useLocation();
+  const [menuOpen, setMenuOpen] = useState(false);
   const isOwner = user?.role === "owner";
   const isAdmin = user?.role === "admin";
   const isStaff = user?.role === "staff";
@@ -99,11 +102,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <header className="glass-strong border-b sticky top-0 z-50">
         <div className="container flex h-16 items-center justify-between">
           <div className="flex items-center gap-3">
-            <Link to={homePath} className="flex items-center gap-2">
-              <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-primary to-info flex items-center justify-center">
-                <Stethoscope className="h-5 w-5 text-primary-foreground" />
-              </div>
-              <span className="font-display font-bold text-lg hidden sm:inline">MediBook</span>
+            <Link to="/" className="flex items-center gap-2">
+              <svg width="36" height="36" viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">
+                <rect x="0" y="13" width="44" height="18" rx="9" fill="#65a98f" />
+                <rect x="13" y="0" width="18" height="22" rx="9" fill="#4f8fe6" />
+                <rect x="13" y="22" width="18" height="22" rx="9" fill="#4f8fe6" />
+              </svg>
+              <span className="font-display font-bold text-lg hidden sm:inline" style={{ color: "#1a2e3b" }}>MediBook</span>
             </Link>
             <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-accent text-accent-foreground">
               {roleLabel}
@@ -131,34 +136,59 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <div className="flex items-center gap-1">
             <LanguageSwitcher />
             <span className="text-sm text-muted-foreground hidden lg:block">{user?.email}</span>
+            <button
+              className="md:hidden flex items-center justify-center w-10 h-10 rounded-xl border border-[#b5d1cc] text-[#5a7a8a] hover:bg-[#eaf5ff] transition-colors"
+              onClick={() => setMenuOpen(!menuOpen)}
+              aria-label="Menü"
+            >
+              {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </button>
             <Button variant="ghost" size="icon" onClick={logout}>
               <LogOut className="h-4 w-4" />
             </Button>
           </div>
         </div>
       </header>
+      <AnimatePresence>
+        {menuOpen && (
+          <motion.nav
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.22, ease: "easeOut" }}
+            className="md:hidden overflow-hidden border-b sticky top-16 z-40 bg-white/95 backdrop-blur-md"
+            style={{ borderColor: "#b5d1cc" }}
+          >
+            <div className="container flex flex-col gap-1 py-3">
+              {links.map((link) => (
+                <Link
+                  key={link.to}
+                  to={link.to}
+                  onClick={() => setMenuOpen(false)}
+                  className={cn(
+                    "flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors",
+                    isActiveLink(link.to)
+                      ? "bg-[#eaf5ff] text-[#4f8fe6]"
+                      : "text-[#5a7a8a] hover:bg-[#f4f8fd] hover:text-[#1a2e3b]"
+                  )}
+                >
+                  <link.icon className="h-4 w-4" />
+                  {link.label}
+                </Link>
+              ))}
+              <div className="mt-2 pt-2 border-t flex items-center justify-between px-2" style={{ borderColor: "#b5d1cc" }}>
+                <span className="text-xs text-[#5a7a8a]">{user?.email}</span>
+                <button onClick={logout} className="flex items-center gap-1 text-xs text-[#5a7a8a] hover:text-[#e05252] transition-colors">
+                  <LogOut className="h-3.5 w-3.5" />
+                  Çıkış
+                </button>
+              </div>
+            </div>
+          </motion.nav>
+        )}
+      </AnimatePresence>
 
-      <nav className="md:hidden fixed bottom-0 inset-x-0 z-50 glass-strong border-t">
-        <div className="flex justify-around py-2">
-          {links.map((link) => (
-            <Link
-                key={link.to}
-                to={link.to}
-                className={cn(
-                  "flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors",
-                  isActiveLink(link.to)
-                  ? "text-primary"
-                  : "text-muted-foreground"
-              )}
-            >
-              <link.icon className="h-5 w-5" />
-              {link.label}
-            </Link>
-          ))}
-        </div>
-      </nav>
-
-      <main className="container py-6 pb-24 md:pb-6">{children}</main>
+      <main className="container py-6">{children}</main>
     </div>
   );
 }
