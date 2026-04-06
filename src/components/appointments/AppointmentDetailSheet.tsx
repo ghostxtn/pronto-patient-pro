@@ -19,12 +19,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -50,6 +50,7 @@ export function AppointmentDetailSheet({
   const [treatment, setTreatment] = useState("");
   const [prescription, setPrescription] = useState("");
   const [notes, setNotes] = useState("");
+  const [confirmComplete, setConfirmComplete] = useState(false);
 
   useEffect(() => {
     if (!open) {
@@ -126,20 +127,20 @@ export function AppointmentDetailSheet({
   const StatusIcon = status?.icon;
 
   return (
-    <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
-      <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto rounded-2xl">
+    <Sheet open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
+      <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
         {appointment && status && StatusIcon ? (
           <>
-            <DialogHeader>
-              <DialogTitle className="font-display">{t.appointmentDetails}</DialogTitle>
-              <DialogDescription asChild>
+            <SheetHeader>
+              <SheetTitle className="font-display">{t.appointmentDetails}</SheetTitle>
+              <SheetDescription asChild>
                 <div>
                   <Badge className={cn("mt-2 rounded-full border", status.color)} variant="outline">
                     <StatusIcon className="mr-1 h-3 w-3" /> {status.label}
                   </Badge>
                 </div>
-              </DialogDescription>
-            </DialogHeader>
+              </SheetDescription>
+            </SheetHeader>
 
             <div className="space-y-4">
               <div className="flex items-center gap-3">
@@ -184,12 +185,40 @@ export function AppointmentDetailSheet({
               ) : null}
 
               {appointment.status === "confirmed" && onStatusUpdate ? (
-                <Button
-                  className="w-full rounded-xl"
-                  onClick={() => onStatusUpdate(appointment.id, "completed")}
-                >
-                  <CheckCircle2 className="mr-2 h-4 w-4" /> {t.markCompleted}
-                </Button>
+                !confirmComplete ? (
+                  <Button
+                    variant="outline"
+                    className="w-full rounded-xl"
+                    onClick={() => setConfirmComplete(true)}
+                  >
+                    <CheckCircle2 className="mr-2 h-4 w-4" />
+                    {t.markCompleted}
+                  </Button>
+                ) : (
+                  <div className="rounded-xl border border-border p-4 space-y-3">
+                    <p className="text-sm text-foreground font-medium">
+                      Bu randevuyu tamamlandı olarak işaretlemek istediğinize emin misiniz?
+                    </p>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        className="flex-1 rounded-xl"
+                        onClick={() => setConfirmComplete(false)}
+                      >
+                        İptal
+                      </Button>
+                      <Button
+                        className="flex-1 rounded-xl"
+                        onClick={() => {
+                          onStatusUpdate(appointment.id, "completed");
+                          setConfirmComplete(false);
+                        }}
+                      >
+                        Evet, Tamamlandı
+                      </Button>
+                    </div>
+                  </div>
+                )
               ) : null}
 
               {!isStaff && (
@@ -324,7 +353,7 @@ export function AppointmentDetailSheet({
             </div>
           </>
         ) : null}
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   );
 }

@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import * as React from "react";
+import { useMemo, useState, useCallback } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Calendar as BigCalendar,
@@ -22,11 +23,13 @@ import {
   subDays,
 } from "date-fns";
 import { tr } from "date-fns/locale";
-import { Pencil, Settings2, Trash2 } from "lucide-react";
+import { Pencil, Settings2, Trash2, ChevronLeft, ChevronRight, CalendarPlus, Clock, Ban } from "lucide-react";
 import { toast } from "sonner";
 import { AvailabilityModal } from "@/components/calendar/AvailabilityModal";
 import { OverrideModal } from "@/components/calendar/OverrideModal";
 import { AppointmentDetailSheet } from "@/components/appointments/AppointmentDetailSheet";
+import { AppointmentCreateSheet } from "@/components/calendar/AppointmentCreateSheet";
+import { OverrideDetailSheet } from "@/components/calendar/OverrideDetailSheet";
 import api from "@/services/api";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
@@ -61,7 +64,7 @@ import {
   AvailabilityOverride,
   CalendarEvent,
 } from "@/types/calendar";
-import { appointmentsToEvents, overridesToEvents } from "@/utils/calendarUtils";
+import { appointmentsToEvents, availabilityToEvents, overridesToEvents } from "@/utils/calendarUtils";
 
 const locales = { tr };
 
@@ -92,6 +95,7 @@ const calendarMessages = {
 
 interface DoctorCalendarProps {
   doctorId: string;
+  mode?: "doctor" | "staff";
 }
 
 interface CalendarAppointmentResponse {
@@ -260,7 +264,201 @@ function getDateRange(date: Date, view: View) {
   }
 }
 
-export function DoctorCalendar({ doctorId }: DoctorCalendarProps) {
+const SlotPopup = ({
+  popup,
+  mode,
+  onClose,
+  onAppointment,
+  onAvailability,
+  onBlock,
+}: {
+  popup: { x: number; y: number; date: string; start: string; end: string; label: string };
+  mode: "doctor" | "staff";
+  onClose: () => void;
+  onAppointment: () => void;
+  onAvailability: () => void;
+  onBlock: () => void;
+}) => {
+  const ref = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        onClose();
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [onClose]);
+
+  const isMobile = window.innerWidth < 640;
+
+  const desktopStyle: React.CSSProperties = {
+    position: "fixed",
+    left: Math.min(popup.x, window.innerWidth - 240),
+    top: Math.min(popup.y, window.innerHeight - 200),
+    zIndex: 50,
+    width: 220,
+  };
+
+  const mobileStyle: React.CSSProperties = {
+    position: "fixed",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    zIndex: 50,
+  };
+
+  return (
+    <div
+      ref={ref}
+      style={isMobile ? mobileStyle : desktopStyle}
+      className="bg-card border border-border rounded-xl shadow-md overflow-hidden"
+    >
+      <div className="px-4 py-3 border-b border-border">
+        <p className="text-xs text-muted-foreground">{popup.label}</p>
+        <p className="text-sm font-semibold text-foreground">
+          {popup.start} – {popup.end}
+        </p>
+      </div>
+      <div className="py-1">
+        {mode === "staff" && (
+          <button
+            onClick={onAppointment}
+            className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-foreground hover:bg-muted transition-colors text-left"
+          >
+            <CalendarPlus className="h-4 w-4 text-primary" />
+            <span>Randevu Oluştur</span>
+          </button>
+        )}
+        <button
+          onClick={onAvailability}
+          className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-foreground hover:bg-muted transition-colors text-left"
+        >
+          <Clock className="h-4 w-4 text-success" />
+          <span>Müsaitlik Ekle</span>
+        </button>
+        <button
+          onClick={onBlock}
+          className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-foreground hover:bg-muted transition-colors text-left"
+        >
+          <Ban className="h-4 w-4 text-destructive" />
+          <span>Zaman Blokla</span>
+        </button>
+      </div>
+    </div>
+  );
+};
+
+interface CalendarToolbarProps {
+  date: Date;
+  view: View;
+  views: string[];
+  label: string;
+  onNavigate: (action: "PREV" | "NEXT" | "TODAY") => void;
+  onView: (view: View) => void;
+  onManageAvailability: () => void;
+}
+
+const CalendarToolbar = ({
+  label,
+  view,
+  onNavigate,
+  onView,
+  onManageAvailability,
+}: CalendarToolbarProps) => {
+  const viewLabels: Record<string, string> = {
+    month: "Ay",
+    week: "Hafta",
+    day: "Gün",
+    agenda: "Ajanda",
+  };
+
+  return (
+    <div className="flex items-center justify-between mb-4 gap-2 flex-wrap">
+      <div className="flex items-center gap-1">
+        <button
+          onClick={() => onNavigate("PREV")}
+          className="p-2 rounded-lg hover:bg-muted transition-colors"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+        <button
+          onClick={() => onNavigate("TODAY")}
+          className="px-3 py-1.5 text-sm rounded-lg border border-border hover:bg-muted transition-colors"
+        >
+          Bugün
+        </button>
+        <button
+          onClick={() => onNavigate("NEXT")}
+          className="p-2 rounded-lg hover:bg-muted transition-colors"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </button>
+        <span className="ml-2 font-semibold text-base text-foreground">
+          {label}
+        </span>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <div className="flex items-center rounded-full border border-border overflow-hidden">
+          {(["month", "week", "day", "agenda"] as View[]).map((v) => (
+            <button
+              key={v}
+              onClick={() => onView(v)}
+              className={`px-3 py-1.5 text-sm transition-colors ${
+                view === v
+                  ? "bg-primary text-primary-foreground"
+                  : "hover:bg-muted text-foreground"
+              }`}
+            >
+              {viewLabels[v]}
+            </button>
+          ))}
+        </div>
+        <button
+          onClick={onManageAvailability}
+          className="px-3 py-1.5 text-sm rounded-lg border border-border hover:bg-muted transition-colors flex items-center gap-1.5"
+        >
+          Müsaitliği Yönet
+        </button>
+      </div>
+    </div>
+  );
+};
+
+const CalendarEventCard = ({ event }: { event: CalendarEvent }) => {
+  let containerClass =
+    "h-full w-full rounded-md px-2 py-1 text-xs overflow-hidden truncate border-l-2 ";
+
+  if (event.type === "appointment") {
+    containerClass += "bg-primary/10 border-primary text-primary";
+  } else if (event.type === "availability") {
+    containerClass += "bg-success/10 border-success text-success";
+  } else if (event.type === "blackout") {
+    containerClass += "bg-destructive/10 border-destructive text-destructive";
+  } else if (event.type === "custom_hours") {
+    containerClass += "bg-warning/10 border-warning text-warning";
+  } else {
+    containerClass += "bg-muted border-border text-muted-foreground";
+  }
+
+  const getLabel = () => {
+    if (event.type === "appointment") return event.title;
+    if (event.type === "availability") return "Müsait";
+    if (event.type === "blackout") return "Kapalı";
+    if (event.type === "custom_hours") return "Özel Mesai";
+    return event.title;
+  };
+
+  return (
+    <div className={containerClass}>
+      <span className="font-medium truncate block">{getLabel()}</span>
+    </div>
+  );
+};
+
+export function DoctorCalendar({ doctorId, mode = "doctor" }: DoctorCalendarProps) {
   const queryClient = useQueryClient();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [view, setView] = useState<View>(Views.WEEK);
@@ -283,6 +481,20 @@ export function DoctorCalendar({ doctorId }: DoctorCalendarProps) {
   const [isAvailabilitySheetOpen, setIsAvailabilitySheetOpen] = useState(false);
   const [slotToDelete, setSlotToDelete] = useState<AvailabilitySlot | null>(null);
   const [overrideToDelete, setOverrideToDelete] = useState<AvailabilityOverride | null>(null);
+  const [appointmentCreateTarget, setAppointmentCreateTarget] = useState<{
+    date: string;
+    start: string;
+    end: string;
+  } | null>(null);
+  const [slotPopup, setSlotPopup] = useState<{
+    x: number;
+    y: number;
+    date: string;
+    start: string;
+    end: string;
+    label: string;
+  } | null>(null);
+  const [selectedOverride, setSelectedOverride] = useState<AvailabilityOverride | null>(null);
   const [contextMenuState, setContextMenuState] = useState<{
     open: boolean;
     x: number;
@@ -310,7 +522,10 @@ export function DoctorCalendar({ doctorId }: DoctorCalendarProps) {
     error: availabilityError,
   } = useQuery({
     queryKey: ["availability", doctorId],
-    queryFn: async () => api.availability.listByDoctor(doctorId) as Promise<AvailabilitySlot[]>,
+    queryFn: async () => {
+      const res = await api.availability.listByDoctor(doctorId);
+      return (Array.isArray(res) ? res : (res as any)?.data || []) as AvailabilitySlot[];
+    },
     enabled: Boolean(doctorId),
   });
 
@@ -322,7 +537,7 @@ export function DoctorCalendar({ doctorId }: DoctorCalendarProps) {
   } = useQuery({
     queryKey: ["doctor-calendar", doctorId, toApiDate(rangeStart), toApiDate(rangeEnd), view],
     queryFn: async () => {
-      const [overrides, appointments] = await Promise.all([
+      const [overridesRes, appointmentsRes] = await Promise.all([
         api.availabilityOverrides.listByDoctor(
           doctorId,
           toApiDate(rangeStart),
@@ -335,7 +550,10 @@ export function DoctorCalendar({ doctorId }: DoctorCalendarProps) {
         }) as Promise<CalendarAppointmentResponse[]>,
       ]);
 
-      const normalizedAppointments: Appointment[] = appointments.map((appointment) => ({
+      const overrides = Array.isArray(overridesRes) ? overridesRes : (overridesRes as any)?.data || [];
+      const appointments = Array.isArray(appointmentsRes) ? appointmentsRes : (appointmentsRes as any)?.data || [];
+
+      const normalizedAppointments: Appointment[] = appointments.map((appointment: any) => ({
         id: appointment.id,
         doctor_id: appointment.doctor_id,
         patient_id: appointment.patient_id,
@@ -364,12 +582,14 @@ export function DoctorCalendar({ doctorId }: DoctorCalendarProps) {
     isLoading: isOverrideListLoading,
   } = useQuery({
     queryKey: ["availability-overrides", doctorId, overrideRangeStart, overrideRangeEnd],
-    queryFn: async () =>
-      api.availabilityOverrides.listByDoctor(
+    queryFn: async () => {
+      const res = await api.availabilityOverrides.listByDoctor(
         doctorId,
         overrideRangeStart,
         overrideRangeEnd,
-      ) as Promise<AvailabilityOverride[]>,
+      );
+      return (Array.isArray(res) ? res : (res as any)?.data || []) as AvailabilityOverride[];
+    },
     enabled: Boolean(doctorId),
   });
 
@@ -407,8 +627,14 @@ export function DoctorCalendar({ doctorId }: DoctorCalendarProps) {
 
     const appointmentEvents = appointmentsToEvents(data.appointments);
     const overrideEvents = overridesToEvents(data.overrides);
-    return [...overrideEvents, ...appointmentEvents];
-  }, [data]);
+    
+    let availabilityEvents: CalendarEvent[] = [];
+    if (view === Views.DAY) {
+      availabilityEvents = availabilityToEvents(availabilitySlots, currentDate);
+    }
+
+    return [...overrideEvents, ...appointmentEvents, ...availabilityEvents];
+  }, [data, view, availabilitySlots, currentDate]);
 
   const foregroundEvents = useMemo(() => events, [events]);
 
@@ -469,15 +695,9 @@ export function DoctorCalendar({ doctorId }: DoctorCalendarProps) {
       return;
     }
 
-    if (event.type === "blackout") {
-      const override = event.resource as AvailabilityOverride;
-      toast.info(override.reason ?? "Kapali");
+    if (event.type === "blackout" || event.type === "custom_hours") {
+      setSelectedOverride(event.resource as AvailabilityOverride);
       return;
-    }
-
-    if (event.type === "custom_hours") {
-      const override = event.resource as AvailabilityOverride;
-      toast.info(override.reason ?? "Özel saat tanımlı");
     }
   };
 
@@ -500,6 +720,24 @@ export function DoctorCalendar({ doctorId }: DoctorCalendarProps) {
       initialType: type,
     });
   };
+
+  const handleSelectSlot = useCallback(
+    (slotInfo: any) => {
+      if (view === Views.MONTH) return;
+
+      const date = format(slotInfo.start, "yyyy-MM-dd");
+      const dateLabel = format(slotInfo.start, "d MMMM EEEE", { locale: tr });
+      const start = format(slotInfo.start, "HH:mm");
+      const end = format(slotInfo.end, "HH:mm");
+
+      const bounds = (slotInfo as any).bounds || (slotInfo as any).box;
+      const x = bounds?.x ?? window.innerWidth / 2;
+      const y = bounds?.y ?? window.innerHeight / 2;
+
+      setSlotPopup({ x, y, date, start, end, label: dateLabel });
+    },
+    [view]
+  );
 
   const isLoading = isAvailabilityLoading || isCalendarLoading;
   const isError = isAvailabilityError || isCalendarError;
@@ -537,16 +775,7 @@ export function DoctorCalendar({ doctorId }: DoctorCalendarProps) {
 
   return (
     <div className="space-y-4">
-      <div>
-        <div>
-          <h2 className="font-display text-2xl font-bold">Haftalik Takvim</h2>
-          <p className="text-sm text-muted-foreground">
-            Musait saatler, randevular ve gunluk istisnalar tek gorunumde.
-          </p>
-        </div>
-      </div>
-
-      <div className="glass rounded-2xl p-4 shadow-card">
+      <div className="h-[calc(100vh-220px)] min-h-[600px]">
         <BigCalendar
           components={{
             header: ({ date, label }) => (
@@ -556,11 +785,12 @@ export function DoctorCalendar({ doctorId }: DoctorCalendarProps) {
               <CalendarHeader date={date} label={String(label)} onContextMenu={handleHeaderContextMenu} />
             ),
             toolbar: (toolbarProps) => (
-              <CustomToolbar
+              <CalendarToolbar
                 {...toolbarProps}
                 onManageAvailability={() => setIsAvailabilitySheetOpen(true)}
               />
             ),
+            event: CalendarEventCard,
           }}
           localizer={localizer}
           events={foregroundEvents}
@@ -600,41 +830,7 @@ export function DoctorCalendar({ doctorId }: DoctorCalendarProps) {
             setView(Views.DAY);
           }}
           getDrilldownView={() => Views.DAY}
-          onSelectSlot={(slotInfo) => {
-            if (view === Views.MONTH) {
-              setCurrentDate(slotInfo.start);
-              setView(Views.DAY);
-              return;
-            }
-
-            const clickedDay = slotInfo.start.getDay();
-            const clickedTime = `${String(slotInfo.start.getHours()).padStart(2, "0")}:${String(slotInfo.start.getMinutes()).padStart(2, "0")}`;
-            const endTime = `${String(slotInfo.end.getHours()).padStart(2, "0")}:${String(slotInfo.end.getMinutes()).padStart(2, "0")}`;
-            const existingSlot = availabilitySlots.find(
-              (slot) =>
-                slot.day_of_week === clickedDay &&
-                slot.is_active &&
-                clickedTime >= slot.start_time.slice(0, 5) &&
-                clickedTime < slot.end_time.slice(0, 5),
-            );
-
-            if (existingSlot) {
-              setAvailabilityModal({
-                open: true,
-                mode: "edit",
-                slot: existingSlot,
-              });
-              return;
-            }
-
-            setAvailabilityModal({
-              open: true,
-              mode: "create",
-              dayOfWeek: clickedDay,
-              startTime: clickedTime,
-              endTime,
-            });
-          }}
+          onSelectSlot={handleSelectSlot}
           onSelectEvent={handleSelectEvent}
           selectable
           popup
@@ -978,6 +1174,54 @@ export function DoctorCalendar({ doctorId }: DoctorCalendarProps) {
         appointment={selectedAppointment}
         open={Boolean(selectedAppointment)}
         onClose={() => setSelectedAppointment(null)}
+      />
+
+      {slotPopup && (
+        <SlotPopup
+          popup={slotPopup}
+          mode={mode}
+          onClose={() => setSlotPopup(null)}
+          onAppointment={() => {
+            setAppointmentCreateTarget({
+              date: slotPopup.date,
+              start: slotPopup.start,
+              end: slotPopup.end,
+            });
+            setSlotPopup(null);
+          }}
+          onAvailability={() => {
+            setAvailabilityModal({
+              open: true,
+              mode: "create",
+              dayOfWeek: new Date(slotPopup.date).getDay(),
+            });
+            setSlotPopup(null);
+          }}
+          onBlock={() => {
+            setOverrideModal({
+              open: true,
+              mode: "create",
+              initialDate: slotPopup.date,
+            });
+            setSlotPopup(null);
+          }}
+        />
+      )}
+
+      <OverrideDetailSheet
+        override={selectedOverride}
+        open={Boolean(selectedOverride)}
+        onClose={() => setSelectedOverride(null)}
+        doctorId={doctorId}
+      />
+
+      <AppointmentCreateSheet
+        open={Boolean(appointmentCreateTarget)}
+        onClose={() => setAppointmentCreateTarget(null)}
+        doctorId={doctorId}
+        selectedDate={appointmentCreateTarget?.date ?? ""}
+        selectedStart={appointmentCreateTarget?.start ?? ""}
+        selectedEnd={appointmentCreateTarget?.end ?? ""}
       />
     </div>
   );

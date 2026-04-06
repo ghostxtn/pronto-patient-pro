@@ -55,13 +55,17 @@ export default function DoctorSchedule() {
   return (
     <AppLayout>
       <motion.div initial="hidden" animate="visible">
-        <motion.div className="mb-8" custom={0} variants={fadeUp}>
-          <h1 className="text-3xl font-display font-bold mb-2">{t.mySchedule}</h1>
-          <p className="text-muted-foreground">{t.myScheduleDesc}</p>
+        <motion.div custom={0} variants={fadeUp}>
+          <h1 className="text-2xl font-display font-bold text-foreground">Programım</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Randevularınızı ve müsaitlik saatlerinizi yönetin.
+          </p>
         </motion.div>
 
         {doctorRecord ? (
-          <DoctorCalendar doctorId={doctorRecord.id} />
+          <div className="mt-6">
+            <DoctorCalendar doctorId={doctorRecord.id} />
+          </div>
         ) : isError ? (
           <Alert className="rounded-2xl">
             <AlertTitle>Doctor schedule could not be loaded</AlertTitle>

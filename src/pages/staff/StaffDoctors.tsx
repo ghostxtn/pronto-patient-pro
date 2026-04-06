@@ -153,7 +153,7 @@ export default function StaffDoctors() {
                     Listeye Dön
                   </Button>
                 </div>
-                <DoctorCalendar doctorId={selectedDoctor.id} />
+                <DoctorCalendar doctorId={selectedDoctor.id} mode="staff" />
               </div>
             )}
           </motion.div>

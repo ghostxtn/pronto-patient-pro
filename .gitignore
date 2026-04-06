@@ -31,3 +31,7 @@ redis_data/
 uploads_data/
 bun.lock
 bun.lockb
+docs/calendar-stabilization/milestone-1-brief.md
+docs/calendar-stabilization/calendar-architecture-pack.md
+docs/calendar-stabilization/calendar-context.md
+docs/calendar-stabilization/calendar-diff-decisions.md
