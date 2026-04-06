@@ -248,7 +248,9 @@ export function AvailabilityModal({
           <DialogHeader>
             <DialogTitle>{mode === "edit" ? "Musaitligi Duzenle" : "Musaitlik Ekle"}</DialogTitle>
             <DialogDescription>
-              Hekimin calisma araligini ve randevu slot suresini belirleyin.
+              {mode === "edit"
+                ? "Secili recurring musaitlik kaydini duzenleyin."
+                : "Yeni recurring musaitlik araligini ve randevu slot suresini belirleyin."}
             </DialogDescription>
           </DialogHeader>
 
@@ -339,7 +341,7 @@ export function AvailabilityModal({
                 disabled={!isValid || saveMutation.isPending || deleteMutation.isPending}
               >
                 {saveMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                Kaydet
+                {mode === "edit" ? "Guncelle" : "Kaydet"}
               </Button>
             </div>
           </div>

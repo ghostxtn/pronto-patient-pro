@@ -85,6 +85,13 @@
       "when": 1775341177750,
       "tag": "0011_daffy_lake",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1775400000000,
+      "tag": "0012_same_day_custom_hours",
+      "breakpoints": true
     }
   ]
 }

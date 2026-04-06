@@ -89,7 +89,11 @@ import {
   AvailabilityOverride,
   CalendarEvent,
 } from "@/types/calendar";
-import { appointmentsToEvents, overridesToEvents } from "@/utils/calendarUtils";
+import {
+  appointmentsToEvents,
+  overridesToEvents,
+  parseDateOnly,
+} from "@/utils/calendarUtils";
 import TimeGrid from "react-big-calendar/lib/TimeGrid";
 
 const locales = { tr };
@@ -174,7 +178,6 @@ interface QuickActionState {
     top: number;
     bottom: number;
   };
-  availabilitySlot: AvailabilitySlot | null;
   override: AvailabilityOverride | null;
 }
 
@@ -281,8 +284,7 @@ function getOverrideBadge(type: AvailabilityOverride["type"]) {
 
 function compareOverrides(left: AvailabilityOverride, right: AvailabilityOverride) {
   const dateDiff =
-    new Date(`${left.date}T00:00:00`).getTime() -
-    new Date(`${right.date}T00:00:00`).getTime();
+    parseDateOnly(left.date).getTime() - parseDateOnly(right.date).getTime();
 
   if (dateDiff !== 0) {
     return dateDiff;
@@ -622,7 +624,7 @@ const CustomToolbar = ({
           onClick={onManageAvailability}
         >
           <Settings2 className="mr-2 h-4 w-4" />
-          Musaitligi yonet
+          Musaitlik paneli
         </Button>
       </div>
     </div>
@@ -655,7 +657,7 @@ const CalendarHeader = ({ date, onContextMenu }: CalendarHeaderProps) => {
         "scheduler-week-header",
         currentDay && "scheduler-week-header-today",
       )}
-      title="Sag tiklayarak istisna ekleyin"
+      title="Sag tik: gunluk istisna ekle. Haftalik slotlar panelden duzenlenir."
     >
       <span className="scheduler-week-header-day">
         {format(date, "EEE", { locale: tr })}
@@ -735,6 +737,9 @@ export function DoctorCalendar({
   const [internalCurrentDate, setInternalCurrentDate] = useState(new Date());
   const [internalView, setInternalView] = useState<View>(Views.WEEK);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(
+    null,
+  );
+  const [selectedCalendarEventId, setSelectedCalendarEventId] = useState<string | null>(
     null,
   );
   const [selectedAppointmentId, setSelectedAppointmentId] = useState<string | null>(
@@ -1005,7 +1010,7 @@ export function DoctorCalendar({
       setBlockActionState(null);
       setBlockReason("");
       setQuickActionSlot(null);
-      clearAppointmentSelection();
+      clearCalendarSelection();
       await queryClient.invalidateQueries({
         queryKey: ["availability-overrides", doctorId],
       });
@@ -1066,7 +1071,7 @@ export function DoctorCalendar({
       setManualPatientNote("");
       setAppointmentNotes("");
       setQuickActionSlot(null);
-      clearAppointmentSelection();
+      clearCalendarSelection();
       await queryClient.invalidateQueries({
         queryKey: ["doctor-calendar", doctorId],
       });
@@ -1078,29 +1083,6 @@ export function DoctorCalendar({
       toast.error(error instanceof Error ? error.message : "Randevu olusturulamadi");
     },
   });
-
-  const events = useMemo<SchedulerEvent[]>(() => {
-    if (!data) {
-      return [];
-    }
-
-    const appointmentEvents = appointmentsToEvents(data.appointments);
-    const overrideEvents = overridesToEvents(data.overrides);
-    return [...overrideEvents, ...appointmentEvents];
-  }, [data]);
-
-  const sortedAvailabilitySlots = useMemo(
-    () =>
-      [...availabilitySlots].sort(
-        (left, right) => getAvailabilitySortValue(left) - getAvailabilitySortValue(right),
-      ),
-    [availabilitySlots],
-  );
-
-  const sortedOverrides = useMemo(
-    () => [...overrideList].sort(compareOverrides),
-    [overrideList],
-  );
 
   const availabilityWindows = useMemo<AvailabilityWindow[]>(() => {
     const windows: AvailabilityWindow[] = [];
@@ -1178,9 +1160,11 @@ export function DoctorCalendar({
       if (
         previous &&
         toApiDate(previous.start) === toApiDate(window.start) &&
-        previous.end.getTime() === window.start.getTime()
+        previous.end.getTime() >= window.start.getTime()
       ) {
-        previous.end = window.end;
+        if (window.end.getTime() > previous.end.getTime()) {
+          previous.end = window.end;
+        }
         previous.slotIds = [...previous.slotIds, ...window.slotIds];
         return merged;
       }
@@ -1210,6 +1194,32 @@ export function DoctorCalendar({
       },
     }));
   }, [availabilityWindows, resolvedView]);
+
+  const events = useMemo<SchedulerEvent[]>(() => {
+    if (!data) {
+      return [];
+    }
+
+    const availabilityEvents = resolvedView === Views.WEEK || resolvedView === Views.DAY
+      ? availabilitySurfaceEvents
+      : [];
+    const appointmentEvents = appointmentsToEvents(data.appointments);
+    const overrideEvents = overridesToEvents(data.overrides);
+    return [...availabilityEvents, ...overrideEvents, ...appointmentEvents];
+  }, [availabilitySurfaceEvents, data, resolvedView]);
+
+  const sortedAvailabilitySlots = useMemo(
+    () =>
+      [...availabilitySlots].sort(
+        (left, right) => getAvailabilitySortValue(left) - getAvailabilitySortValue(right),
+      ),
+    [availabilitySlots],
+  );
+
+  const sortedOverrides = useMemo(
+    () => [...overrideList].sort(compareOverrides),
+    [overrideList],
+  );
 
   const filteredPatients = useMemo(() => {
     const query = patientSearch.trim().toLowerCase();
@@ -1296,15 +1306,22 @@ export function DoctorCalendar({
 
   const selectedCalendarEvent = useMemo(
     () =>
-      selectedAppointmentId
-        ? events.find((event) => event.id === selectedAppointmentId) ?? null
+      selectedCalendarEventId
+        ? events.find((event) => event.id === selectedCalendarEventId) ?? null
         : null,
-    [events, selectedAppointmentId],
+    [events, selectedCalendarEventId],
   );
 
-  const clearAppointmentSelection = () => {
+  const clearCalendarSelection = () => {
+    setSelectedCalendarEventId(null);
     setSelectedAppointment(null);
     setSelectedAppointmentId(null);
+  };
+
+  const resetCalendarActiveState = () => {
+    setQuickActionSlot(null);
+    setAvailabilityDraft(null);
+    clearCalendarSelection();
   };
 
   const getBlockingOverrideForDate = (date: Date) => {
@@ -1406,7 +1423,7 @@ export function DoctorCalendar({
     end: Date,
   ): {
     blockingOverride: AvailabilityOverride | null;
-    availabilitySlot: AvailabilitySlot | null;
+    hasAvailability: boolean;
     hasAppointmentConflict: boolean;
     isPast: boolean;
     kind: QuickActionState["kind"];
@@ -1418,10 +1435,7 @@ export function DoctorCalendar({
 
     return {
       blockingOverride,
-      availabilitySlot: availabilityWindow
-        ? availabilitySlots.find((slot) => availabilityWindow.slotIds.includes(slot.id)) ??
-          null
-        : null,
+      hasAvailability: Boolean(availabilityWindow),
       hasAppointmentConflict,
       isPast,
       kind: blockingOverride
@@ -1438,6 +1452,7 @@ export function DoctorCalendar({
         className: "scheduler-event scheduler-event-availability-surface",
         style: {
           pointerEvents: "none",
+          zIndex: 0,
         },
       };
     }
@@ -1458,7 +1473,13 @@ export function DoctorCalendar({
         event.type === "appointment" &&
           selectedAppointmentId === event.id &&
           "scheduler-event-appointment-selected",
+        event.type === "blackout" &&
+          selectedCalendarEventId === event.id &&
+          "scheduler-event-override-selected",
         event.type === "blackout" && "scheduler-event-blackout",
+        event.type === "custom_hours" &&
+          selectedCalendarEventId === event.id &&
+          "scheduler-event-override-selected",
         event.type === "custom_hours" && "scheduler-event-custom-hours",
       ),
     };
@@ -1474,12 +1495,14 @@ export function DoctorCalendar({
 
     if (event.type === "appointment") {
       const appointment = event.resource as Appointment;
+      setSelectedCalendarEventId(appointment.id);
       setSelectedAppointment(appointment);
       setSelectedAppointmentId(appointment.id);
       return;
     }
 
-    clearAppointmentSelection();
+    clearCalendarSelection();
+    setSelectedCalendarEventId(event.id);
 
     if (event.type === "blackout") {
       const override = event.resource as AvailabilityOverride;
@@ -1507,7 +1530,7 @@ export function DoctorCalendar({
   ) => {
     event.preventDefault();
     setQuickActionSlot(null);
-    clearAppointmentSelection();
+    clearCalendarSelection();
     setContextMenuState({
       open: true,
       x: event.clientX,
@@ -1522,7 +1545,7 @@ export function DoctorCalendar({
   ) => {
     setContextMenuState({ open: false, x: 0, y: 0 });
     setQuickActionSlot(null);
-    clearAppointmentSelection();
+    clearCalendarSelection();
     setOverrideModal({
       open: true,
       mode: "create",
@@ -1535,7 +1558,6 @@ export function DoctorCalendar({
     slotInfo: SlotInfo,
     config: {
       kind: QuickActionState["kind"];
-      availabilitySlot?: AvailabilitySlot | null;
       override?: AvailabilityOverride | null;
     },
   ) => {
@@ -1549,7 +1571,7 @@ export function DoctorCalendar({
     }
 
     setContextMenuState({ open: false, x: 0, y: 0 });
-    clearAppointmentSelection();
+    clearCalendarSelection();
 
     setQuickActionSlot({
       open: true,
@@ -1569,7 +1591,6 @@ export function DoctorCalendar({
         bottom:
           "bottom" in anchorSource ? anchorSource.bottom : anchorSource.y,
       },
-      availabilitySlot: config.availabilitySlot ?? null,
       override: config.override ?? null,
     });
   };
@@ -1606,8 +1627,7 @@ export function DoctorCalendar({
     setQuickActionSlot(null);
     setBlockActionState(null);
     setBlockReason("");
-    setSelectedAppointment(null);
-    setSelectedAppointmentId(null);
+    clearCalendarSelection();
     setAppointmentComposer(null);
     setAppointmentMode("registered");
     setPatientSearch("");
@@ -1709,16 +1729,38 @@ export function DoctorCalendar({
             label:
               quickActionSlot.override?.type === "blackout"
                 ? "Kapali gun"
-                : "Blok / istisna",
+                : "Istisna uygulanmis",
             className:
               quickActionSlot.override?.type === "blackout"
                 ? "border-destructive/25 bg-destructive/10 text-destructive"
                 : "border-warning/30 bg-warning/10 text-warning",
           }
         : {
-            label: "Musait degil",
+            label: "Musaitlik disi",
             className: "border-border/70 bg-muted/50 text-muted-foreground",
           };
+
+  const quickActionCanRemoveDirectly =
+    quickActionSlot?.kind === "blocked" && quickActionSlot.override
+      ? quickActionSlot.override.type === "blackout" ||
+        !quickActionSlot.override.start_time ||
+        !quickActionSlot.override.end_time ||
+        (() => {
+          const overrideRange = normalizeMinuteRange(
+            timeToMinutes(quickActionSlot.override?.start_time ?? "00:00"),
+            timeToMinutes(quickActionSlot.override?.end_time ?? "00:00"),
+          );
+          const selectedRange = normalizeMinuteRange(
+            timeToMinutes(format(quickActionSlot.start, "HH:mm")),
+            timeToMinutes(format(quickActionSlot.end, "HH:mm")),
+          );
+
+          return (
+            overrideRange.start === selectedRange.start &&
+            overrideRange.end === selectedRange.end
+          );
+        })()
+      : false;
 
   const canBlockSelectedRange =
     mode === "staff" &&
@@ -1726,26 +1768,12 @@ export function DoctorCalendar({
     (quickActionSlot.kind === "available" ||
       quickActionSlot.kind === "unavailable");
 
-  const handleQuickActionEditAvailability = () => {
-    if (!quickActionSlot?.availabilitySlot) {
-      return;
-    }
-
-    setQuickActionSlot(null);
-    clearAppointmentSelection();
-    setAvailabilityModal({
-      open: true,
-      mode: "edit",
-      slot: quickActionSlot.availabilitySlot,
-    });
-  };
-
   const handleQuickActionOpenAppointmentComposer = () => {
     if (!quickActionSlot || quickActionSlot.kind !== "available") {
       return;
     }
 
-    clearAppointmentSelection();
+    clearCalendarSelection();
     setAppointmentMode("registered");
     setPatientSearch("");
     setSelectedPatientId(null);
@@ -1771,7 +1799,7 @@ export function DoctorCalendar({
     }
 
     setQuickActionSlot(null);
-    clearAppointmentSelection();
+    clearCalendarSelection();
     setAvailabilityModal({
       open: true,
       mode: "create",
@@ -1787,7 +1815,7 @@ export function DoctorCalendar({
     }
 
     setQuickActionSlot(null);
-    clearAppointmentSelection();
+    clearCalendarSelection();
     setOverrideModal({
       open: true,
       mode: "edit",
@@ -1805,7 +1833,7 @@ export function DoctorCalendar({
     if (override.type === "custom_hours") {
       if (!override.start_time || !override.end_time) {
         setQuickActionSlot(null);
-        clearAppointmentSelection();
+        clearCalendarSelection();
         setOverrideToDelete(override);
         return;
       }
@@ -1826,7 +1854,7 @@ export function DoctorCalendar({
 
       if (exactMatch) {
         setQuickActionSlot(null);
-        clearAppointmentSelection();
+        clearCalendarSelection();
         setOverrideToDelete(override);
         return;
       }
@@ -1836,7 +1864,7 @@ export function DoctorCalendar({
       );
 
       setQuickActionSlot(null);
-      clearAppointmentSelection();
+      clearCalendarSelection();
       setOverrideModal({
         open: true,
         mode: "edit",
@@ -1846,7 +1874,7 @@ export function DoctorCalendar({
     }
 
     setQuickActionSlot(null);
-    clearAppointmentSelection();
+    clearCalendarSelection();
     setOverrideToDelete(override);
   };
 
@@ -1855,7 +1883,7 @@ export function DoctorCalendar({
       return;
     }
 
-    clearAppointmentSelection();
+    clearCalendarSelection();
     setBlockReason("");
 
     setBlockActionState({
@@ -1871,7 +1899,7 @@ export function DoctorCalendar({
 
   const handleSlotSelection = (slotInfo: SlotInfo) => {
     setContextMenuState({ open: false, x: 0, y: 0 });
-    clearAppointmentSelection();
+    clearCalendarSelection();
 
     if (resolvedView === Views.MONTH) {
       setQuickActionSlot(null);
@@ -1896,7 +1924,6 @@ export function DoctorCalendar({
     ) {
       openQuickAction(slotInfo, {
         kind: "blocked",
-        availabilitySlot: slotState.availabilitySlot,
         override: slotState.blockingOverride,
       });
       return;
@@ -1910,26 +1937,11 @@ export function DoctorCalendar({
     if (
       mode === "staff" &&
       slotState.kind === "available" &&
-      slotState.availabilitySlot &&
+      slotState.hasAvailability &&
       !slotState.isPast
     ) {
       openQuickAction(slotInfo, {
         kind: "available",
-        availabilitySlot: slotState.availabilitySlot,
-      });
-      return;
-    }
-
-    if (
-      slotState.kind === "available" &&
-      slotState.availabilitySlot &&
-      mode !== "staff"
-    ) {
-      setQuickActionSlot(null);
-      setAvailabilityModal({
-        open: true,
-        mode: "edit",
-        slot: slotState.availabilitySlot,
       });
       return;
     }
@@ -1939,9 +1951,15 @@ export function DoctorCalendar({
       return;
     }
 
+    if (slotState.kind === "available") {
+      openQuickAction(slotInfo, {
+        kind: "available",
+      });
+      return;
+    }
+
     openQuickAction(slotInfo, {
       kind: "unavailable",
-      availabilitySlot: null,
     });
   };
 
@@ -1988,7 +2006,10 @@ export function DoctorCalendar({
             <div className="min-w-0">
               <h2 className="scheduler-surface-title">Calisma takvimi</h2>
               <p className="scheduler-surface-copy">
-                Musait saatler, randevular ve gunluk istisnalar tek operasyon yuzeyinde kalir.
+                Takvim musaitlik, randevu ve gunluk istisnalari gosterir; haftalik slot duzenleme yalnizca musaitlik panelinde yapilir.
+              </p>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Yesil musaitlik alanlari gosterim katmanidir. Takvim uzerindeki secim yalnizca guvenli hizli aksiyonlari acar.
               </p>
             </div>
             {mode === "doctor" ? (
@@ -2038,8 +2059,7 @@ export function DoctorCalendar({
             <CustomToolbar
               {...toolbarProps}
               onManageAvailability={() => {
-                setQuickActionSlot(null);
-                clearAppointmentSelection();
+                resetCalendarActiveState();
                 setIsAvailabilitySheetOpen(true);
               }}
             />
@@ -2051,9 +2071,7 @@ export function DoctorCalendar({
         localizer={localizer}
         events={events}
         backgroundEvents={
-          activeDraftPreview
-            ? [...availabilitySurfaceEvents, activeDraftPreview]
-            : availabilitySurfaceEvents
+          activeDraftPreview ? [activeDraftPreview] : []
         }
         defaultView={Views.WEEK}
         view={resolvedView}
@@ -2100,18 +2118,18 @@ export function DoctorCalendar({
         }}
         onNavigate={(date) => {
           setQuickActionSlot(null);
-          clearAppointmentSelection();
+          clearCalendarSelection();
           setCalendarDate(date);
         }}
         onView={(nextView) => {
           setQuickActionSlot(null);
-          clearAppointmentSelection();
+          clearCalendarSelection();
           setCalendarView(nextView);
         }}
         onDrillDown={(date, nextView) => {
           void nextView;
           setQuickActionSlot(null);
-          clearAppointmentSelection();
+          clearCalendarSelection();
           setCalendarDate(date);
           setCalendarView(Views.DAY);
         }}
@@ -2153,10 +2171,10 @@ export function DoctorCalendar({
               <div className="space-y-1">
                 <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
                   {quickActionSlot.kind === "available"
-                    ? "Musait slot islemi"
+                    ? "Secili musait aralik"
                     : quickActionSlot.kind === "blocked"
-                      ? "Blok / istisna"
-                      : "Takvim baglami"}
+                      ? "Secili istisna"
+                      : "Secili aralik"}
                 </p>
                 <h3 className="text-lg font-display font-semibold text-foreground">
                   {doctorName}
@@ -2207,6 +2225,14 @@ export function DoctorCalendar({
               </div>
             </div>
 
+            <p className="text-xs text-muted-foreground">
+              {quickActionSlot.kind === "available"
+                ? "Bu panel secili aralik icin hizli aksiyon sunar. Haftalik musaitlik duzenleme ayri paneldedir."
+                : quickActionSlot.kind === "blocked"
+                  ? "Bu aralikta gunluk istisna vardir. Duzenleme ve kaldirma istisna kaydi uzerinden yapilir."
+                  : "Bu aralik takvimde musaitlik disi gorunur. Musaitlik ekleme ayri panelde acilir."}
+            </p>
+
             <div className="grid gap-2">
               {quickActionSlot.kind === "available" ? (
                 <>
@@ -2225,16 +2251,7 @@ export function DoctorCalendar({
                     onClick={handleQuickActionBlockTime}
                   >
                     <CircleOff className="mr-2 h-4 w-4" />
-                    Bu zamani blokla
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="justify-start rounded-xl border-border/70 bg-background/70"
-                    onClick={handleQuickActionEditAvailability}
-                  >
-                    <Pencil className="mr-2 h-4 w-4" />
-                    Musaitligi duzenle
+                    Bu araliga blok istisnasi ekle
                   </Button>
                 </>
               ) : null}
@@ -2247,7 +2264,7 @@ export function DoctorCalendar({
                     onClick={handleQuickActionOpenAvailabilityCreate}
                   >
                     <Pencil className="mr-2 h-4 w-4" />
-                    Musaitlik ekle
+                    Panelde musaitlik ekle
                   </Button>
                   <Button
                     type="button"
@@ -2256,7 +2273,7 @@ export function DoctorCalendar({
                     onClick={handleQuickActionBlockTime}
                   >
                     <CircleOff className="mr-2 h-4 w-4" />
-                    Bu zamani blokla
+                    Bu araliga blok istisnasi ekle
                   </Button>
                 </>
               ) : null}
@@ -2270,18 +2287,22 @@ export function DoctorCalendar({
                     onClick={handleQuickActionEditOverride}
                   >
                     <Pencil className="mr-2 h-4 w-4" />
-                    Istisnayi duzenle
+                    Istisnayi panelde duzenle
                   </Button>
                   <Button
                     type="button"
-                    variant="destructive"
-                    className="justify-start rounded-xl"
+                    variant={quickActionCanRemoveDirectly ? "destructive" : "outline"}
+                    className={cn(
+                      "justify-start rounded-xl",
+                      !quickActionCanRemoveDirectly &&
+                        "border-border/70 bg-background/70",
+                    )}
                     onClick={handleQuickActionRemoveOverride}
                   >
                     <Trash2 className="mr-2 h-4 w-4" />
-                    {quickActionSlot.override?.type === "custom_hours"
-                      ? "Istisnayi duzenle / kaldir"
-                      : "Istisnayi kaldir"}
+                    {quickActionCanRemoveDirectly
+                      ? "Istisnayi kaldir"
+                      : "Istisnayi panelde gozden gecir"}
                   </Button>
                 </>
               ) : null}
@@ -2292,19 +2313,23 @@ export function DoctorCalendar({
 
       <Drawer
         open={Boolean(quickActionSlot?.open) && isMobile}
-        onOpenChange={(open) => !open && setQuickActionSlot(null)}
+        onOpenChange={(open) => {
+          if (!open) {
+            resetCalendarActiveState();
+          }
+        }}
       >
         <DrawerContent className="rounded-t-[28px]">
           <DrawerHeader>
             <DrawerTitle>
               {quickActionSlot?.kind === "available"
-                ? "Musait slot islemi"
+                ? "Secili musait aralik"
                 : quickActionSlot?.kind === "blocked"
-                  ? "Blok / istisna"
-                  : "Takvim baglami"}
+                  ? "Secili istisna"
+                  : "Secili aralik"}
             </DrawerTitle>
             <DrawerDescription>
-              Secilen slot ayrintisi burada acilir. Dar ekranlarda panel tasma yapmaz.
+              Secilen aralik ayrintisi burada acilir. Musaitlik duzenleme ayri paneldedir.
             </DrawerDescription>
           </DrawerHeader>
 
@@ -2350,6 +2375,14 @@ export function DoctorCalendar({
                 </div>
               </div>
 
+              <p className="text-xs text-muted-foreground">
+                {quickActionSlot.kind === "available"
+                  ? "Bu panel secili aralik icin hizli aksiyon sunar. Haftalik musaitlik duzenleme ayri paneldedir."
+                  : quickActionSlot.kind === "blocked"
+                    ? "Bu aralikta gunluk istisna vardir. Duzenleme ve kaldirma istisna kaydi uzerinden yapilir."
+                    : "Bu aralik takvimde musaitlik disi gorunur. Musaitlik ekleme ayri panelde acilir."}
+              </p>
+
               <div className="grid gap-2">
                 {quickActionSlot.kind === "available" ? (
                   <>
@@ -2368,16 +2401,7 @@ export function DoctorCalendar({
                       onClick={handleQuickActionBlockTime}
                     >
                       <Ban className="mr-2 h-4 w-4" />
-                      Bu zamani blokla
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="rounded-xl"
-                      onClick={handleQuickActionEditAvailability}
-                    >
-                      <Pencil className="mr-2 h-4 w-4" />
-                      Musaitligi duzenle
+                      Bu araliga blok istisnasi ekle
                     </Button>
                   </>
                 ) : null}
@@ -2390,7 +2414,7 @@ export function DoctorCalendar({
                       onClick={handleQuickActionOpenAvailabilityCreate}
                     >
                       <Pencil className="mr-2 h-4 w-4" />
-                      Musaitlik ekle
+                      Panelde musaitlik ekle
                     </Button>
                     <Button
                       type="button"
@@ -2399,7 +2423,7 @@ export function DoctorCalendar({
                       onClick={handleQuickActionBlockTime}
                     >
                       <Ban className="mr-2 h-4 w-4" />
-                      Bu zamani blokla
+                      Bu araliga blok istisnasi ekle
                     </Button>
                   </>
                 ) : null}
@@ -2413,18 +2437,22 @@ export function DoctorCalendar({
                       onClick={handleQuickActionEditOverride}
                     >
                       <Pencil className="mr-2 h-4 w-4" />
-                      Istisnayi duzenle
+                      Istisnayi panelde duzenle
                     </Button>
                     <Button
                       type="button"
-                      variant="destructive"
-                      className="rounded-xl"
+                      variant={quickActionCanRemoveDirectly ? "destructive" : "outline"}
+                      className={cn(
+                        "rounded-xl",
+                        !quickActionCanRemoveDirectly &&
+                          "border-border/70 bg-background/70",
+                      )}
                       onClick={handleQuickActionRemoveOverride}
                     >
                       <Trash2 className="mr-2 h-4 w-4" />
-                      {quickActionSlot.override?.type === "custom_hours"
-                        ? "Istisnayi duzenle / kaldir"
-                        : "Istisnayi kaldir"}
+                      {quickActionCanRemoveDirectly
+                        ? "Istisnayi kaldir"
+                        : "Istisnayi panelde gozden gecir"}
                     </Button>
                   </>
                 ) : null}
@@ -2438,6 +2466,7 @@ export function DoctorCalendar({
         open={Boolean(appointmentComposer?.open)}
         onOpenChange={(open) => {
           if (!open) {
+            resetCalendarActiveState();
             setAppointmentComposer(null);
             setAppointmentMode("registered");
             setPatientSearch("");
@@ -2662,7 +2691,7 @@ export function DoctorCalendar({
           <AlertDialogHeader>
             <AlertDialogTitle>Bu zaman araligi bloklansin mi?</AlertDialogTitle>
             <AlertDialogDescription>
-              Secili musait aralik takvimde bloklu zaman olarak isaretlenecek. Mevcut musaitlik kurali korunur, bu tarih ve saat araligi icin takvim istisnasi uygulanir.
+              Takvimdeki secili aralik duzenlenmez; bu islem o tarih ve saat icin blok istisnasi ekler. Haftalik musaitlik kurali korunur.
             </AlertDialogDescription>
           </AlertDialogHeader>
 
@@ -2770,17 +2799,25 @@ export function DoctorCalendar({
               handleOpenOverrideCreate(contextMenuState.date, "custom_hours")
             }
           >
-            Bloklu zaman ekle
+            Bu gune blok istisnasi ekle
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <Sheet open={isAvailabilitySheetOpen} onOpenChange={setIsAvailabilitySheetOpen}>
+      <Sheet
+        open={isAvailabilitySheetOpen}
+        onOpenChange={(open) => {
+          setIsAvailabilitySheetOpen(open);
+          if (!open) {
+            resetCalendarActiveState();
+          }
+        }}
+      >
         <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-lg">
           <SheetHeader>
-            <SheetTitle>Musaitligi yonet</SheetTitle>
+            <SheetTitle>Musaitlik paneli</SheetTitle>
             <SheetDescription>
-              Haftalik musaitlik slotlarini burada duzenleyebilir, aktiflik durumunu degistirebilir veya yeni slot ekleyebilirsiniz.
+              Haftalik musaitlik slotlarini burada duzenleyebilir, aktiflik durumunu degistirebilir veya yeni slot ekleyebilirsiniz. Takvimdeki yesil alanlar yalnizca gosterimdir.
             </SheetDescription>
           </SheetHeader>
 
@@ -2932,7 +2969,7 @@ export function DoctorCalendar({
                         <div className="flex items-start justify-between gap-3">
                           <div className="space-y-2">
                             <div className="font-semibold">
-                              {format(new Date(override.date), "d MMMM yyyy", {
+                              {format(parseDateOnly(override.date), "d MMMM yyyy", {
                                 locale: tr,
                               })}
                             </div>
@@ -3035,7 +3072,7 @@ export function DoctorCalendar({
             <AlertDialogTitle>Istisna silinsin mi?</AlertDialogTitle>
             <AlertDialogDescription>
               {overrideToDelete
-                ? `${format(new Date(overrideToDelete.date), "d MMMM yyyy", {
+                ? `${format(parseDateOnly(overrideToDelete.date), "d MMMM yyyy", {
                     locale: tr,
                   })} tarihli istisna kaldirilacak.`
                 : "Bu istisna kaldirilacak."}
@@ -3064,8 +3101,7 @@ export function DoctorCalendar({
         open={availabilityModal.open}
         onClose={() => {
           setAvailabilityModal({ open: false, mode: "create" });
-          setAvailabilityDraft(null);
-          clearAppointmentSelection();
+          resetCalendarActiveState();
         }}
         mode={availabilityModal.mode}
         doctorId={doctorId}
@@ -3076,9 +3112,7 @@ export function DoctorCalendar({
         onDraftChange={setAvailabilityDraft}
         onSaved={() => {
           setAvailabilityModal({ open: false, mode: "create" });
-          setAvailabilityDraft(null);
-          setQuickActionSlot(null);
-          clearAppointmentSelection();
+          resetCalendarActiveState();
           void queryClient.invalidateQueries({ queryKey: ["availability", doctorId] });
           void queryClient.invalidateQueries({ queryKey: ["doctor-calendar", doctorId] });
         }}
@@ -3088,7 +3122,7 @@ export function DoctorCalendar({
         open={overrideModal.open}
         onClose={() => {
           setOverrideModal({ open: false, mode: "create" });
-          clearAppointmentSelection();
+          resetCalendarActiveState();
         }}
         mode={overrideModal.mode}
         doctorId={doctorId}
@@ -3097,8 +3131,7 @@ export function DoctorCalendar({
         override={overrideModal.override}
         onSaved={() => {
           setOverrideModal({ open: false, mode: "create" });
-          setQuickActionSlot(null);
-          clearAppointmentSelection();
+          resetCalendarActiveState();
           void queryClient.invalidateQueries({
             queryKey: ["availability-overrides", doctorId],
           });
@@ -3109,7 +3142,7 @@ export function DoctorCalendar({
       <AppointmentDetailSheet
         appointment={selectedAppointment}
         open={Boolean(selectedAppointment)}
-        onClose={clearAppointmentSelection}
+        onClose={resetCalendarActiveState}
       />
     </div>
   );

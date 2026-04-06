@@ -55,8 +55,14 @@ export class AvailabilityOverridesService {
   async create(dto: CreateAvailabilityOverrideDto, clinicId: string) {
     await this.ensureDoctorInClinic(dto.doctor_id, clinicId);
     this.validateOverridePayload(dto);
-    
-    await this.ensureSingleOverride(dto.doctor_id, dto.date, dto.type, clinicId);
+    await this.ensureOverrideCompatibility({
+      clinicId,
+      doctorId: dto.doctor_id,
+      date: dto.date,
+      type: dto.type,
+      startTime: dto.start_time,
+      endTime: dto.end_time,
+    });
 
     const [override] = await this.db
       .insert(doctorAvailabilityOverrides)
@@ -92,14 +98,15 @@ export class AvailabilityOverridesService {
       start_time: nextStartTime ?? undefined,
       end_time: nextEndTime ?? undefined,
     });
-
-    if (
-      nextDate !== existing.date ||
-      nextType !== existing.type ||
-      nextDoctorId !== existing.doctor_id
-    ) {
-      await this.ensureSingleOverride(nextDoctorId, nextDate, nextType, clinicId, id);
-    }
+    await this.ensureOverrideCompatibility({
+      clinicId,
+      doctorId: nextDoctorId,
+      date: nextDate,
+      type: nextType,
+      startTime: nextStartTime ?? undefined,
+      endTime: nextEndTime ?? undefined,
+      excludeId: id,
+    });
 
     const [override] = await this.db
       .update(doctorAvailabilityOverrides)
@@ -188,33 +195,89 @@ export class AvailabilityOverridesService {
     }
   }
 
-  private async ensureSingleOverride(
-    doctorId: string,
-    date: string,
-    type: string,
-    clinicId: string,
-    excludeId?: string,
-  ) {
-    const existing = await this.db
-      .select({ id: doctorAvailabilityOverrides.id })
+  private async ensureOverrideCompatibility(params: {
+    clinicId: string;
+    doctorId: string;
+    date: string;
+    type: string;
+    startTime?: string | null;
+    endTime?: string | null;
+    excludeId?: string;
+  }) {
+    const existingOverrides = await this.db
+      .select()
       .from(doctorAvailabilityOverrides)
       .where(
         and(
-          eq(doctorAvailabilityOverrides.doctor_id, doctorId),
-          eq(doctorAvailabilityOverrides.clinic_id, clinicId),
-          eq(doctorAvailabilityOverrides.date, date),
-          eq(doctorAvailabilityOverrides.type, type),
+          eq(doctorAvailabilityOverrides.doctor_id, params.doctorId),
+          eq(doctorAvailabilityOverrides.clinic_id, params.clinicId),
+          eq(doctorAvailabilityOverrides.date, params.date),
         ),
       );
 
-    const conflict = existing.find(
-      (row: { id: string }) => row.id !== excludeId,
+    const comparableOverrides = existingOverrides.filter(
+      (override: { id: string }) => override.id !== params.excludeId,
     );
 
-    if (conflict) {
+    if (params.type === 'blackout' && comparableOverrides.length > 0) {
+      throw new ConflictException('Blackout cannot coexist with other overrides');
+    }
+
+    if (params.type !== 'custom_hours') {
+      return;
+    }
+
+    const blackoutOverride = comparableOverrides.find(
+      (override: { type: string }) => override.type === 'blackout',
+    );
+
+    if (blackoutOverride) {
       throw new ConflictException(
-        'An availability override with this doctor, date, and type already exists',
+        'Custom hours cannot coexist with blackout',
       );
     }
+
+    const nextRange = {
+      start: this.timeToMinutes(params.startTime as string),
+      end: this.timeToMinutes(params.endTime as string),
+    };
+
+    const hasTimeConflict = comparableOverrides
+      .filter(
+        (override: {
+          type: string;
+          start_time: string | null;
+          end_time: string | null;
+        }) =>
+          override.type === 'custom_hours' &&
+          override.start_time &&
+          override.end_time,
+      )
+      .some(
+        (override: {
+          start_time: string;
+          end_time: string;
+        }) =>
+          this.rangesOverlapOrTouch(nextRange, {
+            start: this.timeToMinutes(override.start_time),
+            end: this.timeToMinutes(override.end_time),
+          }),
+      );
+
+    if (hasTimeConflict) {
+      throw new ConflictException('Custom hours cannot overlap or touch');
+    }
+  }
+
+  private rangesOverlapOrTouch(
+    left: { start: number; end: number },
+    right: { start: number; end: number },
+  ) {
+    return left.start <= right.end && right.start <= left.end;
+  }
+
+  private timeToMinutes(time: string): number {
+    const [hours, minutes] = time.slice(0, 5).split(':').map(Number);
+    return hours * 60 + minutes;
   }
 }

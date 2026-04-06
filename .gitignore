@@ -33,3 +33,4 @@ bun.lock
 bun.lockb
 diff-review/AppointmentDetailSheet.diff.txt
 *.txt
+*.md

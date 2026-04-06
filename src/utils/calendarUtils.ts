@@ -1,7 +1,7 @@
 import {
   addDays,
   format,
-  parseISO,
+  parse,
   setHours,
   setMinutes,
   startOfWeek,
@@ -17,6 +17,10 @@ import {
 function parseTimeToDate(baseDate: Date, time: string) {
   const [hours, minutes] = time.slice(0, 5).split(":").map(Number);
   return setMinutes(setHours(baseDate, hours), minutes);
+}
+
+export function parseDateOnly(date: string) {
+  return parse(date, "yyyy-MM-dd", new Date());
 }
 
 export function availabilityToEvents(
@@ -42,7 +46,7 @@ export function appointmentsToEvents(
   appointments: Appointment[],
 ): CalendarEvent[] {
   return appointments.map((appointment) => {
-    const baseDate = parseISO(appointment.appointment_date);
+    const baseDate = parseDateOnly(appointment.appointment_date);
     return {
       id: appointment.id,
       title: `${appointment.patient.firstName} ${appointment.patient.lastName}`.trim(),
@@ -58,15 +62,14 @@ export function overridesToEvents(
   overrides: AvailabilityOverride[],
 ): CalendarEvent[] {
   return overrides.map((override) => {
-    const baseDate = parseISO(override.date);
+    const baseDate = parseDateOnly(override.date);
 
     if (override.type === "blackout") {
-      const blackoutDate = new Date(override.date);
       return {
         id: override.id,
         title: override.reason ?? "Kapali",
-        start: blackoutDate,
-        end: blackoutDate,
+        start: baseDate,
+        end: baseDate,
         allDay: true,
         type: override.type,
         resource: override,

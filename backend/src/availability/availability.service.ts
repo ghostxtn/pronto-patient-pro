@@ -59,16 +59,22 @@ export class AvailabilityService {
       return [];
     }
 
-    const customHoursOverride = overrides.find(
-      (override: {
-        type: string;
-        start_time: string | null;
-        end_time: string | null;
-      }) =>
-        override.type === 'custom_hours' &&
-        override.start_time &&
-        override.end_time,
-    );
+    const customHoursOverrides = overrides
+      .filter(
+        (override: {
+          type: string;
+          start_time: string | null;
+          end_time: string | null;
+        }) =>
+          override.type === 'custom_hours' &&
+          override.start_time &&
+          override.end_time,
+      )
+      .map((override: { start_time: string; end_time: string }) => ({
+        start: this.timeToMinutes(override.start_time),
+        end: this.timeToMinutes(override.end_time),
+      }))
+      .sort((left, right) => left.start - right.start);
 
     const rawSlots = availabilityBlocks.flatMap((block: DoctorAvailability) => {
       let segments = [
@@ -78,11 +84,11 @@ export class AvailabilityService {
         },
       ];
 
-      if (customHoursOverride) {
+      for (const customHoursOverride of customHoursOverrides) {
         segments = this.subtractBlockedRange(
           segments,
-          this.timeToMinutes(customHoursOverride.start_time as string),
-          this.timeToMinutes(customHoursOverride.end_time as string),
+          customHoursOverride.start,
+          customHoursOverride.end,
         );
       }
 

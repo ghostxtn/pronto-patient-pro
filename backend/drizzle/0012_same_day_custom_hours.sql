@@ -1,0 +1,2 @@
+ALTER TABLE "doctor_availability_overrides"
+DROP CONSTRAINT "doctor_availability_overrides_doctor_date_type_unique";

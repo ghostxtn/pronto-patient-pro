@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/services/api";
@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
-import { format, addMinutes, parse, isBefore, isToday } from "date-fns";
+import { format, addMinutes, parse, isBefore, isToday, endOfMonth, eachDayOfInterval, startOfMonth } from "date-fns";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import {
@@ -43,6 +43,8 @@ export default function DoctorProfile() {
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [notes, setNotes] = useState("");
   const [slots, setSlots] = useState<string[]>([]);
+  const [visibleMonth, setVisibleMonth] = useState<Date>(new Date());
+  const [slotAvailabilityByDate, setSlotAvailabilityByDate] = useState<Record<string, boolean>>({});
 
   const { data: doctor, isLoading } = useQuery({
     queryKey: ["doctor", id],
@@ -60,8 +62,17 @@ export default function DoctorProfile() {
   });
 
   useEffect(() => {
+    setSelectedDate(undefined);
+    setSelectedSlot(null);
+    setSlots([]);
+    setVisibleMonth(new Date());
+    setSlotAvailabilityByDate({});
+  }, [id]);
+
+  useEffect(() => {
     if (!id || !selectedDate) {
       setSlots([]);
+      setSelectedSlot(null);
       return;
     }
 
@@ -69,9 +80,78 @@ export default function DoctorProfile() {
 
     void api.availability
       .getDoctorSlots(id, dateStr)
-      .then((data) => setSlots(data))
-      .catch(() => setSlots([]));
+      .then((data) => {
+        setSlots(data);
+        setSelectedSlot((current) => (current && data.includes(current) ? current : null));
+      })
+      .catch(() => {
+        setSlots([]);
+        setSelectedSlot(null);
+      });
   }, [id, selectedDate]);
+
+  const availableDays = useMemo(
+    () => availability?.map((a) => a.day_of_week) || [],
+    [availability],
+  );
+
+  useEffect(() => {
+    if (!id || availableDays.length === 0) {
+      setSlotAvailabilityByDate({});
+      return;
+    }
+
+    const monthStart = startOfMonth(visibleMonth);
+    const monthEnd = endOfMonth(visibleMonth);
+    const today = new Date();
+    const candidateDates = eachDayOfInterval({ start: monthStart, end: monthEnd }).filter(
+      (date) =>
+        !(isBefore(date, today) && !isToday(date)) &&
+        availableDays.includes(date.getDay()),
+    );
+
+    if (candidateDates.length === 0) {
+      setSlotAvailabilityByDate({});
+      return;
+    }
+
+    let cancelled = false;
+
+    void Promise.all(
+      candidateDates.map(async (date) => {
+        const dateStr = format(date, "yyyy-MM-dd");
+
+        try {
+          const daySlots = await api.availability.getDoctorSlots(id, dateStr);
+          return [dateStr, daySlots.length > 0] as const;
+        } catch {
+          return [dateStr, false] as const;
+        }
+      }),
+    ).then((entries) => {
+      if (!cancelled) {
+        setSlotAvailabilityByDate(Object.fromEntries(entries));
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [availableDays, id, visibleMonth]);
+
+  useEffect(() => {
+    if (!selectedDate) {
+      return;
+    }
+
+    const dateStr = format(selectedDate, "yyyy-MM-dd");
+
+    if (slotAvailabilityByDate[dateStr] === false) {
+      setSelectedDate(undefined);
+      setSelectedSlot(null);
+      setSlots([]);
+    }
+  }, [selectedDate, slotAvailabilityByDate]);
 
   const activeSlotDuration = (() => {
     if (!selectedDate || !availability) return 30;
@@ -98,8 +178,13 @@ export default function DoctorProfile() {
     onError: (err: any) => toast.error(err.message || t.bookingFailed),
   });
 
-  const availableDays = availability?.map((a) => a.day_of_week) || [];
-  const isDateDisabled = (date: Date) => { if (isBefore(date, new Date()) && !isToday(date)) return true; return !availableDays.includes(date.getDay()); };
+  const isDateDisabled = (date: Date) => {
+    if (isBefore(date, new Date()) && !isToday(date)) return true;
+    if (!availableDays.includes(date.getDay())) return true;
+
+    const dateStr = format(date, "yyyy-MM-dd");
+    return slotAvailabilityByDate[dateStr] !== true;
+  };
   const availableSlots = slots;
 
   if (isLoading) return <AppLayout><div className="flex items-center justify-center py-20"><div className="h-8 w-8 rounded-full border-2 border-primary border-t-transparent animate-spin" /></div></AppLayout>;
@@ -193,6 +278,8 @@ export default function DoctorProfile() {
                       mode="single"
                       selected={selectedDate}
                       onSelect={(date) => { setSelectedDate(date); setSelectedSlot(null); }}
+                      month={visibleMonth}
+                      onMonthChange={setVisibleMonth}
                       disabled={isDateDisabled}
                       fromDate={new Date()}
                       className="p-3 pointer-events-auto rounded-xl border w-full"
@@ -228,7 +315,7 @@ export default function DoctorProfile() {
                     <span className="text-muted-foreground" style={{ color: "#5a7a8a", fontSize: "0.875rem" }}>{t.doctor}</span><span className="font-medium" style={{ color: "#1a2e3b", fontWeight: 600, fontSize: "0.875rem" }}>Dr. {profile?.full_name}</span>
                     <span className="text-muted-foreground" style={{ color: "#5a7a8a", fontSize: "0.875rem" }}>{t.specialty}</span><span className="font-medium" style={{ color: "#1a2e3b", fontWeight: 600, fontSize: "0.875rem" }}>{spec?.name}</span>
                     <span className="text-muted-foreground" style={{ color: "#5a7a8a", fontSize: "0.875rem" }}>{t.date}</span><span className="font-medium" style={{ color: "#1a2e3b", fontWeight: 600, fontSize: "0.875rem" }}>{format(selectedDate, "EEEE, MMMM d, yyyy")}</span>
-                    <span className="text-muted-foreground" style={{ color: "#5a7a8a", fontSize: "0.875rem" }}>{t.time}</span><span className="font-medium" style={{ color: "#1a2e3b", fontWeight: 600, fontSize: "0.875rem" }}>{selectedSlot} — {format(addMinutes(parse(selectedSlot, "HH:mm", new Date()), 30), "HH:mm")}</span>
+                    <span className="text-muted-foreground" style={{ color: "#5a7a8a", fontSize: "0.875rem" }}>{t.time}</span><span className="font-medium" style={{ color: "#1a2e3b", fontWeight: 600, fontSize: "0.875rem" }}>{selectedSlot} — {format(addMinutes(parse(selectedSlot, "HH:mm", new Date()), activeSlotDuration), "HH:mm")}</span>
                     <span className="text-muted-foreground" style={{ color: "#5a7a8a", fontSize: "0.875rem" }}>{t.fee}</span><span className="font-medium" style={{ color: "#1a2e3b", fontWeight: 600, fontSize: "0.875rem" }}>{doctor.consultation_fee ?? doctor.consultationFee ?? "-"}</span>
                   </div>
                 </div>

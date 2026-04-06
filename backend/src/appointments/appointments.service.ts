@@ -1,5 +1,6 @@
 import { ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { and, eq, gte, lte } from 'drizzle-orm';
+import { AvailabilityService } from '../availability/availability.service';
 import { appointmentNotes, appointments, doctors, patients, users } from '../database/schema';
 import { EncryptionService } from '../encryption/encryption.service';
 import { CreateAppointmentNoteDto } from './dto/create-appointment-note.dto';
@@ -14,6 +15,7 @@ export class AppointmentsService {
   constructor(
     @Inject('DRIZZLE') private readonly db: any,
     private readonly encryptionService: EncryptionService,
+    private readonly availabilityService: AvailabilityService,
   ) {}
 
   async create(dto: CreateAppointmentDto, clinicId: string, userRole: string, userId: string) {
@@ -34,6 +36,16 @@ export class AppointmentsService {
 
     if (dto.startTime >= dto.endTime) {
       throw new ForbiddenException('Appointment end time must be after start time');
+    }
+
+    const bookableSlots = await this.availabilityService.getBookableSlots(
+      clinicId,
+      dto.doctorId,
+      dto.appointmentDate,
+    );
+
+    if (!bookableSlots.includes(dto.startTime)) {
+      throw new ForbiddenException('Requested time is not bookable');
     }
 
     const existingAppointments = await this.db
