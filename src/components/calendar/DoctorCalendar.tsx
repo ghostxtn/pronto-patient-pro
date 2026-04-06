@@ -673,10 +673,12 @@ function CalendarEventContent({
   event,
   title,
   view,
+  className,
 }: {
   event: SchedulerEvent;
   title: string;
   view?: string;
+  className?: string;
 }) {
   const timeRange = `${format(event.start, "HH:mm")} - ${format(event.end, "HH:mm")}`;
 
@@ -705,6 +707,17 @@ function CalendarEventContent({
     );
   }
 
+  if (view === Views.AGENDA) {
+    return (
+      <div className={className}>
+        <div className="scheduler-event-content-stack">
+          <span className="scheduler-event-meta">{timeRange}</span>
+          <span className="scheduler-event-title">{title}</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="scheduler-event-content-stack">
       <span className="scheduler-event-meta">{timeRange}</span>
@@ -721,7 +734,6 @@ export function DoctorCalendar({
   doctorId,
   mode = "doctor",
   doctorName = "Doktor",
-  specializationName = "Brans belirtilmedi",
   calendarDate,
   onCalendarDateChange,
   calendarView,
@@ -1454,6 +1466,23 @@ export function DoctorCalendar({
     };
   };
 
+  const getSchedulerEventClassName = (event: SchedulerEvent) =>
+    cn(
+      "scheduler-event",
+      event.type === "appointment" && "scheduler-event-appointment",
+      event.type === "appointment" &&
+        selectedAppointmentId === event.id &&
+        "scheduler-event-appointment-selected",
+      event.type === "blackout" &&
+        selectedCalendarEventId === event.id &&
+        "scheduler-event-override-selected",
+      event.type === "blackout" && "scheduler-event-blackout",
+      event.type === "custom_hours" &&
+        selectedCalendarEventId === event.id &&
+        "scheduler-event-override-selected",
+      event.type === "custom_hours" && "scheduler-event-custom-hours",
+    );
+
   const eventPropGetter: EventPropGetter<SchedulerEvent> = (event) => {
     if (event.type === "availability-surface") {
       return {
@@ -1474,22 +1503,12 @@ export function DoctorCalendar({
       };
     }
 
+    if (resolvedView === Views.AGENDA) {
+      return {};
+    }
+
     return {
-      className: cn(
-        "scheduler-event",
-        event.type === "appointment" && "scheduler-event-appointment",
-        event.type === "appointment" &&
-          selectedAppointmentId === event.id &&
-          "scheduler-event-appointment-selected",
-        event.type === "blackout" &&
-          selectedCalendarEventId === event.id &&
-          "scheduler-event-override-selected",
-        event.type === "blackout" && "scheduler-event-blackout",
-        event.type === "custom_hours" &&
-          selectedCalendarEventId === event.id &&
-          "scheduler-event-override-selected",
-        event.type === "custom_hours" && "scheduler-event-custom-hours",
-      ),
+      className: getSchedulerEventClassName(event),
     };
   };
 
@@ -2007,31 +2026,6 @@ export function DoctorCalendar({
       ref={calendarShellRef}
       className="scheduler-calendar-shell overflow-hidden rounded-[34px] border border-border/60 bg-card/95 shadow-soft"
     >
-      <div className="scheduler-surface-intro">
-        <div className="min-w-0">
-          <p className="scheduler-surface-kicker">Takvim yuzeyi</p>
-          <div className="scheduler-surface-heading-row">
-            <div className="min-w-0">
-              <h2 className="scheduler-surface-title">Calisma takvimi</h2>
-              <p className="scheduler-surface-copy">
-                Takvim musaitlik, randevu ve gunluk istisnalari gosterir; haftalik slot duzenleme yalnizca musaitlik panelinde yapilir.
-              </p>
-              <p className="mt-2 text-xs text-muted-foreground">
-                Yesil musaitlik alanlari gosterim katmanidir. Takvim uzerindeki secim yalnizca guvenli hizli aksiyonlari acar.
-              </p>
-            </div>
-            {mode === "doctor" ? (
-              <Badge
-                variant="outline"
-                className="hidden rounded-full border-border/60 bg-card px-3 py-1 text-muted-foreground lg:inline-flex"
-              >
-                {specializationName}
-              </Badge>
-            ) : null}
-          </div>
-        </div>
-      </div>
-
       <BigCalendar<SchedulerEvent>
         className="scheduler-calendar"
         views={{
@@ -2073,7 +2067,14 @@ export function DoctorCalendar({
             />
           ),
           event: ({ event, title }) => (
-            <CalendarEventContent event={event} title={title} />
+            <CalendarEventContent
+              event={event}
+              title={title}
+              view={resolvedView}
+              className={
+                resolvedView === Views.AGENDA ? getSchedulerEventClassName(event) : undefined
+              }
+            />
           ),
         }}
         localizer={localizer}

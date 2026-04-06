@@ -299,24 +299,10 @@
     box-shadow: none;
   }
 
-  .scheduler-surface-intro {
-    @apply border-b border-border/50 bg-background/70 px-5 py-4 backdrop-blur-sm lg:px-6;
-  }
-
-  .scheduler-surface-kicker {
-    @apply text-[11px] font-medium uppercase tracking-[0.2em] text-muted-foreground;
-  }
-
-  .scheduler-surface-heading-row {
-    @apply mt-1.5 flex flex-col gap-2.5 xl:flex-row xl:items-end xl:justify-between;
-  }
-
-  .scheduler-surface-title {
-    @apply text-[1.85rem] font-display font-bold tracking-[-0.03em] text-foreground;
-  }
-
-  .scheduler-surface-copy {
-    @apply mt-0.5 max-w-xl text-[13px] leading-6 text-muted-foreground;
+  .scheduler-calendar-shell .rbc-time-view,
+  .scheduler-calendar-shell .rbc-time-content,
+  .scheduler-calendar-shell .rbc-month-view {
+    touch-action: none;
   }
 
   .scheduler-calendar-shell .rbc-toolbar {
@@ -550,6 +536,15 @@
     height: 100%;
   }
 
+  .scheduler-calendar-shell .rbc-agenda-event-cell .scheduler-event {
+    display: block;
+    width: 100%;
+    border-radius: 12px;
+    padding: 0.625rem 0.75rem;
+    box-sizing: border-box;
+    overflow: hidden;
+  }
+
   .scheduler-event-content-stack {
     @apply flex h-full flex-col justify-start gap-0.5;
   }
@@ -649,10 +644,11 @@
     box-sizing: border-box;
   }
 
-  .scheduler-calendar-shell .rbc-day-slot .rbc-background-event.scheduler-event-availability-surface,
-  .scheduler-calendar-shell .rbc-day-slot .rbc-background-event.availability-surface {
+  .scheduler-calendar-shell .rbc-day-slot .rbc-background-event.scheduler-event-availability-surface {
     display: block !important;
     position: absolute !important;
+    top: 0 !important;
+    bottom: 0 !important;
     left: 0 !important;
     right: 0 !important;
     width: 100% !important;
@@ -663,7 +659,8 @@
     padding: 0 !important;
     pointer-events: none !important;
     z-index: 0 !important;
-    background: hsla(142, 45%, 48%, 0.18) !important;
+    background: hsla(142, 52%, 46%, 0.16) !important;
+    opacity: 1 !important;
     min-height: 0;
     overflow: hidden;
   }
@@ -729,10 +726,6 @@
   }
 
   @media (max-width: 1024px) {
-    .scheduler-surface-intro {
-      @apply px-3 py-3.5;
-    }
-
     .scheduler-calendar-shell .rbc-toolbar {
       @apply px-3 py-2.5;
     }
@@ -749,10 +742,6 @@
   @media (max-width: 768px) {
     .scheduler-toolbar-row {
       @apply items-stretch;
-    }
-
-    .scheduler-surface-title {
-      @apply text-[1.55rem];
     }
 
     .scheduler-toolbar-actions {
