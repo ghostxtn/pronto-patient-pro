@@ -83,7 +83,12 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
-import { Appointment, AvailabilitySlot, AvailabilityOverride, CalendarEvent } from "@/types/calendar";
+import {
+  Appointment,
+  AvailabilitySlot,
+  AvailabilityOverride,
+  CalendarEvent,
+} from "@/types/calendar";
 import { appointmentsToEvents, overridesToEvents } from "@/utils/calendarUtils";
 import TimeGrid from "react-big-calendar/lib/TimeGrid";
 
@@ -255,13 +260,53 @@ function formatTimeRange(startTime: string, endTime: string) {
 
 function getAvailabilitySortValue(slot: AvailabilitySlot) {
   const normalizedDay = slot.day_of_week === 0 ? 7 : slot.day_of_week;
-  return normalizedDay * 10000 + Number(slot.start_time.slice(0, 2)) * 100 + Number(slot.start_time.slice(3, 5));
+  return (
+    normalizedDay * 10000 +
+    Number(slot.start_time.slice(0, 2)) * 100 +
+    Number(slot.start_time.slice(3, 5))
+  );
 }
 
 function getOverrideBadge(type: AvailabilityOverride["type"]) {
   return type === "blackout"
-    ? { label: "Kapali gun", className: "border-destructive/20 bg-destructive/10 text-destructive" }
-    : { label: "Ozel saat", className: "border-warning/30 bg-warning/10 text-warning" };
+    ? {
+        label: "Kapali gun",
+        className: "border-destructive/20 bg-destructive/10 text-destructive",
+      }
+    : {
+        label: "Bloklu zaman",
+        className: "border-warning/30 bg-warning/10 text-warning",
+      };
+}
+
+function compareOverrides(left: AvailabilityOverride, right: AvailabilityOverride) {
+  const dateDiff =
+    new Date(`${left.date}T00:00:00`).getTime() -
+    new Date(`${right.date}T00:00:00`).getTime();
+
+  if (dateDiff !== 0) {
+    return dateDiff;
+  }
+
+  if (left.type !== right.type) {
+    return left.type === "blackout" ? -1 : 1;
+  }
+
+  const startDiff =
+    timeToMinutes(left.start_time ?? "00:00") - timeToMinutes(right.start_time ?? "00:00");
+
+  if (startDiff !== 0) {
+    return startDiff;
+  }
+
+  const endDiff =
+    timeToMinutes(left.end_time ?? "00:00") - timeToMinutes(right.end_time ?? "00:00");
+
+  if (endDiff !== 0) {
+    return endDiff;
+  }
+
+  return left.id.localeCompare(right.id);
 }
 
 function getRollingWeekRange(date: Date) {
@@ -315,13 +360,6 @@ function normalizeMinuteRange(start: number, end: number) {
     start: Math.min(start, end),
     end: Math.max(start, end),
   };
-}
-
-function rangesOverlapOrTouch(
-  left: { start: number; end: number },
-  right: { start: number; end: number },
-) {
-  return left.start <= right.end && right.start <= left.end;
 }
 
 function rangeContains(
@@ -381,11 +419,22 @@ function formatToolbarRangeLabel(date: Date, view: View) {
   if (view === Views.WEEK) {
     const [weekStart, , , , , , weekEnd] = getRollingWeekRange(date);
 
-    if (format(weekStart, "MMMM yyyy", { locale: tr }) === format(weekEnd, "MMMM yyyy", { locale: tr })) {
-      return `${format(weekStart, "d", { locale: tr })} - ${format(weekEnd, "d MMMM yyyy", { locale: tr })}`;
+    if (
+      format(weekStart, "MMMM yyyy", { locale: tr }) ===
+      format(weekEnd, "MMMM yyyy", { locale: tr })
+    ) {
+      return `${format(weekStart, "d", { locale: tr })} - ${format(
+        weekEnd,
+        "d MMMM yyyy",
+        { locale: tr },
+      )}`;
     }
 
-    return `${format(weekStart, "d MMM", { locale: tr })} - ${format(weekEnd, "d MMM yyyy", { locale: tr })}`;
+    return `${format(weekStart, "d MMM", { locale: tr })} - ${format(
+      weekEnd,
+      "d MMM yyyy",
+      { locale: tr },
+    )}`;
   }
 
   if (view === Views.DAY) {
@@ -399,7 +448,8 @@ function formatToolbarRangeLabel(date: Date, view: View) {
   return `Ajanda - ${format(date, "d MMMM yyyy", { locale: tr })}`;
 }
 
-const TimeGridComponent = TimeGrid as unknown as React.ComponentType<Record<string, unknown>>;
+const TimeGridComponent =
+  TimeGrid as unknown as React.ComponentType<Record<string, unknown>>;
 
 interface RollingWeekViewProps {
   date: Date;
@@ -409,7 +459,6 @@ interface RollingWeekViewProps {
 const RollingWeekView = Object.assign(
   function RollingWeekView(props: RollingWeekViewProps) {
     const range = getRollingWeekRange(props.date);
-
     return <TimeGridComponent {...props} range={range} eventOffset={15} />;
   },
   {
@@ -445,7 +494,10 @@ function getToolbarSubtitle(view: View) {
   }
 }
 
-function getQuickActionPosition(anchor: QuickActionState["anchor"], calendarBounds?: DOMRect | null) {
+function getQuickActionPosition(
+  anchor: QuickActionState["anchor"],
+  calendarBounds?: DOMRect | null,
+) {
   const panelWidth = 320;
   const panelHeight = 360;
   const gutter = 12;
@@ -453,26 +505,40 @@ function getQuickActionPosition(anchor: QuickActionState["anchor"], calendarBoun
   const viewportWidth = window.innerWidth;
   const viewportHeight = window.innerHeight;
   const calendarLeft = calendarBounds ? calendarBounds.left + calendarInset : gutter;
-  const calendarRight = calendarBounds ? calendarBounds.right - calendarInset : viewportWidth - gutter;
+  const calendarRight = calendarBounds
+    ? calendarBounds.right - calendarInset
+    : viewportWidth - gutter;
   const calendarTop = calendarBounds ? calendarBounds.top + calendarInset : gutter;
-  const calendarBottom = calendarBounds ? calendarBounds.bottom - calendarInset : viewportHeight - gutter;
+  const calendarBottom = calendarBounds
+    ? calendarBounds.bottom - calendarInset
+    : viewportHeight - gutter;
   const minLeft = Math.max(gutter, calendarLeft);
-  const maxLeft = Math.min(viewportWidth - panelWidth - gutter, calendarRight - panelWidth);
+  const maxLeft = Math.min(
+    viewportWidth - panelWidth - gutter,
+    calendarRight - panelWidth,
+  );
   const anchorMidY = anchor.top + (anchor.bottom - anchor.top) / 2;
   const preferredRight = anchor.right + 10;
   const preferredLeft = anchor.left - panelWidth - 10;
-  const canPlaceRight = preferredRight + panelWidth <= Math.min(calendarRight, viewportWidth - gutter);
+  const canPlaceRight =
+    preferredRight + panelWidth <= Math.min(calendarRight, viewportWidth - gutter);
   const canPlaceLeft = preferredLeft >= Math.max(gutter, calendarLeft);
 
   let left = canPlaceRight
     ? preferredRight
     : canPlaceLeft
       ? preferredLeft
-      : Math.min(Math.max(anchor.left - panelWidth / 2, minLeft), Math.max(minLeft, maxLeft));
+      : Math.min(
+          Math.max(anchor.left - panelWidth / 2, minLeft),
+          Math.max(minLeft, maxLeft),
+        );
 
   let top = anchorMidY - panelHeight / 2;
   const minTop = Math.max(gutter, calendarTop);
-  const maxTop = Math.min(viewportHeight - panelHeight - gutter, calendarBottom - panelHeight);
+  const maxTop = Math.min(
+    viewportHeight - panelHeight - gutter,
+    calendarBottom - panelHeight,
+  );
 
   top = Math.min(Math.max(top, minTop), Math.max(minTop, maxTop));
   left = Math.min(Math.max(left, minLeft), Math.max(minLeft, maxLeft));
@@ -514,19 +580,37 @@ const CustomToolbar = ({
     <div className="scheduler-toolbar-row">
       <div className="min-w-0">
         <p className="scheduler-toolbar-caption">{getToolbarSubtitle(view)}</p>
-        <h3 className="scheduler-toolbar-title">{formatToolbarRangeLabel(date, view)}</h3>
+        <h3 className="scheduler-toolbar-title">
+          {formatToolbarRangeLabel(date, view)}
+        </h3>
       </div>
 
       <div className="scheduler-toolbar-actions">
-        <Button type="button" className="scheduler-toolbar-today-button rounded-full" onClick={() => onNavigate("TODAY")}>
+        <Button
+          type="button"
+          className="scheduler-toolbar-today-button rounded-full"
+          onClick={() => onNavigate("TODAY")}
+        >
           Bugun
         </Button>
 
         <div className="scheduler-nav-group">
-          <Button type="button" variant="outline" size="icon" className="scheduler-toolbar-nav-button rounded-full" onClick={() => onNavigate("PREV")}>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className="scheduler-toolbar-nav-button rounded-full"
+            onClick={() => onNavigate("PREV")}
+          >
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <Button type="button" variant="outline" size="icon" className="scheduler-toolbar-nav-button rounded-full" onClick={() => onNavigate("NEXT")}>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className="scheduler-toolbar-nav-button rounded-full"
+            onClick={() => onNavigate("NEXT")}
+          >
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
@@ -567,7 +651,10 @@ const CalendarHeader = ({ date, onContextMenu }: CalendarHeaderProps) => {
   return (
     <div
       onContextMenu={(event) => onContextMenu(event, date)}
-      className={cn("scheduler-week-header", currentDay && "scheduler-week-header-today")}
+      className={cn(
+        "scheduler-week-header",
+        currentDay && "scheduler-week-header-today",
+      )}
       title="Sag tiklayarak istisna ekleyin"
     >
       <span className="scheduler-week-header-day">
@@ -580,7 +667,15 @@ const CalendarHeader = ({ date, onContextMenu }: CalendarHeaderProps) => {
   );
 };
 
-function CalendarEventContent({ event, title, view }: { event: SchedulerEvent; title: string; view?: string }) {
+function CalendarEventContent({
+  event,
+  title,
+  view,
+}: {
+  event: SchedulerEvent;
+  title: string;
+  view?: string;
+}) {
   const timeRange = `${format(event.start, "HH:mm")} - ${format(event.end, "HH:mm")}`;
 
   if (event.type === "availability-surface") {
@@ -590,7 +685,8 @@ function CalendarEventContent({ event, title, view }: { event: SchedulerEvent; t
   if (view === Views.MONTH) {
     return (
       <div className="truncate text-[11px] leading-tight">
-        <span className="font-bold opacity-80">{format(event.start, "HH:mm")}</span> <span className="font-semibold">{title}</span>
+        <span className="font-bold opacity-80">{format(event.start, "HH:mm")}</span>{" "}
+        <span className="font-semibold">{title}</span>
       </div>
     );
   }
@@ -632,12 +728,20 @@ export function DoctorCalendar({
   const isMobile = useIsMobile();
   const queryClient = useQueryClient();
   const calendarShellRef = useRef<HTMLDivElement | null>(null);
-  const lastMobileSlotTapRef = useRef<{ start: number; timestamp: number } | null>(null);
+  const lastMobileSlotTapRef = useRef<{ start: number; timestamp: number } | null>(
+    null,
+  );
+
   const [internalCurrentDate, setInternalCurrentDate] = useState(new Date());
   const [internalView, setInternalView] = useState<View>(Views.WEEK);
-  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
-  const [selectedAppointmentId, setSelectedAppointmentId] = useState<string | null>(null);
-  const [availabilityDraft, setAvailabilityDraft] = useState<AvailabilityDraftPreview | null>(null);
+  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(
+    null,
+  );
+  const [selectedAppointmentId, setSelectedAppointmentId] = useState<string | null>(
+    null,
+  );
+  const [availabilityDraft, setAvailabilityDraft] =
+    useState<AvailabilityDraftPreview | null>(null);
   const [availabilityModal, setAvailabilityModal] = useState<{
     open: boolean;
     mode: "create" | "edit";
@@ -655,24 +759,32 @@ export function DoctorCalendar({
   }>({ open: false, mode: "create" });
   const [isAvailabilitySheetOpen, setIsAvailabilitySheetOpen] = useState(false);
   const [slotToDelete, setSlotToDelete] = useState<AvailabilitySlot | null>(null);
-  const [overrideToDelete, setOverrideToDelete] = useState<AvailabilityOverride | null>(null);
+  const [overrideToDelete, setOverrideToDelete] =
+    useState<AvailabilityOverride | null>(null);
   const [contextMenuState, setContextMenuState] = useState<{
     open: boolean;
     x: number;
     y: number;
     date?: Date;
   }>({ open: false, x: 0, y: 0 });
-  const [quickActionSlot, setQuickActionSlot] = useState<QuickActionState | null>(null);
-  const [blockActionState, setBlockActionState] = useState<BlockActionState | null>(null);
+  const [quickActionSlot, setQuickActionSlot] = useState<QuickActionState | null>(
+    null,
+  );
+  const [blockActionState, setBlockActionState] = useState<BlockActionState | null>(
+    null,
+  );
   const [blockReason, setBlockReason] = useState("");
-  const [appointmentComposer, setAppointmentComposer] = useState<AppointmentComposerState | null>(null);
-  const [appointmentMode, setAppointmentMode] = useState<"registered" | "manual">("registered");
+  const [appointmentComposer, setAppointmentComposer] =
+    useState<AppointmentComposerState | null>(null);
+  const [appointmentMode, setAppointmentMode] =
+    useState<"registered" | "manual">("registered");
   const [patientSearch, setPatientSearch] = useState("");
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   const [manualPatientName, setManualPatientName] = useState("");
   const [manualPatientPhone, setManualPatientPhone] = useState("");
   const [manualPatientNote, setManualPatientNote] = useState("");
   const [appointmentNotes, setAppointmentNotes] = useState("");
+
   const resolvedCurrentDate = calendarDate ?? internalCurrentDate;
   const resolvedView = calendarView ?? internalView;
 
@@ -694,8 +806,15 @@ export function DoctorCalendar({
     () => getDateRange(resolvedCurrentDate, resolvedView),
     [resolvedCurrentDate, resolvedView],
   );
-  const overrideRangeStart = useMemo(() => format(subDays(new Date(), 30), "yyyy-MM-dd"), []);
-  const overrideRangeEnd = useMemo(() => format(addDays(new Date(), 365), "yyyy-MM-dd"), []);
+
+  const overrideRangeStart = useMemo(
+    () => format(subDays(new Date(), 30), "yyyy-MM-dd"),
+    [],
+  );
+  const overrideRangeEnd = useMemo(
+    () => format(addDays(new Date(), 365), "yyyy-MM-dd"),
+    [],
+  );
 
   const {
     data: availabilitySlots = [],
@@ -714,7 +833,13 @@ export function DoctorCalendar({
     isError: isCalendarError,
     error: calendarError,
   } = useQuery({
-    queryKey: ["doctor-calendar", doctorId, toApiDate(rangeStart), toApiDate(rangeEnd), resolvedView],
+    queryKey: [
+      "doctor-calendar",
+      doctorId,
+      toApiDate(rangeStart),
+      toApiDate(rangeEnd),
+      resolvedView,
+    ],
     queryFn: async () => {
       const [overrides, appointments] = await Promise.all([
         api.availabilityOverrides.listByDoctor(
@@ -729,21 +854,23 @@ export function DoctorCalendar({
         }) as Promise<CalendarAppointmentResponse[]>,
       ]);
 
-      const normalizedAppointments: Appointment[] = appointments.map((appointment) => ({
-        id: appointment.id,
-        doctor_id: appointment.doctor_id,
-        patient_id: appointment.patient_id,
-        appointment_date: appointment.appointment_date,
-        start_time: appointment.start_time,
-        end_time: appointment.end_time,
-        status: appointment.status,
-        type: appointment.type ?? "",
-        patient: {
-          id: appointment.patient?.id ?? "",
-          firstName: appointment.patient?.firstName ?? "",
-          lastName: appointment.patient?.lastName ?? "",
-        },
-      }));
+      const normalizedAppointments: Appointment[] = appointments.map(
+        (appointment) => ({
+          id: appointment.id,
+          doctor_id: appointment.doctor_id,
+          patient_id: appointment.patient_id,
+          appointment_date: appointment.appointment_date,
+          start_time: appointment.start_time,
+          end_time: appointment.end_time,
+          status: appointment.status,
+          type: appointment.type ?? "",
+          patient: {
+            id: appointment.patient?.id ?? "",
+            firstName: appointment.patient?.firstName ?? "",
+            lastName: appointment.patient?.lastName ?? "",
+          },
+        }),
+      );
 
       return {
         overrides,
@@ -800,8 +927,12 @@ export function DoctorCalendar({
     onSuccess: async () => {
       toast.success("Istisna silindi");
       setOverrideToDelete(null);
-      await queryClient.invalidateQueries({ queryKey: ["availability-overrides", doctorId] });
-      await queryClient.invalidateQueries({ queryKey: ["doctor-calendar", doctorId] });
+      await queryClient.invalidateQueries({
+        queryKey: ["availability-overrides", doctorId],
+      });
+      await queryClient.invalidateQueries({
+        queryKey: ["doctor-calendar", doctorId],
+      });
     },
     onError: (error: unknown) => {
       toast.error(error instanceof Error ? error.message : "Istisna silinemedi");
@@ -811,15 +942,31 @@ export function DoctorCalendar({
   const createQuickBlock = useMutation({
     mutationFn: async (payload: { start: Date; end: Date; reason?: string }) => {
       const date = toApiDate(payload.start);
-      const sameDayOverrides = (data?.overrides ?? []).filter((override) => override.date === date);
-      const blackoutOverride = sameDayOverrides.find((override) => override.type === "blackout");
+      const sameDayOverrides = (data?.overrides ?? []).filter(
+        (override) => override.date === date,
+      );
+
+      const blackoutOverride = sameDayOverrides.find(
+        (override) => override.type === "blackout",
+      );
+
       const nextStart = format(payload.start, "HH:mm");
       const nextEnd = format(payload.end, "HH:mm");
-      const nextRange = normalizeMinuteRange(timeToMinutes(nextStart), timeToMinutes(nextEnd));
+      const nextRange = normalizeMinuteRange(
+        timeToMinutes(nextStart),
+        timeToMinutes(nextEnd),
+      );
       const nextReason = payload.reason?.trim() || undefined;
-      const appointmentConflictExists = (candidateRange: { start: number; end: number }) =>
+
+      const appointmentConflictExists = (candidateRange: {
+        start: number;
+        end: number;
+      }) =>
         (data?.appointments ?? []).some((appointment) => {
-          if (appointment.status === "cancelled" || appointment.appointment_date !== date) {
+          if (
+            appointment.status === "cancelled" ||
+            appointment.appointment_date !== date
+          ) {
             return false;
           }
 
@@ -828,7 +975,10 @@ export function DoctorCalendar({
             timeToMinutes(appointment.end_time),
           );
 
-          return appointmentRange.start < candidateRange.end && appointmentRange.end > candidateRange.start;
+          return (
+            appointmentRange.start < candidateRange.end &&
+            appointmentRange.end > candidateRange.start
+          );
         });
 
       if (blackoutOverride) {
@@ -836,7 +986,9 @@ export function DoctorCalendar({
       }
 
       if (appointmentConflictExists(nextRange)) {
-        throw new Error("Secilen zaman araliginda randevu oldugu icin blok eklenemiyor.");
+        throw new Error(
+          "Secilen zaman araliginda randevu oldugu icin blok eklenemiyor.",
+        );
       }
 
       return api.availabilityOverrides.create({
@@ -854,72 +1006,15 @@ export function DoctorCalendar({
       setBlockReason("");
       setQuickActionSlot(null);
       clearAppointmentSelection();
-      await queryClient.invalidateQueries({ queryKey: ["availability-overrides", doctorId] });
-      await queryClient.invalidateQueries({ queryKey: ["doctor-calendar", doctorId] });
+      await queryClient.invalidateQueries({
+        queryKey: ["availability-overrides", doctorId],
+      });
+      await queryClient.invalidateQueries({
+        queryKey: ["doctor-calendar", doctorId],
+      });
     },
     onError: (error: unknown) => {
       toast.error(error instanceof Error ? error.message : "Zaman blogu eklenemedi");
-    },
-  });
-
-  const reopenQuickBlock = useMutation({
-    mutationFn: async (payload: { override: AvailabilityOverride; reopenStart: Date; reopenEnd: Date }) => {
-      if (payload.override.type !== "custom_hours" || !payload.override.start_time || !payload.override.end_time) {
-        return api.availabilityOverrides.remove(payload.override.id);
-      }
-
-      const blockedRange = normalizeMinuteRange(
-        timeToMinutes(payload.override.start_time),
-        timeToMinutes(payload.override.end_time),
-      );
-      const reopenRange = normalizeMinuteRange(
-        timeToMinutes(format(payload.reopenStart, "HH:mm")),
-        timeToMinutes(format(payload.reopenEnd, "HH:mm")),
-      );
-      const remainingRanges = subtractBlockedRange([blockedRange], reopenRange.start, reopenRange.end);
-
-      if (remainingRanges.length === 0) {
-        return api.availabilityOverrides.remove(payload.override.id);
-      }
-
-      if (remainingRanges.length === 1) {
-        const [remainingRange] = remainingRanges;
-        return api.availabilityOverrides.update(payload.override.id, {
-          date: payload.override.date,
-          type: "custom_hours",
-          start_time: minutesToTime(remainingRange.start),
-          end_time: minutesToTime(remainingRange.end),
-          reason: payload.override.reason ?? undefined,
-        });
-      }
-
-      const [firstRange, secondRange] = remainingRanges;
-      await api.availabilityOverrides.update(payload.override.id, {
-        date: payload.override.date,
-        type: "custom_hours",
-        start_time: minutesToTime(firstRange.start),
-        end_time: minutesToTime(firstRange.end),
-        reason: payload.override.reason ?? undefined,
-      });
-
-      return api.availabilityOverrides.create({
-        doctor_id: doctorId,
-        date: payload.override.date,
-        type: "custom_hours",
-        start_time: minutesToTime(secondRange.start),
-        end_time: minutesToTime(secondRange.end),
-        reason: payload.override.reason ?? undefined,
-      });
-    },
-    onSuccess: async () => {
-      toast.success("Secili blok araligi guncellendi");
-      setQuickActionSlot(null);
-      clearAppointmentSelection();
-      await queryClient.invalidateQueries({ queryKey: ["availability-overrides", doctorId] });
-      await queryClient.invalidateQueries({ queryKey: ["doctor-calendar", doctorId] });
-    },
-    onError: (error: unknown) => {
-      toast.error(error instanceof Error ? error.message : "Blok araligi guncellenemedi");
     },
   });
 
@@ -972,8 +1067,12 @@ export function DoctorCalendar({
       setAppointmentNotes("");
       setQuickActionSlot(null);
       clearAppointmentSelection();
-      await queryClient.invalidateQueries({ queryKey: ["doctor-calendar", doctorId] });
-      await queryClient.invalidateQueries({ queryKey: ["staff-calendar-patients"] });
+      await queryClient.invalidateQueries({
+        queryKey: ["doctor-calendar", doctorId],
+      });
+      await queryClient.invalidateQueries({
+        queryKey: ["staff-calendar-patients"],
+      });
     },
     onError: (error: unknown) => {
       toast.error(error instanceof Error ? error.message : "Randevu olusturulamadi");
@@ -991,13 +1090,18 @@ export function DoctorCalendar({
   }, [data]);
 
   const sortedAvailabilitySlots = useMemo(
-    () => [...availabilitySlots].sort((left, right) => getAvailabilitySortValue(left) - getAvailabilitySortValue(right)),
+    () =>
+      [...availabilitySlots].sort(
+        (left, right) => getAvailabilitySortValue(left) - getAvailabilitySortValue(right),
+      ),
     [availabilitySlots],
   );
+
   const sortedOverrides = useMemo(
-    () => [...overrideList].sort((left, right) => new Date(left.date).getTime() - new Date(right.date).getTime()),
+    () => [...overrideList].sort(compareOverrides),
     [overrideList],
   );
+
   const availabilityWindows = useMemo<AvailabilityWindow[]>(() => {
     const windows: AvailabilityWindow[] = [];
     const activeSlots = availabilitySlots.filter((slot) => slot.is_active);
@@ -1010,15 +1114,24 @@ export function DoctorCalendar({
       currentDay = addDays(currentDay, 1)
     ) {
       const dateKey = toApiDate(currentDay);
-      const daySlots = activeSlots.filter((slot) => slot.day_of_week === currentDay.getDay());
-      const dayOverrides = (data?.overrides ?? []).filter((override) => override.date === dateKey);
+      const daySlots = activeSlots.filter(
+        (slot) => slot.day_of_week === currentDay.getDay(),
+      );
+      const dayOverrides = (data?.overrides ?? []).filter(
+        (override) => override.date === dateKey,
+      );
 
       if (dayOverrides.some((override) => override.type === "blackout")) {
         continue;
       }
 
       const blockedRanges = dayOverrides
-        .filter((override) => override.type === "custom_hours" && override.start_time && override.end_time)
+        .filter(
+          (override) =>
+            override.type === "custom_hours" &&
+            override.start_time &&
+            override.end_time,
+        )
         .map((override) => ({
           start: timeToMinutes(override.start_time ?? "00:00"),
           end: timeToMinutes(override.end_time ?? "23:59"),
@@ -1034,7 +1147,11 @@ export function DoctorCalendar({
         ];
 
         for (const blockedRange of blockedRanges) {
-          segments = subtractBlockedRange(segments, blockedRange.start, blockedRange.end);
+          segments = subtractBlockedRange(
+            segments,
+            blockedRange.start,
+            blockedRange.end,
+          );
         }
 
         for (const segment of segments) {
@@ -1051,7 +1168,9 @@ export function DoctorCalendar({
       }
     }
 
-    const sortedWindows = windows.sort((left, right) => left.start.getTime() - right.start.getTime());
+    const sortedWindows = windows.sort(
+      (left, right) => left.start.getTime() - right.start.getTime(),
+    );
 
     return sortedWindows.reduce<AvailabilityWindow[]>((merged, window) => {
       const previous = merged.at(-1);
@@ -1074,6 +1193,7 @@ export function DoctorCalendar({
       return merged;
     }, []);
   }, [availabilitySlots, data?.overrides, rangeEnd, rangeStart]);
+
   const availabilitySurfaceEvents = useMemo<SchedulerEvent[]>(() => {
     if (resolvedView !== Views.WEEK && resolvedView !== Views.DAY) {
       return [];
@@ -1090,6 +1210,7 @@ export function DoctorCalendar({
       },
     }));
   }, [availabilityWindows, resolvedView]);
+
   const filteredPatients = useMemo(() => {
     const query = patientSearch.trim().toLowerCase();
     if (!query) {
@@ -1101,7 +1222,11 @@ export function DoctorCalendar({
         const name = getPatientName(patient).toLowerCase();
         const phone = (patient.phone ?? "").toLowerCase();
         const email = (patient.email ?? "").toLowerCase();
-        return name.includes(query) || phone.includes(query) || email.includes(query);
+        return (
+          name.includes(query) ||
+          phone.includes(query) ||
+          email.includes(query)
+        );
       })
       .slice(0, 8);
   }, [patientSearch, patients]);
@@ -1114,11 +1239,14 @@ export function DoctorCalendar({
     if (availabilityDraft) {
       const baseDate =
         resolvedView === Views.WEEK
-          ? getRollingWeekRange(resolvedCurrentDate).find((date) => date.getDay() === availabilityDraft.dayOfWeek) ?? null
+          ? getRollingWeekRange(resolvedCurrentDate).find(
+              (date) => date.getDay() === availabilityDraft.dayOfWeek,
+            ) ?? null
           : addDays(
-            startOfDay(resolvedCurrentDate),
-            (availabilityDraft.dayOfWeek - resolvedCurrentDate.getDay() + 7) % 7,
-          );
+              startOfDay(resolvedCurrentDate),
+              (availabilityDraft.dayOfWeek - resolvedCurrentDate.getDay() + 7) %
+                7,
+            );
 
       if (!baseDate) {
         return null;
@@ -1128,7 +1256,10 @@ export function DoctorCalendar({
       const endCandidate = availabilityDraft.endTime
         ? withTime(baseDate, availabilityDraft.endTime)
         : addMinutes(start, availabilityDraft.slotDuration);
-      const end = endCandidate > start ? endCandidate : addMinutes(start, availabilityDraft.slotDuration);
+      const end =
+        endCandidate > start
+          ? endCandidate
+          : addMinutes(start, availabilityDraft.slotDuration);
 
       return {
         id: "availability-draft-preview",
@@ -1154,14 +1285,20 @@ export function DoctorCalendar({
       end: quickActionSlot.end,
       type: "draft",
       resource: {
-        durationMinutes: Math.max(15, differenceInMinutes(quickActionSlot.end, quickActionSlot.start)),
+        durationMinutes: Math.max(
+          15,
+          differenceInMinutes(quickActionSlot.end, quickActionSlot.start),
+        ),
         source: "selection",
       },
     };
   }, [availabilityDraft, quickActionSlot, resolvedCurrentDate, resolvedView]);
 
   const selectedCalendarEvent = useMemo(
-    () => (selectedAppointmentId ? events.find((event) => event.id === selectedAppointmentId) ?? null : null),
+    () =>
+      selectedAppointmentId
+        ? events.find((event) => event.id === selectedAppointmentId) ?? null
+        : null,
     [events, selectedAppointmentId],
   );
 
@@ -1174,56 +1311,55 @@ export function DoctorCalendar({
     const dateStr = toApiDate(date);
     const dayOverrides = (data?.overrides ?? [])
       .filter((override) => override.date === dateStr)
-      .sort((left, right) => {
-        if (left.type === right.type) {
-          return 0;
+      .sort(compareOverrides);
+
+    return (
+      dayOverrides.find((override) => {
+        if (override.type === "blackout") {
+          return true;
         }
 
-        return left.type === "blackout" ? -1 : 1;
-      });
+        if (!override.start_time || !override.end_time) {
+          return true;
+        }
 
-    return dayOverrides.find((override) => {
-      if (override.type === "blackout") {
-        return true;
-      }
-
-      if (!override.start_time || !override.end_time) {
-        return true;
-      }
-
-      const timeMinutes = timeToMinutes(format(date, "HH:mm"));
-      return timeMinutes >= timeToMinutes(override.start_time) && timeMinutes < timeToMinutes(override.end_time);
-    }) ?? null;
+        const timeMinutes = timeToMinutes(format(date, "HH:mm"));
+        return (
+          timeMinutes >= timeToMinutes(override.start_time) &&
+          timeMinutes < timeToMinutes(override.end_time)
+        );
+      }) ?? null
+    );
   };
 
   const getBlockingOverrideForRange = (start: Date, end: Date) => {
     const dateStr = toApiDate(start);
     const dayOverrides = (data?.overrides ?? [])
       .filter((override) => override.date === dateStr)
-      .sort((left, right) => {
-        if (left.type === right.type) {
-          return 0;
+      .sort(compareOverrides);
+
+    return (
+      dayOverrides.find((override) => {
+        if (override.type === "blackout") {
+          return true;
         }
 
-        return left.type === "blackout" ? -1 : 1;
-      });
+        if (!override.start_time || !override.end_time) {
+          return true;
+        }
 
-    return dayOverrides.find((override) => {
-      if (override.type === "blackout") {
-        return true;
-      }
-
-      if (!override.start_time || !override.end_time) {
-        return true;
-      }
-
-      const overrideStart = withTime(start, override.start_time);
-      const overrideEnd = withTime(start, override.end_time);
-      return overrideStart < end && overrideEnd > start;
-    }) ?? null;
+        const overrideStart = withTime(start, override.start_time);
+        const overrideEnd = withTime(start, override.end_time);
+        return overrideStart < end && overrideEnd > start;
+      }) ?? null
+    );
   };
 
-  const isRangeFullyCoveredByOverride = (override: AvailabilityOverride, start: Date, end: Date) => {
+  const isRangeFullyCoveredByOverride = (
+    override: AvailabilityOverride,
+    start: Date,
+    end: Date,
+  ) => {
     if (override.type === "blackout") {
       return true;
     }
@@ -1245,7 +1381,9 @@ export function DoctorCalendar({
   };
 
   const getAvailabilityWindowForRange = (start: Date, end: Date) => {
-    return availabilityWindows.find((window) => window.start <= start && window.end >= end) ?? null;
+    return availabilityWindows.find(
+      (window) => window.start <= start && window.end >= end,
+    ) ?? null;
   };
 
   const getAppointmentConflictForRange = (start: Date, end: Date) =>
@@ -1263,7 +1401,10 @@ export function DoctorCalendar({
       return appointmentStart < end && appointmentEnd > start;
     });
 
-  const getSlotStateForRange = (start: Date, end: Date): {
+  const getSlotStateForRange = (
+    start: Date,
+    end: Date,
+  ): {
     blockingOverride: AvailabilityOverride | null;
     availabilitySlot: AvailabilitySlot | null;
     hasAppointmentConflict: boolean;
@@ -1277,10 +1418,10 @@ export function DoctorCalendar({
 
     return {
       blockingOverride,
-      availabilitySlot:
-        availabilityWindow
-          ? availabilitySlots.find((slot) => availabilityWindow.slotIds.includes(slot.id)) ?? null
-          : null,
+      availabilitySlot: availabilityWindow
+        ? availabilitySlots.find((slot) => availabilityWindow.slotIds.includes(slot.id)) ??
+          null
+        : null,
       hasAppointmentConflict,
       isPast,
       kind: blockingOverride
@@ -1314,7 +1455,9 @@ export function DoctorCalendar({
       className: cn(
         "scheduler-event",
         event.type === "appointment" && "scheduler-event-appointment",
-        event.type === "appointment" && selectedAppointmentId === event.id && "scheduler-event-appointment-selected",
+        event.type === "appointment" &&
+          selectedAppointmentId === event.id &&
+          "scheduler-event-appointment-selected",
         event.type === "blackout" && "scheduler-event-blackout",
         event.type === "custom_hours" && "scheduler-event-custom-hours",
       ),
@@ -1358,7 +1501,10 @@ export function DoctorCalendar({
     }
   };
 
-  const handleHeaderContextMenu = (event: React.MouseEvent<HTMLElement>, date: Date) => {
+  const handleHeaderContextMenu = (
+    event: React.MouseEvent<HTMLElement>,
+    date: Date,
+  ) => {
     event.preventDefault();
     setQuickActionSlot(null);
     clearAppointmentSelection();
@@ -1370,7 +1516,10 @@ export function DoctorCalendar({
     });
   };
 
-  const handleOpenOverrideCreate = (date: Date, type: "blackout" | "custom_hours") => {
+  const handleOpenOverrideCreate = (
+    date: Date,
+    type: "blackout" | "custom_hours",
+  ) => {
     setContextMenuState({ open: false, x: 0, y: 0 });
     setQuickActionSlot(null);
     clearAppointmentSelection();
@@ -1390,13 +1539,18 @@ export function DoctorCalendar({
       override?: AvailabilityOverride | null;
     },
   ) => {
-    const anchorSource = slotInfo.box ?? slotInfo.bounds ?? calendarShellRef.current?.getBoundingClientRect();
+    const anchorSource =
+      slotInfo.box ??
+      slotInfo.bounds ??
+      calendarShellRef.current?.getBoundingClientRect();
+
     if (!anchorSource) {
       return;
     }
 
     setContextMenuState({ open: false, x: 0, y: 0 });
     clearAppointmentSelection();
+
     setQuickActionSlot({
       open: true,
       kind: config.kind,
@@ -1404,12 +1558,16 @@ export function DoctorCalendar({
       end: slotInfo.end,
       dayOfWeek: slotInfo.start.getDay(),
       dateLabel: format(slotInfo.start, "d MMMM yyyy, EEEE", { locale: tr }),
-      timeLabel: `${format(slotInfo.start, "HH:mm")} - ${format(slotInfo.end, "HH:mm")}`,
+      timeLabel: `${format(slotInfo.start, "HH:mm")} - ${format(
+        slotInfo.end,
+        "HH:mm",
+      )}`,
       anchor: {
         left: "left" in anchorSource ? anchorSource.left : anchorSource.x,
         right: "right" in anchorSource ? anchorSource.right : anchorSource.x,
         top: "top" in anchorSource ? anchorSource.top : anchorSource.y,
-        bottom: "bottom" in anchorSource ? anchorSource.bottom : anchorSource.y,
+        bottom:
+          "bottom" in anchorSource ? anchorSource.bottom : anchorSource.y,
       },
       availabilitySlot: config.availabilitySlot ?? null,
       override: config.override ?? null,
@@ -1466,7 +1624,10 @@ export function DoctorCalendar({
     }
 
     const rafId = window.requestAnimationFrame(() => {
-      const draftElement = calendarShellRef.current?.querySelector(".scheduler-event-draft") as HTMLElement | null;
+      const draftElement = calendarShellRef.current?.querySelector(
+        ".scheduler-event-draft",
+      ) as HTMLElement | null;
+
       if (!draftElement) {
         return;
       }
@@ -1526,29 +1687,44 @@ export function DoctorCalendar({
     );
   }
 
-  const quickActionPosition = quickActionSlot?.open && !isMobile
-    ? getQuickActionPosition(quickActionSlot.anchor, calendarShellRef.current?.getBoundingClientRect() ?? null)
-    : null;
+  const quickActionPosition =
+    quickActionSlot?.open && !isMobile
+      ? getQuickActionPosition(
+          quickActionSlot.anchor,
+          calendarShellRef.current?.getBoundingClientRect() ?? null,
+        )
+      : null;
+
   const calendarHeight =
-    resolvedView === Views.MONTH
-      ? 920
-      : resolvedView === Views.AGENDA
-        ? 760
-        : 1320;
+    resolvedView === Views.MONTH ? 920 : resolvedView === Views.AGENDA ? 760 : 1320;
+
   const quickActionBadge =
     quickActionSlot?.kind === "available"
-      ? { label: "Musait zaman", className: "border-success/30 bg-success/10 text-success" }
+      ? {
+          label: "Musait zaman",
+          className: "border-success/30 bg-success/10 text-success",
+        }
       : quickActionSlot?.kind === "blocked"
         ? {
-            label: quickActionSlot.override?.type === "blackout" ? "Kapali gun" : "Blok / istisna",
+            label:
+              quickActionSlot.override?.type === "blackout"
+                ? "Kapali gun"
+                : "Blok / istisna",
             className:
               quickActionSlot.override?.type === "blackout"
                 ? "border-destructive/25 bg-destructive/10 text-destructive"
                 : "border-warning/30 bg-warning/10 text-warning",
           }
-        : { label: "Musait degil", className: "border-border/70 bg-muted/50 text-muted-foreground" };
+        : {
+            label: "Musait degil",
+            className: "border-border/70 bg-muted/50 text-muted-foreground",
+          };
+
   const canBlockSelectedRange =
-    mode === "staff" && !!quickActionSlot && (quickActionSlot.kind === "available" || quickActionSlot.kind === "unavailable");
+    mode === "staff" &&
+    !!quickActionSlot &&
+    (quickActionSlot.kind === "available" ||
+      quickActionSlot.kind === "unavailable");
 
   const handleQuickActionEditAvailability = () => {
     if (!quickActionSlot?.availabilitySlot) {
@@ -1577,6 +1753,7 @@ export function DoctorCalendar({
     setManualPatientPhone("");
     setManualPatientNote("");
     setAppointmentNotes("");
+
     setAppointmentComposer({
       open: true,
       start: quickActionSlot.start,
@@ -1584,6 +1761,7 @@ export function DoctorCalendar({
       dateLabel: quickActionSlot.dateLabel,
       timeLabel: quickActionSlot.timeLabel,
     });
+
     setQuickActionSlot(null);
   };
 
@@ -1622,18 +1800,54 @@ export function DoctorCalendar({
       return;
     }
 
-    if (quickActionSlot.override.type === "custom_hours") {
-      reopenQuickBlock.mutate({
-        override: quickActionSlot.override,
-        reopenStart: quickActionSlot.start,
-        reopenEnd: quickActionSlot.end,
+    const override = quickActionSlot.override;
+
+    if (override.type === "custom_hours") {
+      if (!override.start_time || !override.end_time) {
+        setQuickActionSlot(null);
+        clearAppointmentSelection();
+        setOverrideToDelete(override);
+        return;
+      }
+
+      const overrideRange = normalizeMinuteRange(
+        timeToMinutes(override.start_time),
+        timeToMinutes(override.end_time),
+      );
+
+      const selectedRange = normalizeMinuteRange(
+        timeToMinutes(format(quickActionSlot.start, "HH:mm")),
+        timeToMinutes(format(quickActionSlot.end, "HH:mm")),
+      );
+
+      const exactMatch =
+        overrideRange.start === selectedRange.start &&
+        overrideRange.end === selectedRange.end;
+
+      if (exactMatch) {
+        setQuickActionSlot(null);
+        clearAppointmentSelection();
+        setOverrideToDelete(override);
+        return;
+      }
+
+      toast.info(
+        "Kismi blok acma bu surumde desteklenmiyor. Istisnayi duzenleme ekranindan degistirin.",
+      );
+
+      setQuickActionSlot(null);
+      clearAppointmentSelection();
+      setOverrideModal({
+        open: true,
+        mode: "edit",
+        override,
       });
       return;
     }
 
     setQuickActionSlot(null);
     clearAppointmentSelection();
-    setOverrideToDelete(quickActionSlot.override);
+    setOverrideToDelete(override);
   };
 
   const handleQuickActionBlockTime = () => {
@@ -1643,6 +1857,7 @@ export function DoctorCalendar({
 
     clearAppointmentSelection();
     setBlockReason("");
+
     setBlockActionState({
       open: true,
       start: quickActionSlot.start,
@@ -1650,6 +1865,7 @@ export function DoctorCalendar({
       dateLabel: quickActionSlot.dateLabel,
       timeLabel: quickActionSlot.timeLabel,
     });
+
     setQuickActionSlot(null);
   };
 
@@ -1665,12 +1881,19 @@ export function DoctorCalendar({
     }
 
     const slotState = getSlotStateForRange(slotInfo.start, slotInfo.end);
-    const selectionIsFullyCoveredByBlockingOverride =
-      slotState.blockingOverride
-        ? isRangeFullyCoveredByOverride(slotState.blockingOverride, slotInfo.start, slotInfo.end)
-        : false;
 
-    if (slotState.blockingOverride && selectionIsFullyCoveredByBlockingOverride) {
+    const selectionIsFullyCoveredByBlockingOverride = slotState.blockingOverride
+      ? isRangeFullyCoveredByOverride(
+          slotState.blockingOverride,
+          slotInfo.start,
+          slotInfo.end,
+        )
+      : false;
+
+    if (
+      slotState.blockingOverride &&
+      selectionIsFullyCoveredByBlockingOverride
+    ) {
       openQuickAction(slotInfo, {
         kind: "blocked",
         availabilitySlot: slotState.availabilitySlot,
@@ -1697,7 +1920,11 @@ export function DoctorCalendar({
       return;
     }
 
-    if (slotState.kind === "available" && slotState.availabilitySlot && mode !== "staff") {
+    if (
+      slotState.kind === "available" &&
+      slotState.availabilitySlot &&
+      mode !== "staff"
+    ) {
       setQuickActionSlot(null);
       setAvailabilityModal({
         open: true,
@@ -1727,7 +1954,8 @@ export function DoctorCalendar({
       return;
     }
 
-    const sourceElement = sourceTarget instanceof HTMLElement ? sourceTarget : null;
+    const sourceElement =
+      sourceTarget instanceof HTMLElement ? sourceTarget : null;
     if (sourceElement?.closest(".rbc-event")) {
       return;
     }
@@ -1776,118 +2004,143 @@ export function DoctorCalendar({
       </div>
 
       <BigCalendar<SchedulerEvent>
-          className="scheduler-calendar"
-          views={{
-            month: true,
-            agenda: true,
-            day: true,
-            week: RollingWeekView,
-          }}
-          components={{
-            header: ({ date }) => (
-              <CalendarHeader date={date} onContextMenu={handleHeaderContextMenu} />
-            ),
-            dateHeader: ({ date, label }) => (
-              resolvedView === Views.MONTH ? (
-                <div className={cn("scheduler-month-date", isToday(date) && "scheduler-month-date-today")}>
-                  {label}
-                </div>
-              ) : (
-                <CalendarHeader date={date} onContextMenu={handleHeaderContextMenu} />
-              )
-            ),
-            toolbar: (toolbarProps) => (
-              <CustomToolbar
-                {...toolbarProps}
-                onManageAvailability={() => {
-                  setQuickActionSlot(null);
-                  clearAppointmentSelection();
-                  setIsAvailabilitySheetOpen(true);
-                }}
+        className="scheduler-calendar"
+        views={{
+          month: true,
+          agenda: true,
+          day: true,
+          week: RollingWeekView,
+        }}
+        components={{
+          header: ({ date }) => (
+            <CalendarHeader
+              date={date}
+              onContextMenu={handleHeaderContextMenu}
+            />
+          ),
+          dateHeader: ({ date, label }) =>
+            resolvedView === Views.MONTH ? (
+              <div
+                className={cn(
+                  "scheduler-month-date",
+                  isToday(date) && "scheduler-month-date-today",
+                )}
+              >
+                {label}
+              </div>
+            ) : (
+              <CalendarHeader
+                date={date}
+                onContextMenu={handleHeaderContextMenu}
               />
             ),
-            event: ({ event, title }) => <CalendarEventContent event={event} title={title} />,
-          }}
-          localizer={localizer}
-          events={events}
-          backgroundEvents={activeDraftPreview ? [...availabilitySurfaceEvents, activeDraftPreview] : availabilitySurfaceEvents}
-          defaultView={Views.WEEK}
-          view={resolvedView}
-          date={resolvedCurrentDate}
-          selected={selectedCalendarEvent ?? undefined}
-          startAccessor="start"
-          endAccessor="end"
-          style={{ height: calendarHeight }}
-          messages={calendarMessages}
-          eventPropGetter={eventPropGetter}
-          backgroundEventPropGetter={eventPropGetter}
-          enableAutoScroll={false}
-          slotPropGetter={(date) => {
-            const isPast = date < new Date();
-            const blockingOverride = getBlockingOverrideForDate(date);
-            return {
-              className: cn(
-                "scheduler-slot",
-                blockingOverride?.type === "blackout" && "scheduler-slot-blackout",
-                blockingOverride?.type === "custom_hours" && "scheduler-slot-custom",
-                isPast && "scheduler-slot-past",
-              ),
-              ...(isMobile && (resolvedView === Views.DAY || resolvedView === Views.WEEK)
-                ? {
-                    onClick: (event: { currentTarget: HTMLElement; target: EventTarget | null }) => {
-                      handleMobileSlotTap(date, event.currentTarget, event.target);
-                    },
-                    onTouchEnd: (event: { currentTarget: HTMLElement; target: EventTarget | null; preventDefault: () => void }) => {
-                      event.preventDefault();
-                      handleMobileSlotTap(date, event.currentTarget, event.target);
-                    },
-                  }
-                : {}),
-            };
-          }}
-          onNavigate={(date) => {
-            setQuickActionSlot(null);
-            clearAppointmentSelection();
-            setCalendarDate(date);
-          }}
-          onView={(nextView) => {
-            setQuickActionSlot(null);
-            clearAppointmentSelection();
-            setCalendarView(nextView);
-          }}
-          onDrillDown={(date, nextView) => {
-            void nextView;
-            setQuickActionSlot(null);
-            clearAppointmentSelection();
-            setCalendarDate(date);
-            setCalendarView(Views.DAY);
-          }}
-          getDrilldownView={() => Views.DAY}
-          onSelectSlot={(slotInfo) => {
-            const lastMobileSlotTap = lastMobileSlotTapRef.current;
-            if (
-              isMobile &&
-              lastMobileSlotTap &&
-              lastMobileSlotTap.start === slotInfo.start.getTime() &&
-              Date.now() - lastMobileSlotTap.timestamp < 800
-            ) {
-              lastMobileSlotTapRef.current = null;
-              return;
-            }
+          toolbar: (toolbarProps) => (
+            <CustomToolbar
+              {...toolbarProps}
+              onManageAvailability={() => {
+                setQuickActionSlot(null);
+                clearAppointmentSelection();
+                setIsAvailabilitySheetOpen(true);
+              }}
+            />
+          ),
+          event: ({ event, title }) => (
+            <CalendarEventContent event={event} title={title} />
+          ),
+        }}
+        localizer={localizer}
+        events={events}
+        backgroundEvents={
+          activeDraftPreview
+            ? [...availabilitySurfaceEvents, activeDraftPreview]
+            : availabilitySurfaceEvents
+        }
+        defaultView={Views.WEEK}
+        view={resolvedView}
+        date={resolvedCurrentDate}
+        selected={selectedCalendarEvent ?? undefined}
+        startAccessor="start"
+        endAccessor="end"
+        style={{ height: calendarHeight }}
+        messages={calendarMessages}
+        eventPropGetter={eventPropGetter}
+        backgroundEventPropGetter={eventPropGetter}
+        enableAutoScroll={false}
+        slotPropGetter={(date) => {
+          const isPast = date < new Date();
+          const blockingOverride = getBlockingOverrideForDate(date);
 
-            handleSlotSelection(slotInfo);
-          }}
-          onSelectEvent={handleSelectEvent}
-          selectable
-          popup
-          culture="tr"
-          step={30}
-          timeslots={2}
-          min={setMinutes(setHours(new Date(), 6), 0)}
-          max={setMinutes(setHours(new Date(), 23), 0)}
-          drilldownView={Views.DAY}
-          dayLayoutAlgorithm="no-overlap"
-        />
+          return {
+            className: cn(
+              "scheduler-slot",
+              blockingOverride?.type === "blackout" && "scheduler-slot-blackout",
+              blockingOverride?.type === "custom_hours" && "scheduler-slot-custom",
+              isPast && "scheduler-slot-past",
+            ),
+            ...(isMobile &&
+            (resolvedView === Views.DAY || resolvedView === Views.WEEK)
+              ? {
+                  onClick: (event: {
+                    currentTarget: HTMLElement;
+                    target: EventTarget | null;
+                  }) => {
+                    handleMobileSlotTap(date, event.currentTarget, event.target);
+                  },
+                  onTouchEnd: (event: {
+                    currentTarget: HTMLElement;
+                    target: EventTarget | null;
+                    preventDefault: () => void;
+                  }) => {
+                    event.preventDefault();
+                    handleMobileSlotTap(date, event.currentTarget, event.target);
+                  },
+                }
+              : {}),
+          };
+        }}
+        onNavigate={(date) => {
+          setQuickActionSlot(null);
+          clearAppointmentSelection();
+          setCalendarDate(date);
+        }}
+        onView={(nextView) => {
+          setQuickActionSlot(null);
+          clearAppointmentSelection();
+          setCalendarView(nextView);
+        }}
+        onDrillDown={(date, nextView) => {
+          void nextView;
+          setQuickActionSlot(null);
+          clearAppointmentSelection();
+          setCalendarDate(date);
+          setCalendarView(Views.DAY);
+        }}
+        getDrilldownView={() => Views.DAY}
+        onSelectSlot={(slotInfo) => {
+          const lastMobileSlotTap = lastMobileSlotTapRef.current;
+          if (
+            isMobile &&
+            lastMobileSlotTap &&
+            lastMobileSlotTap.start === slotInfo.start.getTime() &&
+            Date.now() - lastMobileSlotTap.timestamp < 800
+          ) {
+            lastMobileSlotTapRef.current = null;
+            return;
+          }
+
+          handleSlotSelection(slotInfo);
+        }}
+        onSelectEvent={handleSelectEvent}
+        selectable
+        popup
+        culture="tr"
+        step={30}
+        timeslots={2}
+        min={setMinutes(setHours(new Date(), 6), 0)}
+        max={setMinutes(setHours(new Date(), 23), 0)}
+        drilldownView={Views.DAY}
+        dayLayoutAlgorithm="no-overlap"
+      />
 
       {quickActionSlot?.open && quickActionPosition ? (
         <div
@@ -1905,10 +2158,17 @@ export function DoctorCalendar({
                       ? "Blok / istisna"
                       : "Takvim baglami"}
                 </p>
-                <h3 className="text-lg font-display font-semibold text-foreground">{doctorName}</h3>
-                <p className="text-sm text-muted-foreground">{specializationName}</p>
+                <h3 className="text-lg font-display font-semibold text-foreground">
+                  {doctorName}
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  {specializationName}
+                </p>
               </div>
-              <Badge variant="outline" className={cn("rounded-full", quickActionBadge.className)}>
+              <Badge
+                variant="outline"
+                className={cn("rounded-full", quickActionBadge.className)}
+              >
                 {quickActionBadge.label}
               </Badge>
             </div>
@@ -1917,15 +2177,22 @@ export function DoctorCalendar({
               <div className="space-y-2 text-sm">
                 <div className="flex items-center justify-between gap-3">
                   <span className="text-muted-foreground">Tarih</span>
-                  <span className="text-right font-medium text-foreground">{quickActionSlot.dateLabel}</span>
+                  <span className="text-right font-medium text-foreground">
+                    {quickActionSlot.dateLabel}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between gap-3">
                   <span className="text-muted-foreground">Saat</span>
-                  <span className="font-medium text-foreground">{quickActionSlot.timeLabel}</span>
+                  <span className="font-medium text-foreground">
+                    {quickActionSlot.timeLabel}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between gap-3">
                   <span className="text-muted-foreground">Durum</span>
-                  <Badge variant="outline" className={cn("rounded-full", quickActionBadge.className)}>
+                  <Badge
+                    variant="outline"
+                    className={cn("rounded-full", quickActionBadge.className)}
+                  >
                     {quickActionBadge.label}
                   </Badge>
                 </div>
@@ -2010,10 +2277,11 @@ export function DoctorCalendar({
                     variant="destructive"
                     className="justify-start rounded-xl"
                     onClick={handleQuickActionRemoveOverride}
-                    disabled={reopenQuickBlock.isPending}
                   >
                     <Trash2 className="mr-2 h-4 w-4" />
-                    {quickActionSlot.override?.type === "custom_hours" ? "Secili zamani ac" : "Istisnayi kaldir"}
+                    {quickActionSlot.override?.type === "custom_hours"
+                      ? "Istisnayi duzenle / kaldir"
+                      : "Istisnayi kaldir"}
                   </Button>
                 </>
               ) : null}
@@ -2022,7 +2290,10 @@ export function DoctorCalendar({
         </div>
       ) : null}
 
-      <Drawer open={Boolean(quickActionSlot?.open) && isMobile} onOpenChange={(open) => !open && setQuickActionSlot(null)}>
+      <Drawer
+        open={Boolean(quickActionSlot?.open) && isMobile}
+        onOpenChange={(open) => !open && setQuickActionSlot(null)}
+      >
         <DrawerContent className="rounded-t-[28px]">
           <DrawerHeader>
             <DrawerTitle>
@@ -2043,26 +2314,37 @@ export function DoctorCalendar({
                 <div className="space-y-2 text-sm">
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-muted-foreground">Doktor</span>
-                    <span className="text-right font-medium text-foreground">{doctorName}</span>
+                    <span className="text-right font-medium text-foreground">
+                      {doctorName}
+                    </span>
                   </div>
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-muted-foreground">Tarih</span>
-                    <span className="text-right font-medium text-foreground">{quickActionSlot.dateLabel}</span>
+                    <span className="text-right font-medium text-foreground">
+                      {quickActionSlot.dateLabel}
+                    </span>
                   </div>
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-muted-foreground">Saat</span>
-                    <span className="font-medium text-foreground">{quickActionSlot.timeLabel}</span>
+                    <span className="font-medium text-foreground">
+                      {quickActionSlot.timeLabel}
+                    </span>
                   </div>
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-muted-foreground">Durum</span>
-                    <Badge variant="outline" className={cn("rounded-full", quickActionBadge.className)}>
+                    <Badge
+                      variant="outline"
+                      className={cn("rounded-full", quickActionBadge.className)}
+                    >
                       {quickActionBadge.label}
                     </Badge>
                   </div>
                   {quickActionSlot.override?.reason ? (
                     <div className="flex items-start justify-between gap-3">
                       <span className="text-muted-foreground">Not</span>
-                      <span className="text-right font-medium text-foreground">{quickActionSlot.override.reason}</span>
+                      <span className="text-right font-medium text-foreground">
+                        {quickActionSlot.override.reason}
+                      </span>
                     </div>
                   ) : null}
                 </div>
@@ -2140,7 +2422,9 @@ export function DoctorCalendar({
                       onClick={handleQuickActionRemoveOverride}
                     >
                       <Trash2 className="mr-2 h-4 w-4" />
-                      Istisnayi kaldir
+                      {quickActionSlot.override?.type === "custom_hours"
+                        ? "Istisnayi duzenle / kaldir"
+                        : "Istisnayi kaldir"}
                     </Button>
                   </>
                 ) : null}
@@ -2179,15 +2463,21 @@ export function DoctorCalendar({
                 <div className="space-y-2 text-sm">
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-muted-foreground">Doktor</span>
-                    <span className="text-right font-medium text-foreground">{doctorName}</span>
+                    <span className="text-right font-medium text-foreground">
+                      {doctorName}
+                    </span>
                   </div>
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-muted-foreground">Tarih</span>
-                    <span className="text-right font-medium text-foreground">{appointmentComposer.dateLabel}</span>
+                    <span className="text-right font-medium text-foreground">
+                      {appointmentComposer.dateLabel}
+                    </span>
                   </div>
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-muted-foreground">Saat</span>
-                    <span className="text-right font-medium text-foreground">{appointmentComposer.timeLabel}</span>
+                    <span className="text-right font-medium text-foreground">
+                      {appointmentComposer.timeLabel}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -2262,11 +2552,16 @@ export function DoctorCalendar({
                             <div className="min-w-0">
                               <div className="font-medium text-foreground">{patientName}</div>
                               <div className="text-sm text-muted-foreground">
-                                {[patient.phone, patient.email].filter(Boolean).join(" - ") || "Iletisim bilgisi yok"}
+                                {[patient.phone, patient.email]
+                                  .filter(Boolean)
+                                  .join(" - ") || "Iletisim bilgisi yok"}
                               </div>
                             </div>
                             {isSelected ? (
-                              <Badge variant="outline" className="rounded-full border-primary/25 bg-primary/10 text-primary">
+                              <Badge
+                                variant="outline"
+                                className="rounded-full border-primary/25 bg-primary/10 text-primary"
+                              >
                                 Secili
                               </Badge>
                             ) : null}
@@ -2377,21 +2672,30 @@ export function DoctorCalendar({
                 <div className="space-y-2 text-sm">
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-muted-foreground">Doktor</span>
-                    <span className="text-right font-medium text-foreground">{doctorName}</span>
+                    <span className="text-right font-medium text-foreground">
+                      {doctorName}
+                    </span>
                   </div>
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-muted-foreground">Tarih</span>
-                    <span className="text-right font-medium text-foreground">{blockActionState.dateLabel}</span>
+                    <span className="text-right font-medium text-foreground">
+                      {blockActionState.dateLabel}
+                    </span>
                   </div>
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-muted-foreground">Saat</span>
-                    <span className="text-right font-medium text-foreground">{blockActionState.timeLabel}</span>
+                    <span className="text-right font-medium text-foreground">
+                      {blockActionState.timeLabel}
+                    </span>
                   </div>
                 </div>
               </div>
 
               <div className="space-y-2">
-                <label htmlFor="quick-block-reason" className="text-sm font-medium text-foreground">
+                <label
+                  htmlFor="quick-block-reason"
+                  className="text-sm font-medium text-foreground"
+                >
                   Sebep
                 </label>
                 <Input
@@ -2429,7 +2733,9 @@ export function DoctorCalendar({
 
       <DropdownMenu
         open={contextMenuState.open}
-        onOpenChange={(open) => setContextMenuState((current) => ({ ...current, open }))}
+        onOpenChange={(open) =>
+          setContextMenuState((current) => ({ ...current, open }))
+        }
       >
         <DropdownMenuTrigger asChild>
           <button
@@ -2444,17 +2750,27 @@ export function DoctorCalendar({
           align="start"
           sideOffset={4}
           className="w-52 rounded-xl"
-          style={{ position: "fixed", left: contextMenuState.x, top: contextMenuState.y }}
+          style={{
+            position: "fixed",
+            left: contextMenuState.x,
+            top: contextMenuState.y,
+          }}
         >
           <DropdownMenuItem
-            onClick={() => contextMenuState.date && handleOpenOverrideCreate(contextMenuState.date, "blackout")}
+            onClick={() =>
+              contextMenuState.date &&
+              handleOpenOverrideCreate(contextMenuState.date, "blackout")
+            }
           >
             Bu gunu kapat
           </DropdownMenuItem>
           <DropdownMenuItem
-            onClick={() => contextMenuState.date && handleOpenOverrideCreate(contextMenuState.date, "custom_hours")}
+            onClick={() =>
+              contextMenuState.date &&
+              handleOpenOverrideCreate(contextMenuState.date, "custom_hours")
+            }
           >
-            Ozel saat belirle
+            Bloklu zaman ekle
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -2515,9 +2831,15 @@ export function DoctorCalendar({
                               .update(slot.id, { isActive: checked })
                               .then(() => {
                                 toast.success("Musaitlik durumu guncellendi");
-                                return queryClient.invalidateQueries({ queryKey: ["availability", doctorId] });
+                                return queryClient.invalidateQueries({
+                                  queryKey: ["availability", doctorId],
+                                });
                               })
-                              .then(() => queryClient.invalidateQueries({ queryKey: ["doctor-calendar", doctorId] }))
+                              .then(() =>
+                                queryClient.invalidateQueries({
+                                  queryKey: ["doctor-calendar", doctorId],
+                                }),
+                              )
                               .catch((error: unknown) => {
                                 toast.error(
                                   error instanceof Error
@@ -2571,7 +2893,7 @@ export function DoctorCalendar({
                 <div>
                   <h3 className="font-semibold">Istisnalar</h3>
                   <p className="text-sm text-muted-foreground">
-                    Son 30 gun ve gelecek icin planlanan ozel kapanis veya mesai istisnalari.
+                    Son 30 gun ve gelecek icin planlanan gunluk kapanis ve bloklu zaman istisnalari.
                   </p>
                 </div>
                 <Button
@@ -2610,15 +2932,22 @@ export function DoctorCalendar({
                         <div className="flex items-start justify-between gap-3">
                           <div className="space-y-2">
                             <div className="font-semibold">
-                              {format(new Date(override.date), "d MMMM yyyy", { locale: tr })}
+                              {format(new Date(override.date), "d MMMM yyyy", {
+                                locale: tr,
+                              })}
                             </div>
                             <div className="flex items-center gap-2">
                               <Badge variant="outline" className={badge.className}>
                                 {badge.label}
                               </Badge>
-                              {override.type === "custom_hours" && override.start_time && override.end_time ? (
+                              {override.type === "custom_hours" &&
+                              override.start_time &&
+                              override.end_time ? (
                                 <span className="text-sm text-muted-foreground">
-                                  {formatTimeRange(override.start_time, override.end_time)}
+                                  {formatTimeRange(
+                                    override.start_time,
+                                    override.end_time,
+                                  )}
                                 </span>
                               ) : null}
                             </div>
@@ -2664,7 +2993,6 @@ export function DoctorCalendar({
                 </div>
               )}
             </div>
-
           </div>
         </SheetContent>
       </Sheet>
@@ -2675,12 +3003,17 @@ export function DoctorCalendar({
             <AlertDialogTitle>Musaitlik silinsin mi?</AlertDialogTitle>
             <AlertDialogDescription>
               {slotToDelete
-                ? `${dayLabels[slotToDelete.day_of_week]} gunundeki ${formatTimeRange(slotToDelete.start_time, slotToDelete.end_time)} araligi kaldirilacak.`
+                ? `${dayLabels[slotToDelete.day_of_week]} gunundeki ${formatTimeRange(
+                    slotToDelete.start_time,
+                    slotToDelete.end_time,
+                  )} araligi kaldirilacak.`
                 : "Bu musaitlik slotu kaldirilacak."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setSlotToDelete(null)}>Iptal</AlertDialogCancel>
+            <AlertDialogCancel onClick={() => setSlotToDelete(null)}>
+              Iptal
+            </AlertDialogCancel>
             <Button
               variant="destructive"
               disabled={removeAvailability.isPending}
@@ -2702,12 +3035,16 @@ export function DoctorCalendar({
             <AlertDialogTitle>Istisna silinsin mi?</AlertDialogTitle>
             <AlertDialogDescription>
               {overrideToDelete
-                ? `${format(new Date(overrideToDelete.date), "d MMMM yyyy", { locale: tr })} tarihli istisna kaldirilacak.`
+                ? `${format(new Date(overrideToDelete.date), "d MMMM yyyy", {
+                    locale: tr,
+                  })} tarihli istisna kaldirilacak.`
                 : "Bu istisna kaldirilacak."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setOverrideToDelete(null)}>Iptal</AlertDialogCancel>
+            <AlertDialogCancel onClick={() => setOverrideToDelete(null)}>
+              Iptal
+            </AlertDialogCancel>
             <Button
               variant="destructive"
               disabled={removeOverride.isPending}
@@ -2762,7 +3099,9 @@ export function DoctorCalendar({
           setOverrideModal({ open: false, mode: "create" });
           setQuickActionSlot(null);
           clearAppointmentSelection();
-          void queryClient.invalidateQueries({ queryKey: ["availability-overrides", doctorId] });
+          void queryClient.invalidateQueries({
+            queryKey: ["availability-overrides", doctorId],
+          });
           void queryClient.invalidateQueries({ queryKey: ["doctor-calendar", doctorId] });
         }}
       />
