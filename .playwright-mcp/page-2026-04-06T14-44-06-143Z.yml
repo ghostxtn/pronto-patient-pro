@@ -1,0 +1,62 @@
+- generic [ref=e2]:
+  - region "Notifications (F8)":
+    - list
+  - region "Notifications alt+T"
+  - generic [ref=e3]:
+    - generic [ref=e8]:
+      - generic [ref=e9]:
+        - img [ref=e10]
+        - generic [ref=e14]: Pronto Klinik
+      - generic [ref=e15]:
+        - heading "Saginiz, onceligimiz." [level=2] [ref=e16]:
+          - text: Saginiz,
+          - strong [ref=e17]: onceligimiz.
+        - paragraph [ref=e18]: Modern klinik yonetimi ile randevularinizi kolayca planlayin.
+      - generic [ref=e19]:
+        - generic [ref=e20]:
+          - generic [ref=e21]: 2.4k+
+          - generic [ref=e22]: Hasta
+        - generic [ref=e23]:
+          - generic [ref=e24]: 98%
+          - generic [ref=e25]: Memnuniyet
+        - generic [ref=e26]:
+          - generic [ref=e27]: 7/24
+          - generic [ref=e28]: Destek
+    - generic [ref=e30]:
+      - generic [ref=e31]:
+        - link "Ana sayfaya don" [ref=e32] [cursor=pointer]:
+          - /url: /
+          - img [ref=e33]
+          - text: Ana sayfaya don
+        - button "TR" [ref=e35] [cursor=pointer]:
+          - generic [ref=e36]: TR
+      - generic [ref=e37]:
+        - generic [ref=e38]:
+          - img [ref=e39]
+          - generic [ref=e43]: Pronto Klinik
+        - generic [ref=e44]:
+          - heading "Tekrar hos geldiniz" [level=1] [ref=e45]
+          - paragraph [ref=e46]: Hesabiniza giris yapin
+        - button "Google ile devam et" [ref=e48] [cursor=pointer]:
+          - img
+          - text: Google ile devam et
+        - generic [ref=e53]: veya
+        - generic [ref=e54]:
+          - generic [ref=e55]:
+            - text: Email
+            - generic [ref=e56]:
+              - img [ref=e57]
+              - textbox "Email" [ref=e60]:
+                - /placeholder: you@example.com
+          - generic [ref=e61]:
+            - text: Password
+            - generic [ref=e62]:
+              - img [ref=e63]
+              - textbox "Password" [ref=e66]:
+                - /placeholder: "********"
+          - link "Forgot password?" [ref=e68] [cursor=pointer]:
+            - /url: /forgot-password
+          - button "Sign In" [ref=e69] [cursor=pointer]
+        - paragraph [ref=e70]:
+          - text: Don't have an account?
+          - button "Sign up" [ref=e71] [cursor=pointer]

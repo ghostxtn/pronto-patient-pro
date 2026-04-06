@@ -34,3 +34,4 @@ bun.lockb
 diff-review/AppointmentDetailSheet.diff.txt
 *.txt
 *.md
+backend/drizzle/meta/0012_snapshot.json

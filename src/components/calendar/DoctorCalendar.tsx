@@ -1155,12 +1155,21 @@ export function DoctorCalendar({
     );
 
     return sortedWindows.reduce<AvailabilityWindow[]>((merged, window) => {
-      const previous = merged.at(-1);
+      if (merged.length === 0) {
+        return [
+          {
+            start: window.start,
+            end: window.end,
+            slotIds: [...window.slotIds],
+          },
+        ];
+      }
+
+      const previous = merged[merged.length - 1];
 
       if (
-        previous &&
         toApiDate(previous.start) === toApiDate(window.start) &&
-        previous.end.getTime() >= window.start.getTime()
+        window.start.getTime() <= previous.end.getTime()
       ) {
         if (window.end.getTime() > previous.end.getTime()) {
           previous.end = window.end;
@@ -1169,12 +1178,14 @@ export function DoctorCalendar({
         return merged;
       }
 
-      merged.push({
-        start: window.start,
-        end: window.end,
-        slotIds: [...window.slotIds],
-      });
-      return merged;
+      return [
+        ...merged,
+        {
+          start: window.start,
+          end: window.end,
+          slotIds: [...window.slotIds],
+        },
+      ];
     }, []);
   }, [availabilitySlots, data?.overrides, rangeEnd, rangeStart]);
 
@@ -1200,13 +1211,10 @@ export function DoctorCalendar({
       return [];
     }
 
-    const availabilityEvents = resolvedView === Views.WEEK || resolvedView === Views.DAY
-      ? availabilitySurfaceEvents
-      : [];
     const appointmentEvents = appointmentsToEvents(data.appointments);
     const overrideEvents = overridesToEvents(data.overrides);
-    return [...availabilityEvents, ...overrideEvents, ...appointmentEvents];
-  }, [availabilitySurfaceEvents, data, resolvedView]);
+    return [...overrideEvents, ...appointmentEvents];
+  }, [data]);
 
   const sortedAvailabilitySlots = useMemo(
     () =>
@@ -2070,9 +2078,10 @@ export function DoctorCalendar({
         }}
         localizer={localizer}
         events={events}
-        backgroundEvents={
-          activeDraftPreview ? [activeDraftPreview] : []
-        }
+        backgroundEvents={[
+          ...availabilitySurfaceEvents,
+          ...(activeDraftPreview ? [activeDraftPreview] : []),
+        ]}
         defaultView={Views.WEEK}
         view={resolvedView}
         date={resolvedCurrentDate}
