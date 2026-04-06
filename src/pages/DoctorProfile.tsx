@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import api from "@/services/api";
+import api, { ApiError, type BookableSlot } from "@/services/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import AppLayout from "@/components/AppLayout";
@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
-import { format, addMinutes, parse, isBefore, isToday, endOfMonth, eachDayOfInterval, startOfMonth } from "date-fns";
+import { format, isBefore, isToday, endOfMonth, eachDayOfInterval, startOfMonth, parse } from "date-fns";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import {
@@ -30,21 +30,170 @@ const fadeUp = {
   }),
 };
 
+const BOOKING_UI_COPY = {
+  en: {
+    bookingGuide: "The weekly schedule is only a guide. Book only from the final time list below.",
+    bookableSlots: "Bookable Times",
+    loadingSlots: "Loading bookable times...",
+    slotLoadFailed: "Could not load bookable times for this date.",
+    expiredSlotsHidden: "Past times for today are hidden. Only remaining bookable times are shown.",
+    noRemainingToday: "There are no remaining bookable times for today.",
+    selectBookableTime: "Select a bookable time to continue.",
+    expiredSlotError: "This time has already passed today. Pick a remaining time.",
+    slotContractError: "The selected slot could not be verified. Please choose another time.",
+    patientRecordError: "Your patient record could not be found. Contact the clinic before booking.",
+    staleSlotError: "This time is no longer bookable. Please choose another available time.",
+    raceSlotError: "That time was just taken. Please choose another available time.",
+    unknownBookingError: "Booking could not be completed. Please try another available time.",
+    missingPatientIdentity: "Your patient identity could not be resolved for booking.",
+    timePending: "To be confirmed",
+  },
+  tr: {
+    bookingGuide: "Haftalik program sadece on bilgidir. Kesin uygun saatler asagidaki listeden alinmalidir.",
+    bookableSlots: "Alinabilir Saatler",
+    loadingSlots: "Alinabilir saatler yukleniyor...",
+    slotLoadFailed: "Bu tarih icin alinabilir saatler yuklenemedi.",
+    expiredSlotsHidden: "Bugun icin gecmis saatler gizlendi. Yalnizca alinabilir saatler gosteriliyor.",
+    noRemainingToday: "Bugun icin kalan alinabilir saat yok.",
+    selectBookableTime: "Devam etmek icin alinabilir bir saat secin.",
+    expiredSlotError: "Bu saat bugun icin artik gecti. Lutfen kalan bir saat secin.",
+    slotContractError: "Secilen saat dogrulanamadi. Lutfen baska bir saat secin.",
+    patientRecordError: "Hasta kaydiniz bulunamadi. Randevu almadan once klinikle iletisime gecin.",
+    staleSlotError: "Bu saat artik alinabilir degil. Lutfen listeden baska bir saat secin.",
+    raceSlotError: "Bu saat az once doldu. Lutfen baska bir saat secin.",
+    unknownBookingError: "Randevu olusturulamadi. Lutfen baska bir saat deneyin.",
+    missingPatientIdentity: "Randevu icin hasta kimligi cozumlenemedi.",
+    timePending: "Dogrulanacak",
+  },
+} as const;
+
+function parseTimeToMinutes(value: string | null | undefined): number | null {
+  if (!value) {
+    return null;
+  }
+
+  const [hours, minutes] = value.slice(0, 5).split(":").map(Number);
+
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) {
+    return null;
+  }
+
+  return (hours * 60) + minutes;
+}
+
+function addMinutesToTime(value: string, duration: number): string | null {
+  const totalMinutes = parseTimeToMinutes(value);
+
+  if (totalMinutes === null || !Number.isFinite(duration)) {
+    return null;
+  }
+
+  const nextMinutes = totalMinutes + duration;
+  const hours = String(Math.floor(nextMinutes / 60)).padStart(2, "0");
+  const minutes = String(nextMinutes % 60).padStart(2, "0");
+  return `${hours}:${minutes}`;
+}
+
+function getDurationBetweenTimes(startTime: string, endTime: string | null): number | null {
+  const startMinutes = parseTimeToMinutes(startTime);
+  const endMinutes = parseTimeToMinutes(endTime);
+
+  if (startMinutes === null || endMinutes === null || endMinutes <= startMinutes) {
+    return null;
+  }
+
+  return endMinutes - startMinutes;
+}
+
+function isSlotExpiredForDate(date: Date, startTime: string, now: Date): boolean {
+  if (!isToday(date)) {
+    return false;
+  }
+
+  const slotStart = parse(startTime, "HH:mm", date);
+  return !Number.isNaN(slotStart.getTime()) && slotStart <= now;
+}
+
+function readString(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value : null;
+}
+
+function resolvePatientBookingId(user: unknown): string | null {
+  if (!user || typeof user !== "object") {
+    return null;
+  }
+
+  const candidateUser = user as Record<string, unknown>;
+  const nestedPatient =
+    candidateUser.patient && typeof candidateUser.patient === "object"
+      ? (candidateUser.patient as Record<string, unknown>)
+      : null;
+  const nestedProfile =
+    candidateUser.profile && typeof candidateUser.profile === "object"
+      ? (candidateUser.profile as Record<string, unknown>)
+      : null;
+
+  return (
+    readString(candidateUser.patientId) ??
+    readString(candidateUser.patient_id) ??
+    readString(candidateUser.patientRecordId) ??
+    readString(candidateUser.patient_record_id) ??
+    readString(nestedPatient?.id) ??
+    readString(nestedProfile?.patientId) ??
+    readString(nestedProfile?.patient_id) ??
+    readString(candidateUser.id)
+  );
+}
+
+function mapBookingErrorMessage(error: unknown, lang: "en" | "tr") {
+  const copy = BOOKING_UI_COPY[lang];
+  const rawMessage =
+    error instanceof ApiError
+      ? error.message
+      : error instanceof Error
+        ? error.message
+        : null;
+
+  switch (rawMessage) {
+    case copy.expiredSlotError:
+    case copy.slotContractError:
+    case copy.patientRecordError:
+    case copy.staleSlotError:
+    case copy.raceSlotError:
+    case copy.missingPatientIdentity:
+      return rawMessage;
+    case "Requested time is not bookable":
+      return copy.staleSlotError;
+    case "Doctor already has an appointment in this time range":
+      return copy.raceSlotError;
+    case "Patient record not found":
+      return copy.patientRecordError;
+    case "Appointment end time must be after start time":
+      return copy.slotContractError;
+    default:
+      return rawMessage || copy.unknownBookingError;
+  }
+}
+
 export default function DoctorProfile() {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
-  const { t } = useLanguage();
+  const { lang, t } = useLanguage();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const uiCopy = BOOKING_UI_COPY[lang];
 
   const dayNames = [t.sunday, t.monday, t.tuesday, t.wednesday, t.thursday, t.friday, t.saturday];
 
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [notes, setNotes] = useState("");
-  const [slots, setSlots] = useState<string[]>([]);
+  const [slots, setSlots] = useState<BookableSlot[]>([]);
   const [visibleMonth, setVisibleMonth] = useState<Date>(new Date());
   const [slotAvailabilityByDate, setSlotAvailabilityByDate] = useState<Record<string, boolean>>({});
+  const [isLoadingSlots, setIsLoadingSlots] = useState(false);
+  const [slotLoadError, setSlotLoadError] = useState<string | null>(null);
+  const [now, setNow] = useState(() => new Date());
 
   const { data: doctor, isLoading } = useQuery({
     queryKey: ["doctor", id],
@@ -62,36 +211,72 @@ export default function DoctorProfile() {
   });
 
   useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setNow(new Date());
+    }, 30000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, []);
+
+  useEffect(() => {
     setSelectedDate(undefined);
     setSelectedSlot(null);
     setSlots([]);
     setVisibleMonth(new Date());
     setSlotAvailabilityByDate({});
+    setSlotLoadError(null);
   }, [id]);
 
   useEffect(() => {
     if (!id || !selectedDate) {
       setSlots([]);
       setSelectedSlot(null);
+      setSlotLoadError(null);
+      setIsLoadingSlots(false);
       return;
     }
 
     const dateStr = format(selectedDate, "yyyy-MM-dd");
+    let cancelled = false;
+    setIsLoadingSlots(true);
+    setSlotLoadError(null);
 
     void api.availability
       .getDoctorSlots(id, dateStr)
       .then((data) => {
+        if (cancelled) {
+          return;
+        }
+
         setSlots(data);
-        setSelectedSlot((current) => (current && data.includes(current) ? current : null));
+        setSelectedSlot((current) =>
+          current && data.some((slot) => slot.startTime === current) ? current : null,
+        );
       })
       .catch(() => {
+        if (cancelled) {
+          return;
+        }
+
         setSlots([]);
         setSelectedSlot(null);
+        setSlotLoadError(uiCopy.slotLoadFailed);
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsLoadingSlots(false);
+        }
       });
-  }, [id, selectedDate]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [id, selectedDate, uiCopy.slotLoadFailed]);
 
   const availableDays = useMemo(
-    () => availability?.map((a) => a.day_of_week) || [],
+    () => availability?.map((availabilitySlot: any) => availabilitySlot.day_of_week) || [],
     [availability],
   );
 
@@ -104,6 +289,7 @@ export default function DoctorProfile() {
     const monthStart = startOfMonth(visibleMonth);
     const monthEnd = endOfMonth(visibleMonth);
     const today = new Date();
+    const snapshotNow = new Date();
     const candidateDates = eachDayOfInterval({ start: monthStart, end: monthEnd }).filter(
       (date) =>
         !(isBefore(date, today) && !isToday(date)) &&
@@ -123,7 +309,10 @@ export default function DoctorProfile() {
 
         try {
           const daySlots = await api.availability.getDoctorSlots(id, dateStr);
-          return [dateStr, daySlots.length > 0] as const;
+          const hasBookableSlot = daySlots.some(
+            (slot) => !isSlotExpiredForDate(date, slot.startTime, snapshotNow),
+          );
+          return [dateStr, hasBookableSlot] as const;
         } catch {
           return [dateStr, false] as const;
         }
@@ -153,29 +342,147 @@ export default function DoctorProfile() {
     }
   }, [selectedDate, slotAvailabilityByDate]);
 
-  const activeSlotDuration = (() => {
-    if (!selectedDate || !availability) return 30;
-    const daySlot = availability.find((a: any) => a.day_of_week === selectedDate.getDay());
-    return daySlot?.slot_duration ?? 30;
-  })();
+  const slotOptions = useMemo(() => {
+    return slots.map((slot) => {
+      const fallbackAvailability = selectedDate
+        ? availability?.find((availabilitySlot: any) => {
+            if (availabilitySlot?.day_of_week !== selectedDate.getDay()) {
+              return false;
+            }
+
+            if (availabilitySlot?.is_active === false) {
+              return false;
+            }
+
+            const slotStartMinutes = parseTimeToMinutes(slot.startTime);
+            const blockStartMinutes = parseTimeToMinutes(availabilitySlot?.start_time);
+            const blockEndMinutes = parseTimeToMinutes(availabilitySlot?.end_time);
+            const fallbackDuration =
+              typeof availabilitySlot?.slot_duration === "number"
+                ? availabilitySlot.slot_duration
+                : Number(availabilitySlot?.slot_duration ?? 30);
+
+            return (
+              slotStartMinutes !== null &&
+              blockStartMinutes !== null &&
+              blockEndMinutes !== null &&
+              Number.isFinite(fallbackDuration) &&
+              slotStartMinutes >= blockStartMinutes &&
+              slotStartMinutes + fallbackDuration <= blockEndMinutes
+            );
+          }) ??
+          availability?.find(
+            (availabilitySlot: any) =>
+              availabilitySlot?.day_of_week === selectedDate.getDay() &&
+              availabilitySlot?.is_active !== false,
+          )
+        : null;
+
+      const fallbackDuration =
+        typeof fallbackAvailability?.slot_duration === "number"
+          ? fallbackAvailability.slot_duration
+          : Number(fallbackAvailability?.slot_duration ?? 30);
+      const durationFromShape =
+        slot.slotDuration ?? getDurationBetweenTimes(slot.startTime, slot.endTime);
+      const resolvedDuration =
+        durationFromShape ??
+        (Number.isFinite(fallbackDuration) && fallbackDuration > 0 ? fallbackDuration : 30);
+      const resolvedEndTime = slot.endTime ?? addMinutesToTime(slot.startTime, resolvedDuration);
+      const isExpiredSameDay = selectedDate
+        ? isSlotExpiredForDate(selectedDate, slot.startTime, now)
+        : false;
+
+      return {
+        ...slot,
+        resolvedDuration,
+        resolvedEndTime,
+        isExpiredSameDay,
+      };
+    });
+  }, [availability, now, selectedDate, slots]);
+
+  const selectedSlotOption = useMemo(
+    () => slotOptions.find((slot) => slot.startTime === selectedSlot) ?? null,
+    [selectedSlot, slotOptions],
+  );
+
+  const bookableSlotOptions = useMemo(
+    () => slotOptions.filter((slot) => !slot.isExpiredSameDay),
+    [slotOptions],
+  );
+
+  const expiredSlotCount = slotOptions.length - bookableSlotOptions.length;
+
+  useEffect(() => {
+    if (selectedSlotOption && !selectedSlotOption.isExpiredSameDay) {
+      return;
+    }
+
+    if (selectedSlot) {
+      setSelectedSlot(null);
+    }
+  }, [selectedSlot, selectedSlotOption]);
 
   const bookMutation = useMutation({
     mutationFn: async () => {
-      if (!user || !selectedDate || !selectedSlot || !id) throw new Error("Missing data");
-      const startTime = selectedSlot;
-      const endParsed = addMinutes(parse(selectedSlot, "HH:mm", new Date()), activeSlotDuration);
-      const endTime = format(endParsed, "HH:mm");
+      if (!user || !selectedDate || !selectedSlotOption || !id) {
+        throw new Error(uiCopy.selectBookableTime);
+      }
+
+      if (selectedSlotOption.isExpiredSameDay) {
+        throw new Error(uiCopy.expiredSlotError);
+      }
+
+      if (!selectedSlotOption.resolvedEndTime) {
+        throw new Error(uiCopy.slotContractError);
+      }
+
+      const patientId = resolvePatientBookingId(user);
+
+      if (!patientId) {
+        throw new Error(uiCopy.missingPatientIdentity);
+      }
+
       return api.appointments.create({
-        patientId: user.id,
+        patientId,
         doctorId: id,
         appointmentDate: format(selectedDate, "yyyy-MM-dd"),
-        startTime: startTime,
-        endTime: endTime,
+        startTime: selectedSlotOption.startTime,
+        endTime: selectedSlotOption.resolvedEndTime,
         notes: notes || null,
       });
     },
-    onSuccess: () => { toast.success(t.bookingSuccess); queryClient.invalidateQueries({ queryKey: ["doctor-appointments"] }); navigate("/patient/appointments"); },
-    onError: (err: any) => toast.error(err.message || t.bookingFailed),
+    onSuccess: () => {
+      toast.success(t.bookingSuccess);
+      queryClient.invalidateQueries({ queryKey: ["doctor-appointments"] });
+      navigate("/patient/appointments");
+    },
+    onError: (error: unknown) => {
+      const message = mapBookingErrorMessage(error, lang);
+      toast.error(message || t.bookingFailed);
+
+      if (message === uiCopy.staleSlotError || message === uiCopy.raceSlotError) {
+        setSelectedSlot(null);
+
+        if (id && selectedDate) {
+          const dateStr = format(selectedDate, "yyyy-MM-dd");
+          setIsLoadingSlots(true);
+          setSlotLoadError(null);
+
+          void api.availability.getDoctorSlots(id, dateStr)
+            .then((data) => {
+              setSlots(data);
+            })
+            .catch(() => {
+              setSlots([]);
+              setSlotLoadError(uiCopy.slotLoadFailed);
+            })
+            .finally(() => {
+              setIsLoadingSlots(false);
+            });
+        }
+      }
+    },
   });
 
   const isDateDisabled = (date: Date) => {
@@ -185,7 +492,6 @@ export default function DoctorProfile() {
     const dateStr = format(date, "yyyy-MM-dd");
     return slotAvailabilityByDate[dateStr] !== true;
   };
-  const availableSlots = slots;
 
   if (isLoading) return <AppLayout><div className="flex items-center justify-center py-20"><div className="h-8 w-8 rounded-full border-2 border-primary border-t-transparent animate-spin" /></div></AppLayout>;
   if (!doctor) return <AppLayout><div className="text-center py-20"><h2 className="font-display font-bold text-xl mb-2">{t.doctorNotFound}</h2><Button variant="outline" onClick={() => navigate("/patient/doctors")}>{t.backToDoctors}</Button></div></AppLayout>;
@@ -241,11 +547,11 @@ export default function DoctorProfile() {
               <h3 className="font-display font-semibold mb-3 flex items-center gap-2" style={{ color: "#1a2e3b", fontFamily: "Manrope, sans-serif", fontWeight: 600, marginBottom: "8px", display: "flex", alignItems: "center", gap: "8px" }}><Clock style={{ color: "#4f8fe6", width: 16, height: 16 }} /> {t.weeklySchedule}</h3>
               <div className="space-y-2">
                 {dayNames.map((day, idx) => {
-                  const daySlots = availability?.filter((a) => a.day_of_week === idx);
+                  const daySlots = availability?.filter((slot: any) => slot.day_of_week === idx);
                   return (
                     <div key={day} className="flex items-center justify-between text-sm">
                       <span className={cn("font-medium", daySlots && daySlots.length > 0 ? "text-foreground" : "text-muted-foreground")} style={daySlots && daySlots.length > 0 ? { color: "#1a2e3b", fontWeight: 600 } : { color: "#b5d1cc" }}>{day}</span>
-                      {daySlots && daySlots.length > 0 ? <span className="text-muted-foreground" style={{ color: "#65a98f", fontSize: "0.85rem" }}>{daySlots.map((s) => `${s.start_time.slice(0, 5)} - ${s.end_time.slice(0, 5)}`).join(", ")}</span> : <span className="text-muted-foreground/50 text-xs" style={{ color: "#b5d1cc", fontSize: "0.75rem" }}>{t.unavailable}</span>}
+                      {daySlots && daySlots.length > 0 ? <span className="text-muted-foreground" style={{ color: "#65a98f", fontSize: "0.85rem" }}>{daySlots.map((slot: any) => `${slot.start_time.slice(0, 5)} - ${slot.end_time.slice(0, 5)}`).join(", ")}</span> : <span className="text-muted-foreground/50 text-xs" style={{ color: "#b5d1cc", fontSize: "0.75rem" }}>{t.unavailable}</span>}
                     </div>
                   );
                 })}
@@ -256,7 +562,7 @@ export default function DoctorProfile() {
           <motion.div className="lg:col-span-2 space-y-4" custom={2} variants={fadeUp}>
             <div style={{ background: "white", border: "1px solid #b5d1cc", borderRadius: "16px", padding: "24px", boxShadow: "0 2px 12px rgba(79,143,230,0.08)" }}>
               <h2 className="text-xl font-display font-bold mb-1 flex items-center gap-2" style={{ color: "#1a2e3b", fontFamily: "Manrope, sans-serif", fontWeight: 700, display: "flex", alignItems: "center", gap: "8px" }}><CalendarCheck style={{ color: "#4f8fe6", width: 20, height: 20 }} /> {t.bookAnAppointment}</h2>
-              <p className="text-sm text-muted-foreground mb-6" style={{ color: "#5a7a8a", fontSize: "0.875rem", marginBottom: "24px" }}>{t.selectDateAndTime}</p>
+              <p className="text-sm text-muted-foreground mb-6" style={{ color: "#5a7a8a", fontSize: "0.875rem", marginBottom: "24px" }}>{t.selectDateAndTime} {uiCopy.bookingGuide}</p>
               <div className="grid md:grid-cols-2 gap-6">
                 <div>
                   <h3 className="text-sm font-semibold mb-3" style={{ color: "#1a2e3b", fontWeight: 600, fontSize: "0.875rem", marginBottom: "12px" }}>{t.selectDate}</h3>
@@ -299,13 +605,59 @@ export default function DoctorProfile() {
                   </div>
                 </div>
                 <div>
-                  <h3 className="text-sm font-semibold mb-3" style={{ color: "#1a2e3b", fontWeight: 600, fontSize: "0.875rem", marginBottom: "12px" }}>{selectedDate ? `${t.availableSlots} — ${format(selectedDate, "EEE, MMM d")}` : t.selectDateFirst}</h3>
-                  {selectedDate ? (availableSlots.length > 0 ? (<div className="grid grid-cols-3 gap-2">{availableSlots.map((slot) => (<button key={slot} onClick={() => setSelectedSlot(slot)} style={{ padding: "8px", borderRadius: "10px", fontSize: "0.85rem", fontWeight: 500, border: `1.5px solid ${selectedSlot === slot ? "#4f8fe6" : "#b5d1cc"}`, background: selectedSlot === slot ? "#eaf5ff" : "white", color: selectedSlot === slot ? "#4f8fe6" : "#1a2e3b", cursor: "pointer", transition: "all 0.15s" }}>{slot}</button>))}</div>) : (<div className="text-center py-8 text-muted-foreground text-sm">{t.noSlotsAvailable}</div>)) : (<div className="text-center py-8 text-muted-foreground text-sm">{t.pickDate}</div>)}
+                  <h3 className="text-sm font-semibold mb-3" style={{ color: "#1a2e3b", fontWeight: 600, fontSize: "0.875rem", marginBottom: "12px" }}>{selectedDate ? `${uiCopy.bookableSlots} - ${format(selectedDate, "EEE, MMM d")}` : t.selectDateFirst}</h3>
+                  {selectedDate && expiredSlotCount > 0 && (
+                    <p className="mb-3 text-xs" style={{ color: "#5a7a8a" }}>
+                      {uiCopy.expiredSlotsHidden}
+                    </p>
+                  )}
+                  {selectedDate ? (
+                    isLoadingSlots ? (
+                      <div className="text-center py-8 text-muted-foreground text-sm">{uiCopy.loadingSlots}</div>
+                    ) : slotLoadError ? (
+                      <div className="text-center py-8 text-sm" style={{ color: "#c65b5b" }}>{slotLoadError}</div>
+                    ) : bookableSlotOptions.length > 0 ? (
+                      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                        {bookableSlotOptions.map((slot) => {
+                          const isSelected = selectedSlot === slot.startTime;
+                          const slotLabel = slot.resolvedEndTime
+                            ? `${slot.startTime} - ${slot.resolvedEndTime}`
+                            : slot.startTime;
+
+                          return (
+                            <button
+                              key={`${slot.startTime}-${slot.resolvedEndTime ?? "open"}`}
+                              onClick={() => setSelectedSlot(slot.startTime)}
+                              style={{
+                                padding: "8px",
+                                borderRadius: "10px",
+                                fontSize: "0.85rem",
+                                fontWeight: 500,
+                                border: `1.5px solid ${isSelected ? "#4f8fe6" : "#b5d1cc"}`,
+                                background: isSelected ? "#eaf5ff" : "white",
+                                color: isSelected ? "#4f8fe6" : "#1a2e3b",
+                                cursor: "pointer",
+                                transition: "all 0.15s",
+                              }}
+                            >
+                              {slotLabel}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="text-center py-8 text-muted-foreground text-sm">
+                        {isToday(selectedDate) && slotOptions.length > 0 ? uiCopy.noRemainingToday : t.noSlotsAvailable}
+                      </div>
+                    )
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground text-sm">{t.pickDate}</div>
+                  )}
                 </div>
               </div>
             </div>
 
-            {selectedSlot && selectedDate && (
+            {selectedSlotOption && selectedDate && (
               <motion.div style={{ background: "white", border: "1px solid #b5d1cc", borderRadius: "16px", padding: "24px", boxShadow: "0 2px 12px rgba(79,143,230,0.08)" }} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
                 <h3 className="font-display font-semibold mb-3">{t.additionalNotes}</h3>
                 <Textarea placeholder={t.symptomsPlaceholder} value={notes} onChange={(e) => setNotes(e.target.value)} className="rounded-xl mb-4" rows={3} />
@@ -315,7 +667,7 @@ export default function DoctorProfile() {
                     <span className="text-muted-foreground" style={{ color: "#5a7a8a", fontSize: "0.875rem" }}>{t.doctor}</span><span className="font-medium" style={{ color: "#1a2e3b", fontWeight: 600, fontSize: "0.875rem" }}>Dr. {profile?.full_name}</span>
                     <span className="text-muted-foreground" style={{ color: "#5a7a8a", fontSize: "0.875rem" }}>{t.specialty}</span><span className="font-medium" style={{ color: "#1a2e3b", fontWeight: 600, fontSize: "0.875rem" }}>{spec?.name}</span>
                     <span className="text-muted-foreground" style={{ color: "#5a7a8a", fontSize: "0.875rem" }}>{t.date}</span><span className="font-medium" style={{ color: "#1a2e3b", fontWeight: 600, fontSize: "0.875rem" }}>{format(selectedDate, "EEEE, MMMM d, yyyy")}</span>
-                    <span className="text-muted-foreground" style={{ color: "#5a7a8a", fontSize: "0.875rem" }}>{t.time}</span><span className="font-medium" style={{ color: "#1a2e3b", fontWeight: 600, fontSize: "0.875rem" }}>{selectedSlot} — {format(addMinutes(parse(selectedSlot, "HH:mm", new Date()), activeSlotDuration), "HH:mm")}</span>
+                    <span className="text-muted-foreground" style={{ color: "#5a7a8a", fontSize: "0.875rem" }}>{t.time}</span><span className="font-medium" style={{ color: "#1a2e3b", fontWeight: 600, fontSize: "0.875rem" }}>{selectedSlotOption.startTime} - {selectedSlotOption.resolvedEndTime ?? uiCopy.timePending}</span>
                     <span className="text-muted-foreground" style={{ color: "#5a7a8a", fontSize: "0.875rem" }}>{t.fee}</span><span className="font-medium" style={{ color: "#1a2e3b", fontWeight: 600, fontSize: "0.875rem" }}>{doctor.consultation_fee ?? doctor.consultationFee ?? "-"}</span>
                   </div>
                 </div>

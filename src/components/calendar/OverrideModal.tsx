@@ -54,7 +54,6 @@ export function OverrideModal({
   const [type, setType] = useState<"blackout" | "custom_hours">("blackout");
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
-  const [reason, setReason] = useState("");
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
   useEffect(() => {
@@ -67,7 +66,6 @@ export function OverrideModal({
       setType(override.type);
       setStartTime(toTimeValue(override.start_time));
       setEndTime(toTimeValue(override.end_time));
-      setReason(override.reason ?? "");
       return;
     }
 
@@ -75,7 +73,6 @@ export function OverrideModal({
     setType(initialType);
     setStartTime("");
     setEndTime("");
-    setReason("");
   }, [initialDate, initialType, mode, open, override]);
 
   const timeError = useMemo(() => {
@@ -107,7 +104,6 @@ export function OverrideModal({
         type: "blackout" | "custom_hours";
         start_time?: string;
         end_time?: string;
-        reason?: string;
       } = {
         date,
         type,
@@ -116,10 +112,6 @@ export function OverrideModal({
       if (type === "custom_hours") {
         payload.start_time = startTime;
         payload.end_time = endTime;
-      }
-
-      if (reason.trim()) {
-        payload.reason = reason.trim();
       }
 
       if (mode === "edit" && override) {
@@ -132,7 +124,6 @@ export function OverrideModal({
         type: payload.type,
         start_time: payload.start_time,
         end_time: payload.end_time,
-        reason: payload.reason,
       });
     },
     onSuccess: () => {
@@ -258,18 +249,6 @@ export function OverrideModal({
               ) : null}
 
               {timeError ? <p className="text-sm text-destructive">{timeError}</p> : null}
-
-              <div className="space-y-2">
-                <Label htmlFor="override-reason">Sebep</Label>
-                <Input
-                  id="override-reason"
-                  type="text"
-                  value={reason}
-                  onChange={(event) => setReason(event.target.value)}
-                  placeholder="Orn. tatil, toplanti"
-                  className="rounded-xl"
-                />
-              </div>
             </div>
 
             <div className="flex items-center justify-between gap-3">

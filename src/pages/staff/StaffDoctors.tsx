@@ -496,13 +496,15 @@ export default function StaffDoctors() {
         className="relative left-1/2 w-[min(calc(100vw-1.5rem),1520px)] -translate-x-1/2 space-y-5 md:w-[min(calc(100vw-2.5rem),1520px)]"
       >
         <motion.div custom={0} variants={fadeUp}>
-          <div className="space-y-2">
+          <div className="rounded-[28px] border border-border/60 bg-card/80 px-4 py-4 shadow-soft">
             <div className="inline-flex items-center gap-2 rounded-full border border-primary/15 bg-primary/5 px-3 py-1 text-xs font-medium text-primary">
               <Stethoscope className="h-3.5 w-3.5" />
               Staff scheduler
             </div>
-            <div>
-              <h1 className="text-3xl font-display font-bold text-foreground">Doktor Takvimi</h1>
+            <div className="mt-3">
+              <h1 className="text-[1.9rem] font-display font-bold tracking-[-0.03em] text-foreground">
+                Doktor Takvimi
+              </h1>
               <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
                 Tarih gezinmesi, doktor secimi ve operasyon takvimi ayni urun dilinde bir araya gelir.
               </p>

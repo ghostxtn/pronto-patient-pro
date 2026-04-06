@@ -259,6 +259,172 @@ export type MessageResponse = {
   message: string;
 };
 
+type UnknownRecord = Record<string, unknown>;
+
+export type BookableSlot = {
+  startTime: string;
+  endTime: string | null;
+  slotDuration: number | null;
+  sourceBlockId: string | null;
+  availabilityId: string | null;
+  raw: unknown;
+};
+
+function isRecord(value: unknown): value is UnknownRecord {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function coerceTime(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const match = value.match(/^(\d{2}:\d{2})/);
+  return match ? match[1] : null;
+}
+
+function coerceNumber(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === "string" && value.trim() !== "") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  return null;
+}
+
+function coerceString(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value : null;
+}
+
+function pickFirst(record: UnknownRecord, keys: string[]): unknown {
+  for (const key of keys) {
+    if (key in record && record[key] != null) {
+      return record[key];
+    }
+  }
+
+  return null;
+}
+
+function minutesToTime(totalMinutes: number): string {
+  const hours = String(Math.floor(totalMinutes / 60)).padStart(2, "0");
+  const minutes = String(totalMinutes % 60).padStart(2, "0");
+  return `${hours}:${minutes}`;
+}
+
+function addMinutesToTime(startTime: string, duration: number): string | null {
+  const [hours, minutes] = startTime.split(":").map(Number);
+
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) {
+    return null;
+  }
+
+  return minutesToTime((hours * 60) + minutes + duration);
+}
+
+function extractBookableSlotItems(payload: unknown): unknown[] {
+  if (Array.isArray(payload)) {
+    return payload;
+  }
+
+  if (!isRecord(payload)) {
+    return [];
+  }
+
+  const nestedKeys = [
+    "slots",
+    "data",
+    "bookableSlots",
+    "bookable_slots",
+    "availableSlots",
+    "available_slots",
+  ];
+
+  for (const key of nestedKeys) {
+    const nested = extractBookableSlotItems(payload[key]);
+    if (nested.length > 0) {
+      return nested;
+    }
+  }
+
+  const directStartTime = coerceTime(
+    pickFirst(payload, ["startTime", "start_time", "time", "slot", "start"]),
+  );
+
+  return directStartTime ? [payload] : [];
+}
+
+function normalizeBookableSlotItem(item: unknown): BookableSlot | null {
+  if (typeof item === "string") {
+    const startTime = coerceTime(item);
+    return startTime
+      ? {
+          startTime,
+          endTime: null,
+          slotDuration: null,
+          sourceBlockId: null,
+          availabilityId: null,
+          raw: item,
+        }
+      : null;
+  }
+
+  if (!isRecord(item)) {
+    return null;
+  }
+
+  const startTime = coerceTime(
+    pickFirst(item, ["startTime", "start_time", "time", "slot", "start"]),
+  );
+
+  if (!startTime) {
+    return null;
+  }
+
+  const slotDuration = coerceNumber(
+    pickFirst(item, ["slotDuration", "slot_duration", "duration", "slot_length"]),
+  );
+  const explicitEndTime = coerceTime(
+    pickFirst(item, ["endTime", "end_time", "slotEnd", "end"]),
+  );
+
+  return {
+    startTime,
+    endTime: explicitEndTime ?? (slotDuration ? addMinutesToTime(startTime, slotDuration) : null),
+    slotDuration,
+    sourceBlockId: coerceString(
+      pickFirst(item, ["sourceBlockId", "source_block_id", "slotId", "slot_id", "id"]),
+    ),
+    availabilityId: coerceString(
+      pickFirst(item, ["availabilityId", "availability_id", "sourceAvailabilityId", "source_availability_id"]),
+    ),
+    raw: item,
+  };
+}
+
+export function normalizeBookableSlots(payload: unknown): BookableSlot[] {
+  const normalized = extractBookableSlotItems(payload)
+    .map(normalizeBookableSlotItem)
+    .filter((slot): slot is BookableSlot => Boolean(slot));
+
+  const deduped = new Map<string, BookableSlot>();
+
+  for (const slot of normalized) {
+    const key = `${slot.startTime}|${slot.endTime ?? ""}|${slot.slotDuration ?? ""}`;
+    if (!deduped.has(key)) {
+      deduped.set(key, slot);
+    }
+  }
+
+  return Array.from(deduped.values()).sort((left, right) =>
+    left.startTime.localeCompare(right.startTime),
+  );
+}
+
 const api = {
   auth: {
     login: (email: string, pass: string) =>
@@ -430,10 +596,10 @@ const api = {
   availability: {
     listByDoctor: (doctorId: string) => request<any[]>(`/availability/${doctorId}`),
     getDoctorSlots: (doctorId: string, date: string) =>
-      request<string[]>(
+      request<unknown>(
         `/availability/slots?doctor_id=${encodeURIComponent(doctorId)}&date=${encodeURIComponent(date)}`,
         { omitAuth: true },
-      ),
+      ).then((payload) => normalizeBookableSlots(payload)),
     create: (data: {
       doctorId: string;
       dayOfWeek: number;

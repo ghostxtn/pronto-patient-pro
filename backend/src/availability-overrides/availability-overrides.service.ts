@@ -5,13 +5,28 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { and, eq, gte, lte } from 'drizzle-orm';
+import { and, eq, gte, inArray, lte } from 'drizzle-orm';
 import {
   doctorAvailabilityOverrides,
   doctors,
 } from '../database/schema';
+import {
+  createUnionRange,
+  minutesToTime,
+  rangesOverlap,
+  timeToMinutes,
+  type MinuteRange,
+} from '../availability/calendar-time.utils';
 import { CreateAvailabilityOverrideDto } from './dto/create-availability-override.dto';
 import { UpdateAvailabilityOverrideDto } from './dto/update-availability-override.dto';
+
+type CustomHoursOverride = {
+  id: string;
+  type: string;
+  start_time: string | null;
+  end_time: string | null;
+  reason: string | null;
+};
 
 @Injectable()
 export class AvailabilityOverridesService {
@@ -55,29 +70,48 @@ export class AvailabilityOverridesService {
   async create(dto: CreateAvailabilityOverrideDto, clinicId: string) {
     await this.ensureDoctorInClinic(dto.doctor_id, clinicId);
     this.validateOverridePayload(dto);
-    await this.ensureOverrideCompatibility({
+
+    const sameDayOverrides = await this.findOverridesForDate(
+      dto.doctor_id,
       clinicId,
+      dto.date,
+    );
+    this.ensureOverrideCompatibility(sameDayOverrides, dto.type);
+
+    const overlappingCustomHours = this.findOverlappingCustomHours(
+      sameDayOverrides,
+      dto.type,
+      dto.start_time,
+      dto.end_time,
+    );
+
+    if (dto.type !== 'custom_hours' || overlappingCustomHours.length === 0) {
+      const [override] = await this.db
+        .insert(doctorAvailabilityOverrides)
+        .values({
+          clinic_id: clinicId,
+          doctor_id: dto.doctor_id,
+          date: dto.date,
+          type: dto.type,
+          start_time: dto.start_time ?? null,
+          end_time: dto.end_time ?? null,
+          reason: dto.reason ?? null,
+        })
+        .returning();
+
+      return override;
+    }
+
+    return this.normalizeCustomHoursOverlap({
+      keeperId: overlappingCustomHours[0].id,
       doctorId: dto.doctor_id,
+      clinicId,
       date: dto.date,
-      type: dto.type,
-      startTime: dto.start_time,
-      endTime: dto.end_time,
+      reason: dto.reason ?? overlappingCustomHours[0].reason ?? null,
+      startTime: dto.start_time as string,
+      endTime: dto.end_time as string,
+      overlappingOverrides: overlappingCustomHours,
     });
-
-    const [override] = await this.db
-      .insert(doctorAvailabilityOverrides)
-      .values({
-        clinic_id: clinicId,
-        doctor_id: dto.doctor_id,
-        date: dto.date,
-        type: dto.type,
-        start_time: dto.start_time ?? null,
-        end_time: dto.end_time ?? null,
-        reason: dto.reason ?? null,
-      })
-      .returning();
-
-    return override;
   }
 
   async update(id: string, dto: UpdateAvailabilityOverrideDto, clinicId: string) {
@@ -90,7 +124,7 @@ export class AvailabilityOverridesService {
     const nextEndTime =
       dto.end_time !== undefined ? dto.end_time : existing.end_time;
     const nextReason =
-      dto.reason !== undefined ? dto.reason : existing.reason ?? undefined;
+      dto.reason !== undefined ? dto.reason : existing.reason ?? null;
 
     await this.ensureDoctorInClinic(nextDoctorId, clinicId);
     this.validateOverridePayload({
@@ -98,15 +132,33 @@ export class AvailabilityOverridesService {
       start_time: nextStartTime ?? undefined,
       end_time: nextEndTime ?? undefined,
     });
-    await this.ensureOverrideCompatibility({
+
+    const comparableOverrides = (await this.findOverridesForDate(
+      nextDoctorId,
       clinicId,
-      doctorId: nextDoctorId,
-      date: nextDate,
-      type: nextType,
-      startTime: nextStartTime ?? undefined,
-      endTime: nextEndTime ?? undefined,
-      excludeId: id,
-    });
+      nextDate,
+    )).filter((override: { id: string }) => override.id !== id);
+    this.ensureOverrideCompatibility(comparableOverrides, nextType);
+
+    const overlappingCustomHours = this.findOverlappingCustomHours(
+      comparableOverrides,
+      nextType,
+      nextStartTime ?? undefined,
+      nextEndTime ?? undefined,
+    );
+
+    if (nextType === 'custom_hours' && overlappingCustomHours.length > 0) {
+      return this.normalizeCustomHoursOverlap({
+        keeperId: id,
+        doctorId: nextDoctorId,
+        clinicId,
+        date: nextDate,
+        reason: nextReason,
+        startTime: nextStartTime as string,
+        endTime: nextEndTime as string,
+        overlappingOverrides: overlappingCustomHours,
+      });
+    }
 
     const [override] = await this.db
       .update(doctorAvailabilityOverrides)
@@ -116,7 +168,7 @@ export class AvailabilityOverridesService {
         type: nextType,
         start_time: nextType === 'blackout' ? null : nextStartTime,
         end_time: nextType === 'blackout' ? null : nextEndTime,
-        reason: nextReason ?? null,
+        reason: nextReason,
         updated_at: new Date(),
       })
       .where(eq(doctorAvailabilityOverrides.id, id))
@@ -167,6 +219,23 @@ export class AvailabilityOverridesService {
     return override;
   }
 
+  private async findOverridesForDate(
+    doctorId: string,
+    clinicId: string,
+    date: string,
+  ) {
+    return this.db
+      .select()
+      .from(doctorAvailabilityOverrides)
+      .where(
+        and(
+          eq(doctorAvailabilityOverrides.doctor_id, doctorId),
+          eq(doctorAvailabilityOverrides.clinic_id, clinicId),
+          eq(doctorAvailabilityOverrides.date, date),
+        ),
+      );
+  }
+
   private validateOverridePayload(dto: {
     type: string;
     start_time?: string;
@@ -195,35 +264,17 @@ export class AvailabilityOverridesService {
     }
   }
 
-  private async ensureOverrideCompatibility(params: {
-    clinicId: string;
-    doctorId: string;
-    date: string;
-    type: string;
-    startTime?: string | null;
-    endTime?: string | null;
-    excludeId?: string;
-  }) {
-    const existingOverrides = await this.db
-      .select()
-      .from(doctorAvailabilityOverrides)
-      .where(
-        and(
-          eq(doctorAvailabilityOverrides.doctor_id, params.doctorId),
-          eq(doctorAvailabilityOverrides.clinic_id, params.clinicId),
-          eq(doctorAvailabilityOverrides.date, params.date),
-        ),
-      );
-
-    const comparableOverrides = existingOverrides.filter(
-      (override: { id: string }) => override.id !== params.excludeId,
-    );
-
-    if (params.type === 'blackout' && comparableOverrides.length > 0) {
+  private ensureOverrideCompatibility(
+    comparableOverrides: Array<{
+      type: string;
+    }>,
+    nextType: string,
+  ) {
+    if (nextType === 'blackout' && comparableOverrides.length > 0) {
       throw new ConflictException('Blackout cannot coexist with other overrides');
     }
 
-    if (params.type !== 'custom_hours') {
+    if (nextType !== 'custom_hours') {
       return;
     }
 
@@ -232,52 +283,86 @@ export class AvailabilityOverridesService {
     );
 
     if (blackoutOverride) {
-      throw new ConflictException(
-        'Custom hours cannot coexist with blackout',
-      );
-    }
-
-    const nextRange = {
-      start: this.timeToMinutes(params.startTime as string),
-      end: this.timeToMinutes(params.endTime as string),
-    };
-
-    const hasTimeConflict = comparableOverrides
-      .filter(
-        (override: {
-          type: string;
-          start_time: string | null;
-          end_time: string | null;
-        }) =>
-          override.type === 'custom_hours' &&
-          override.start_time &&
-          override.end_time,
-      )
-      .some(
-        (override: {
-          start_time: string;
-          end_time: string;
-        }) =>
-          this.rangesOverlapOrTouch(nextRange, {
-            start: this.timeToMinutes(override.start_time),
-            end: this.timeToMinutes(override.end_time),
-          }),
-      );
-
-    if (hasTimeConflict) {
-      throw new ConflictException('Custom hours cannot overlap or touch');
+      throw new ConflictException('Custom hours cannot coexist with blackout');
     }
   }
 
-  private rangesOverlapOrTouch(
-    left: { start: number; end: number },
-    right: { start: number; end: number },
+  private findOverlappingCustomHours(
+    comparableOverrides: CustomHoursOverride[],
+    nextType: string,
+    startTime?: string,
+    endTime?: string,
   ) {
-    return left.start <= right.end && right.start <= left.end;
+    if (nextType !== 'custom_hours' || !startTime || !endTime) {
+      return [];
+    }
+
+    const nextRange = this.toRange(startTime, endTime);
+
+    return comparableOverrides.filter(
+      (override) =>
+        override.type === 'custom_hours' &&
+        override.start_time &&
+        override.end_time &&
+        rangesOverlap(nextRange, this.toRange(override.start_time, override.end_time)),
+    );
   }
 
-  private timeToMinutes(time: string): number {
-    const [hours, minutes] = time.slice(0, 5).split(':').map(Number);
-    return hours * 60 + minutes;
+  private async normalizeCustomHoursOverlap(params: {
+    keeperId: string;
+    doctorId: string;
+    clinicId: string;
+    date: string;
+    reason: string | null;
+    startTime: string;
+    endTime: string;
+    overlappingOverrides: CustomHoursOverride[];
+  }) {
+    const overlappingRanges = params.overlappingOverrides
+      .filter(
+        (override) => override.start_time && override.end_time,
+      )
+      .map((override) =>
+        this.toRange(override.start_time as string, override.end_time as string),
+      );
+    const mergedRange = createUnionRange([
+      this.toRange(params.startTime, params.endTime),
+      ...overlappingRanges,
+    ]);
+    const redundantIds = params.overlappingOverrides
+      .map((override) => override.id)
+      .filter((overrideId) => overrideId !== params.keeperId);
+
+    return this.db.transaction(async (tx: any) => {
+      const [override] = await tx
+        .update(doctorAvailabilityOverrides)
+        .set({
+          clinic_id: params.clinicId,
+          doctor_id: params.doctorId,
+          date: params.date,
+          type: 'custom_hours',
+          start_time: minutesToTime(mergedRange.start),
+          end_time: minutesToTime(mergedRange.end),
+          reason: params.reason,
+          updated_at: new Date(),
+        })
+        .where(eq(doctorAvailabilityOverrides.id, params.keeperId))
+        .returning();
+
+      if (redundantIds.length > 0) {
+        await tx
+          .delete(doctorAvailabilityOverrides)
+          .where(inArray(doctorAvailabilityOverrides.id, redundantIds));
+      }
+
+      return override;
+    });
+  }
+
+  private toRange(startTime: string, endTime: string): MinuteRange {
+    return {
+      start: timeToMinutes(startTime),
+      end: timeToMinutes(endTime),
+    };
   }
 }
