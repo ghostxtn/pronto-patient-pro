@@ -25,6 +25,7 @@ import {
 import { tr } from "date-fns/locale";
 import { Pencil, Settings2, Trash2, ChevronLeft, ChevronRight, CalendarPlus, Clock, Ban } from "lucide-react";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import { AvailabilityModal } from "@/components/calendar/AvailabilityModal";
 import { OverrideModal } from "@/components/calendar/OverrideModal";
 import { AppointmentDetailSheet } from "@/components/appointments/AppointmentDetailSheet";
@@ -291,12 +292,12 @@ const SlotPopup = ({
     return () => document.removeEventListener("mousedown", handleClick);
   }, [onClose]);
 
-  const isMobile = window.innerWidth < 640;
+  const isMobile = window.innerWidth < 768;
 
   const desktopStyle: React.CSSProperties = {
     position: "fixed",
-    left: Math.min(popup.x, window.innerWidth - 240),
-    top: Math.min(popup.y, window.innerHeight - 200),
+    left: Math.max(8, Math.min(popup.x, window.innerWidth - 240)),
+    top: Math.max(8, Math.min(popup.y, window.innerHeight - 260)),
     zIndex: 50,
     width: 220,
   };
@@ -307,6 +308,7 @@ const SlotPopup = ({
     left: 0,
     right: 0,
     zIndex: 50,
+    borderRadius: "16px 16px 0 0",
   };
 
   return (
@@ -406,11 +408,13 @@ const CalendarToolbar = ({
             <button
               key={v}
               onClick={() => onView(v)}
-              className={`px-3 py-1.5 text-sm transition-colors ${
+              className={cn(
+                "px-3 py-1.5 text-sm transition-colors",
                 view === v
                   ? "bg-primary text-primary-foreground"
-                  : "hover:bg-muted text-foreground"
-              }`}
+                  : "hover:bg-muted text-foreground",
+                (v === "month" || v === "agenda") ? "hidden md:flex" : "flex"
+              )}
             >
               {viewLabels[v]}
             </button>
@@ -428,8 +432,14 @@ const CalendarToolbar = ({
 };
 
 const CalendarEventCard = ({ event }: { event: CalendarEvent }) => {
+  if (event.id === "pending-slot") {
+    return (
+      <div className="calendar-pending-slot" />
+    );
+  }
+
   let containerClass =
-    "h-full w-full rounded-md px-2 py-1 text-xs overflow-hidden truncate border-l-2 ";
+    "h-full w-full rounded-md px-1 md:px-2 py-0.5 md:py-1 text-[10px] md:text-xs overflow-hidden truncate border-l-2 ";
 
   if (event.type === "appointment") {
     containerClass += "bg-primary/10 border-primary text-primary";
@@ -495,6 +505,7 @@ export function DoctorCalendar({ doctorId, mode = "doctor" }: DoctorCalendarProp
     label: string;
   } | null>(null);
   const [selectedOverride, setSelectedOverride] = useState<AvailabilityOverride | null>(null);
+  const [pendingSlot, setPendingSlot] = useState<CalendarEvent | null>(null);
   const [contextMenuState, setContextMenuState] = useState<{
     open: boolean;
     x: number;
@@ -636,7 +647,7 @@ export function DoctorCalendar({ doctorId, mode = "doctor" }: DoctorCalendarProp
     return [...overrideEvents, ...appointmentEvents, ...availabilityEvents];
   }, [data, view, availabilitySlots, currentDate]);
 
-  const foregroundEvents = useMemo(() => events, [events]);
+  const foregroundEvents = useMemo(() => [...events, ...(pendingSlot ? [pendingSlot] : [])], [events, pendingSlot]);
 
   const sortedAvailabilitySlots = useMemo(
     () => [...availabilitySlots].sort((left, right) => getAvailabilitySortValue(left) - getAvailabilitySortValue(right)),
@@ -735,6 +746,13 @@ export function DoctorCalendar({ doctorId, mode = "doctor" }: DoctorCalendarProp
       const y = bounds?.y ?? window.innerHeight / 2;
 
       setSlotPopup({ x, y, date, start, end, label: dateLabel });
+      setPendingSlot({
+        id: "pending-slot",
+        title: "",
+        start: slotInfo.start,
+        end: slotInfo.end,
+        type: "availability",
+      });
     },
     [view]
   );
@@ -775,7 +793,7 @@ export function DoctorCalendar({ doctorId, mode = "doctor" }: DoctorCalendarProp
 
   return (
     <div className="space-y-4">
-      <div className="h-[calc(100vh-220px)] min-h-[600px]">
+      <div className="h-[calc(100vh-220px)] min-h-[600px] overflow-x-hidden" style={{ minWidth: 0 }}>
         <BigCalendar
           components={{
             header: ({ date, label }) => (
@@ -833,10 +851,11 @@ export function DoctorCalendar({ doctorId, mode = "doctor" }: DoctorCalendarProp
           onSelectSlot={handleSelectSlot}
           onSelectEvent={handleSelectEvent}
           selectable
+          longPressThreshold={10}
           popup
           culture="tr"
-          step={30}
-          timeslots={2}
+          step={15}
+          timeslots={4}
           min={setMinutes(setHours(new Date(), 6), 0)}
           max={setMinutes(setHours(new Date(), 23), 0)}
           drilldownView={Views.DAY}
@@ -1180,8 +1199,9 @@ export function DoctorCalendar({ doctorId, mode = "doctor" }: DoctorCalendarProp
         <SlotPopup
           popup={slotPopup}
           mode={mode}
-          onClose={() => setSlotPopup(null)}
+          onClose={() => { setSlotPopup(null); setPendingSlot(null); }}
           onAppointment={() => {
+            setPendingSlot(null);
             setAppointmentCreateTarget({
               date: slotPopup.date,
               start: slotPopup.start,
@@ -1190,6 +1210,7 @@ export function DoctorCalendar({ doctorId, mode = "doctor" }: DoctorCalendarProp
             setSlotPopup(null);
           }}
           onAvailability={() => {
+            setPendingSlot(null);
             setAvailabilityModal({
               open: true,
               mode: "create",
@@ -1198,6 +1219,7 @@ export function DoctorCalendar({ doctorId, mode = "doctor" }: DoctorCalendarProp
             setSlotPopup(null);
           }}
           onBlock={() => {
+            setPendingSlot(null);
             setOverrideModal({
               open: true,
               mode: "create",

@@ -1,196 +1,142 @@
-# MediBook — Calendar Milestone 1 Context
+# MediBook (Pronto Patient Pro) — AI Context & Architecture Guide
 
-## Projeyi Anlamak İçin
-
-Bu dosyayı her yeni chat'te Claude'a ver. Claude bu dosyayı okuyarak projeye devam eder.
+Bu dosya projeyi bilmeyen bir yapay zeka asistanına (Claude, Gemini vb.) projenin tüm mimarisini, dosya yapısını, kurallarını ve çalışma mantığını öğretmek için hazırlanmıştır. Önündeki tasklara başlamadan önce **bu mimari kuralları ve sistemi baz alarak** hareket et.
 
 ---
 
-## Stack
-
-- Frontend: React + Vite + TypeScript + Tailwind CSS + shadcn/ui + react-big-calendar
-- Backend: NestJS + Drizzle ORM + PostgreSQL + Redis
-- Auth: JWT + Google OAuth
-- Çalışma yöntemi: Claude (orchestrator/reviewer) → Gemini CLI (code execution)
-
----
-
-## Kesin Mimari Kurallar
-
-- Backend her zaman otorite: slot truth, overlap legality, availability authority hep backend'de
-- Frontend scheduling logic üretmez, conflict check yapmaz, availability hesaplamaz
-- Hardcoded renk yok — sadece Tailwind token ve CSS variables (hsl(var(--primary)) vb.)
-- Scope: calendar-only — homepage, auth, patient portal, admin dashboard dışarıda
-- Eski proje base alınıyor, sıfırdan rewrite yok
-- Modal yerine her zaman sağdan Sheet kullan (tutarlılık)
-- Optimistic UI yasak — mutasyon beklensin, loading state gösterilsin
-- Her Gemini prompt'unun sonuna şunu ekle:
-  "Before finishing, read the full import section of every file you modified
-  and confirm all referenced components, hooks, and utilities are actually
-  imported. If anything is missing, add it now."
+## 1. Proje Özeti
+MediBook, modern klinikler için geliştirilmiş kapsamlı bir randevu, personel, hasta ve doktor yönetim platformudur.
+Uygulamada **5 farklı rol** bulunur ve her rolün kendi dashboard'u ile yetki kapsamı vardır:
+- **Owner**: Tüm kliniğin sahibi. Üst düzey sistem ve finansal ayarlar.
+- **Admin**: Klinik yöneticisi. Doktor ve personel ekleme, çıkarma, kliniği konfigüre etme yetkisi.
+- **Staff (Sekreter)**: Telefonla veya yüz yüze gelen hastaları kaydeder, randevuları oluşturur, tüm doktorların takvimlerini yönetir.
+- **Doctor**: Kendi randevularını görüntüler, müdahale notlarını yazar (Clinical Notes), rutin müsaitlik (availability) ve izinlerini (blackout / özel saatler) belirler.
+- **Patient**: Müşferi/Hasta portalı. Sistemden doktor arar, kendi randevusunu alır, iptal eder ve profilini günceller. (Aynı zamanda landing page üzerinden dışa açık web sitesi bulunur).
 
 ---
 
-## Dosya Haritası
+## 2. Teknoloji Stack'i
 
-```
+### Frontend (Bu repo'nun ana odak noktası)
+- **Framework:** React 18 + Vite + TypeScript
+- **Styling:** Tailwind CSS + Özel CSS (`src/index.css` içerisinde CSS variables kullanılarak theme yönetimi uygulanmıştır. Koyu tema (Dark mode) desteklenir).
+- **UI Components:** `shadcn/ui` bileşenleri (Radix UI tabanlıdır), Framer Motion (Animasyonlar), Lucide React (İkonlar), Sonner / Toast (Bildirimler).
+- **Data Fetching:** `@tanstack/react-query` v5. Veriler her zaman Query aracılığıyla getirilir ve Mutation aracılığıyla değiştirilir.
+- **Routing:** `react-router-dom` v6
+- **Takvim Bileşeni:** `react-big-calendar` (uyarlamalı dizayn ve mobil uyumluluk için modifiye edilmiştir) + `date-fns` (Zaman hesaplamaları).
+
+### Backend (Klasör: `/backend`)
+- **Framework:** NestJS
+- **Database:** PostgreSQL + Drizzle ORM
+- **Cache & Geçici Veri:** Redis
+- **Auth:** JWT tabanlı (Access ve Refresh Token) + Google OAuth entegrasyonu.
+
+---
+
+## 3. Kesin Mimari Kurallar ve Yapay Zeka (AI) Talimatları
+
+Projede kod yazarken **aşağıdaki kurallara kesinlikle uy:**
+
+1. **Backend Her Zaman Otoritedir:**
+   - Frontend asla kompleks randevu algoritmaları, çakışma (overlap) hesaplamaları veya mantıksal yetkilendirme doğrulama kararları almamalıdır.
+   - Frontend'de çakışma olsa bile UI optimistik davranmamalı, otoriteyi backend API'sine bırakmalıdır.
+2. **Hardcoded Renkler YASAKTIR:**
+   - Asla `bg-[#FF0000]`, veya standart `bg-blue-500` gibi Tailwind renkleri kullanma.
+   - Projenin `index.css` dosyasına dayalı token'larını kullan: `bg-primary`, `text-primary`, `bg-muted`, `border-border`, `text-muted-foreground`, `bg-success`, `bg-destructive`.
+3. **Modal Yerine "Sheet" Kullanımı (Sağdan Çıkan Panel):**
+   - Kullanıcı etkileşimleri (kayıt ekleme, düzenleme, randevu detaylarını görüntüleme) için ekranın ortasında açılan standart modal/dialog'dan ziyade, ekranın sağından kayarak açılan `Sheet` (`shadcn/ui`) bileşenleri tercih edilmelidir (Örn: `AppointmentDetailSheet.tsx`).
+4. **Optimistic UI Sınırlaması:**
+   - Veri silme, ekleme veya güncelleme işlemlerinde optimistik yaklaşım zorunlu olmadıkça kullanılmamalıdır. API işleminin sonucunu "Loading..." durumunda bekletin, başarılı olduğunda `queryClient.invalidateQueries` ile listeleri yeniden çekin.
+5. **Component İçe Aktarma (Import) Kontrolü [KRİTİK]:**
+   - Yeniden yazdığın veya modifiye ettiğin dosyalarda kullandığın her özelliğin, UI elemanının, icon'un doğru yerden *import edildiğinden* emin ol. Prompt'u tamamlamadan önce dosyayı baştan aşağı gözden geçir.
+6. **Stil ve UX Hassasiyeti:**
+   - Tasarımlar profesyonel görünmelidir. Boş durumlar (empty states), skeleton yükleniyor durumları ve gerekli geçiş animasyonları (`framer-motion` ile `layout` modları) daima düşünülmelidir.
+
+---
+
+## 4. Dosya ve Klasör Haritası
+
+Projeye baktığında aradığını burada bulmalısın:
+
+```text
 src/
-├── components/
-│   ├── calendar/
-│   │   ├── DoctorCalendar.tsx         ← ana component
-│   │   ├── AppointmentCreateSheet.tsx ← sekreter randevu oluşturma (kayıtlı hasta var, yeni hasta YOK henüz)
-│   │   ├── OverrideDetailSheet.tsx    ← blackout/custom_hours detay + sil
-│   │   ├── AvailabilityModal.tsx      ← dokunulmadı
-│   │   └── OverrideModal.tsx          ← dokunulmadı
-│   └── appointments/
-│       └── AppointmentDetailSheet.tsx ← Dialog→Sheet dönüşümü yapıldı, confirm ekle var
-├── pages/
-│   ├── doctor/DoctorSchedule.tsx      ← header temizlendi
-│   └── staff/StaffDoctors.tsx         ← mode="staff", badge silindi
-├── utils/calendarUtils.ts             ← availabilityToEvents fix yapıldı
-├── types/calendar.ts                  ← dokunulmadı
-└── index.css                          ← Google Calendar CSS override'lar eklendi
+├── components/          # Evrensel veya Modül bazlı bileşenler
+│   ├── ui/              # shadcn/ui base bileşenleri (Button, Input, Alert vs.)
+│   ├── calendar/        # Doktor ve Sekreter kullanımına özel takvim logic'leri (DoctorCalendar, SlotPopup)
+│   ├── appointments/    # Randevu liste ve detay (Sheet) bileşenleri
+│   ├── landing/         # Dış web sitesi (public ana sayfa) bileşenleri
+│   └── AppLayout.tsx    # Giriş yapan kullanıcı rollerinin ana Layout + Sidebar sarmalayıcısı
+├── pages/               # Routing bağlantılı, rollere göre ayrılmış Ana Sayfalar
+│   ├── admin/           # Klinik Owner ve Adminlere özel
+│   ├── doctor/          # Sadece Doktorlara özel (Schedule, Dashboard, vb)
+│   ├── staff/           # Uygulama sekreterlerine özel
+│   ├── public/          # Landing pages, gizlilik politikaları (Yasal metinler) vs.
+│   └── (diğer ana sayfalar: Auth, Profile, NotFound)
+├── services/
+│   └── api.ts           # [ÖNEMLİ] Backend ile haberleşilen TEK veri köprüsü, tüm route'lar objelere ayrılmış.
+├── contexts/            # Global state'ler
+│   ├── AuthContext.tsx  # JWT saklama, Localstorage operasyonları, bootstrap ve "me" kontrolü
+│   └── LanguageContext.tsx
+├── lib/                 # Utility fonksiyonları
+│   └── auth-routing.ts  # Roller ve login sonrası default route tanımlamaları
+└── utils/
+    └── calendarUtils.ts # Takvim datalarını CalendarEvent'e dönüştüren fonksiyonlar
 ```
 
 ---
 
-## Tamamlanan Değişiklikler
+## 5. Uygulama Veri Akışı Örüntüsü (Pattern)
 
-- calendarUtils.ts — mapperlar temiz, cross-stream derivation yok
-- DoctorCalendar.tsx — existingSlot frontend truth check silindi
-- DoctorCalendar.tsx — mode prop eklendi ("doctor" | "staff")
-- DoctorCalendar.tsx — CalendarEventCard component eklendi (token renkleri)
-- DoctorCalendar.tsx — CalendarToolbar custom component eklendi
-- DoctorCalendar.tsx — SlotPopup component eklendi
-- DoctorCalendar.tsx — AppointmentCreateSheet import ve render edildi
-- DoctorCalendar.tsx — OverrideDetailSheet import ve render edildi
-- DoctorCalendar.tsx — Day view availability fix (availabilityToEvents tarih bug düzeltildi)
-- AppointmentCreateSheet.tsx — yeni component, sadece kayıtlı hasta arama var
-- StaffDoctors.tsx — mode="staff" prop eklendi
-- StaffDoctors.tsx — isAvailableToday / todaySlotCount / badge silindi
-- DoctorSchedule.tsx — header temizlendi
-- index.css — Google Calendar CSS override'lar eklendi
-- OverrideDetailSheet.tsx — yeni component, sil + inline onay
-- AppointmentDetailSheet.tsx — Dialog→Sheet dönüşümü + tamamlandı inline onay
+Projeye özellik eklerden standart olarak kullanılan teknoloji paketi `react-query` dir.
+Aşağıda bu mimarinin veri okuma ve veri yazma standart örnekleri bulunur:
 
----
+### A. Veri Okuma (Fetching)
+```tsx
+import { useQuery } from "@tanstack/react-query";
+import api from "@/services/api";
 
-## Bekleyen İşler (Sırayla)
+const { data: doctors = [], isLoading, isError } = useQuery({
+  queryKey: ["doctors-list", filterState],
+  queryFn: () => api.doctors.list({ status: filterState }),
+});
+```
 
-### 1. Şu an test edilmesi gereken
-Tarayıcıda kontrol:
-- AppointmentDetailSheet sağdan sheet mi açılıyor?
-- Randevuya tıkla → tamamlandı butonu → inline onay çalışıyor mu?
-- Blackout tıkla → OverrideDetailSheet açılıyor mu?
-- Sil → inline onay → gerçekten siliniyor mu?
-- SlotPopup → Müsaitlik Ekle → modal açılıyor mu?
-- SlotPopup → Zaman Blokla → modal açılıyor mu?
+### B. Veri Yazma (Mutation)
+```tsx
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import api from "@/services/api";
 
-### 2. AppointmentCreateSheet — yeni hasta tab'ı
-İki tab eklenecek:
-- [ Kayıtlı Hasta Ara ] — şu an var
-- [ Yeni Hasta Ekle ] — yok, yapılacak
+const queryClient = useQueryClient();
+const createAppointment = useMutation({
+  mutationFn: (newAppt: object) => api.appointments.create(newAppt),
+  onSuccess: () => {
+    toast.success("Randevu başarıyla oluşturuldu.");
+    // İşlem başarılı olunca ilgili query'leri gecersiz kılar, UI'in güncellenmesini sağlarız
+    queryClient.invalidateQueries({ queryKey: ["calendar-events"] }); 
+    queryClient.invalidateQueries({ queryKey: ["appointments-list"] });
+  },
+  onError: (error) => {
+    toast.error(error instanceof Error ? error.message : "Bir hata oluştu");
+  }
+});
 
-Yeni Hasta Ekle alanları:
-- Ad (zorunlu)
-- Soyad (zorunlu)
-- Telefon (pratik zorunlu)
-
-Submit akışı:
-1. api.patients.create({ firstName, lastName, phone }) → hata varsa dur
-2. api.appointments.create({ patientId: createdPatient.id, ... }) → başarılı → kapat
-
-### 3. Design polish
-- Grid satır yüksekliği artacak
-- Gün header'ları Google Calendar gibi (gün adı küçük, tarih büyük, bugün mavi daire)
-- Event kartları daha dolgun
-- Seçili slot highlight
-
-### 4. Hasta arama gösterimi
-Şu an sadece isim gösteriyor. İsim + telefon göstermeli.
-
----
-
-## UX Kararları (Kesinleşti)
-
-### Tutarlı davranış — hepsi sağdan sheet
-- Slot seç → popup → aksiyon → sağdan sheet
-- Randevu tıkla → sağdan sheet (AppointmentDetailSheet)
-- Blackout/custom_hours tıkla → sağdan sheet (OverrideDetailSheet)
-
-### SlotPopup içeriği
-- Randevu Oluştur → sadece mode="staff"
-- Müsaitlik Ekle → her iki mod
-- Zaman Blokla → her iki mod
-
-### Onay akışları
-- Tamamlandı: Buton → inline onay → İptal / Evet
-- Sil: Buton → inline onay → İptal / Evet, Sil
-
----
-
-## API Contract (Doğrulandı)
-
-```typescript
-api.patients.list({ search?: string, page?: number, limit?: number })
-api.patients.create({ firstName, lastName, phone?, email?, tcNo?, ... })
-// firstName + lastName zorunlu
-// user_id: null → sekreter kaydı, portal kullanıcısı değil
-
-api.appointments.create({
-  doctorId, patientId, appointmentDate, startTime, endTime,
-  type?, notes?
-})
-
-api.availability.listByDoctor(doctorId)
-// is_active filtresi yok, hepsini döner, frontend is_active kontrolü yapmalı
-
-api.availabilityOverrides.listByDoctor(doctorId)
-api.availabilityOverrides.remove(id)
+// kullanım: onClick={() => createAppointment.mutate({ ...data })}
 ```
 
 ---
 
-## CalendarEvent Type
+## 6. Önemli Ekosistem Detayları
 
-```typescript
-interface CalendarEvent {
-  id: string;
-  title: string;
-  start: Date;
-  end: Date;
-  allDay?: boolean;
-  type: "availability" | "appointment" | "blackout" | "custom_hours";
-  resource?: Appointment | AvailabilitySlot | AvailabilityOverride;
-}
-```
+1. **`api.ts` Mantığı:** Klasik `fetch` kullanılır ve içerisinde otomatik "Token Refresh" mekanizması vardır. İstekler `api.module.action()` şeklinde erişilebilir (ör: `api.auth.login`, `api.availability.create`).
+2. **Karanlık Tema (Dark Mode):** Tüm CSS Tailwind uyumludur, ancak özel HEX değerleri kullanılmaz. Tema geçişlerinde text'lerin görünmez olmaması için form elemanlarında ve backgroundlarda root değişkenler kullanılır (`bg-background text-foreground bg-card`).
+3. **Doktor Takvimi (Doctor Calendar):** 
+   - Takvimde doktorların çalışma saatleri (availability), yasaklı kapalı zamanları (blackout dates) ve randevuları aynı view'de gösterilir. 
+   - Takvim üzerindeki varsayılan HTML selection `.rbc-slot-selection` gizlenmiştir, yerine özel custom component mantığımız işler (Bu tarz UX iyileştirmelerini bozmamaya özen göster).
 
----
-
-## DoctorCalendar Props
-
-```typescript
-interface DoctorCalendarProps {
-  doctorId: string;
-  mode?: "doctor" | "staff"; // default: "doctor"
-}
-```
-
----
-
-## Bilinen Riskler
-
-- calendarUtils.ts — cross-stream derivation eklenmemeli
-- StaffDoctors.tsx — availability fetch loop geri gelmemeli
-- Client-side conflict check hiçbir yere eklenmemeli
-- Gemini bazen import'ları unutuyor — her promptun sonunda import kontrolü yaptır
-- Gemini bazen önceki değişiklikleri eziyor — kritik değişikliklerden sonra ilgili satırları doğrulat
-
----
-
-## Yeni Chat'te Nasıl Kullanılır
-
-1. Bu dosyayı Claude'a ver
-2. "Bu context dosyasına göre devam et" de
-3. Claude mimariyi, kararları ve bekleyen işleri hatırlayacak
-4. Sıradaki adımı sor, Claude Gemini prompt'unu yazar
+## 7. Yeni Bir Task Geldiğinde Nasıl Düşünmelisin?
+1. Verilen dosyayı `view_file` ile oku ve analiz et.
+2. Tasarımsal değişikler varsa `index.css` ve `shadcn/ui` altyapısı üzerine düşün.
+3. Bir veri ekleniyor/çıkarılıyorsa `src/services/api.ts`'te bu özellik hazır edilmiş mi kontrol et. Yoksa ekle.
+4. Mutation varsa `onSuccess` içerisinde doğru `queryKey`'lerin invalidate edildiğinden emin ol.
+5. Değişikliklerini `str_replace` kullanarak minimal hasar ve yüksek güvenilirlikle koda uygula.

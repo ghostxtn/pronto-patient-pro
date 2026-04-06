@@ -107,7 +107,11 @@ export function AppointmentCreateSheet({
       onClose();
     },
     onError: (error: any) => {
-      toast.error(error?.message || "Randevu oluşturulamadı");
+      if (error?.status === 409) {
+        toast.error("Seçilen saatte doktorun randevusu veya izni var.");
+      } else {
+        toast.error(error?.message || "Randevu oluşturulamadı");
+      }
     },
   });
 
@@ -140,7 +144,11 @@ export function AppointmentCreateSheet({
       queryClient.invalidateQueries({ queryKey: ["doctor-calendar"] });
       onClose();
     } catch (error: any) {
-      toast.error(error?.message || "İşlem sırasında bir hata oluştu.");
+      if (error?.status === 409) {
+        toast.error("Seçilen saatte doktorun randevusu veya izni var.");
+      } else {
+        toast.error(error?.message || "İşlem sırasında bir hata oluştu.");
+      }
     } finally {
       setIsSubmitting(false);
     }

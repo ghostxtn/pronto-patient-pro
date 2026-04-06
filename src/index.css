@@ -332,9 +332,37 @@
   }
 
   .rbc-time-slot:hover,
-  .rbc-day-slot .rbc-time-slot:hover,
-  .rbc-slot-selection {
+  .rbc-day-slot .rbc-time-slot:hover {
     cursor: pointer !important;
+  }
+
+  .calendar-pending-slot {
+    @apply h-full w-full rounded-md border-2 border-solid border-primary bg-primary/15 backdrop-blur-none;
+    background-image: none;
+  }
+
+  /* ── Slot selection (drag to create) ── */
+  .rbc-slot-selection {
+    display: none !important;
+  }
+
+  /* ── Time gutter label that appears during drag ── */
+  .rbc-slot-selection span {
+    color: hsl(var(--primary)) !important;
+    font-size: 0.75rem !important;
+    font-weight: 600 !important;
+    padding: 2px 6px !important;
+  }
+
+  /* ── Smoother drag ghost / active cell highlight ── */
+  .rbc-time-slot.rbc-now,
+  .rbc-day-slot .rbc-time-slot:hover {
+    background-color: hsl(var(--primary) / 0.04);
+  }
+
+  /* Remove default blue background on selected slot cells */
+  .rbc-selected-cell {
+    background-color: hsl(var(--primary) / 0.08) !important;
   }
 
   .rbc-time-slot,

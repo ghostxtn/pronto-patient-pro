@@ -66,8 +66,8 @@ export default function StaffDoctors() {
           </p>
         </motion.div>
 
-        <div className="grid gap-6 xl:grid-cols-[360px_minmax(0,1fr)]">
-          <motion.div custom={1} variants={fadeUp}>
+        <div className="grid gap-6 lg:grid-cols-[360px_minmax(0,1fr)]">
+          <motion.div custom={1} variants={fadeUp} className={cn(selectedDoctorId ? "hidden lg:block" : "block")}>
             <Card className="shadow-card">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
@@ -128,7 +128,7 @@ export default function StaffDoctors() {
             </Card>
           </motion.div>
 
-          <motion.div custom={2} variants={fadeUp}>
+          <motion.div custom={2} variants={fadeUp} className={cn(!selectedDoctorId ? "hidden lg:block" : "block")}>
             {!selectedDoctor ? (
               <Card className="shadow-card">
                 <CardContent className="flex min-h-[480px] flex-col items-center justify-center text-center">
@@ -148,7 +148,7 @@ export default function StaffDoctors() {
                       {selectedDoctor.specialization?.name ?? "Brans belirtilmedi"}
                     </p>
                   </div>
-                  <Button variant="outline" className="rounded-xl" onClick={() => setSelectedDoctorId(null)}>
+                  <Button variant="outline" className="rounded-xl lg:hidden min-h-[44px]" onClick={() => setSelectedDoctorId(null)}>
                     <ArrowLeft className="mr-2 h-4 w-4" />
                     Listeye Dön
                   </Button>
