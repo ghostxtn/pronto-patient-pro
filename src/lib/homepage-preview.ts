@@ -7,7 +7,11 @@ import {
   specialtyPresentation,
   type SpecialtyPresentation,
 } from "@/data/specialtyPresentation";
-import type { SupportedLanguage } from "@/components/landing/content";
+import {
+  getLocalizedSpecialtyCopy,
+  toHomepageSlug,
+} from "@/lib/specialty-localization";
+import type { Language } from "@/i18n/config";
 
 export type HomepagePreviewDoctorRecord = {
   id: string;
@@ -59,19 +63,6 @@ const MAX_DOCTOR_PREVIEW = 50;
 const MAX_SPECIALTY_PREVIEW = 50;
 const SPECIALTY_FALLBACK_IMAGE = null;
 
-export function toHomepageSlug(value: string) {
-  return value
-    .toLocaleLowerCase("tr")
-    .replace(/ğ/g, "g")
-    .replace(/ü/g, "u")
-    .replace(/ş/g, "s")
-    .replace(/ı/g, "i")
-    .replace(/ö/g, "o")
-    .replace(/ç/g, "c")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
-
 function sortByPriority<T extends { homepagePriority?: number } & Record<string, unknown>>(
   items: T[],
   getLabel: (item: T) => string,
@@ -103,7 +94,7 @@ function matchSpecialtyPresentation(slug: string): SpecialtyPresentation | undef
 function getDoctorPreviewText(
   doctor: HomepagePreviewDoctorRecord,
   presentation: DoctorPresentation | undefined,
-  lang: SupportedLanguage,
+  lang: Language,
 ) {
   if (presentation?.previewText) {
     return presentation.previewText;
@@ -113,11 +104,15 @@ function getDoctorPreviewText(
     return doctor.bio.trim();
   }
 
-  const specialtyName = doctor.specialization?.name?.trim();
+  const specialtySlug = toHomepageSlug(doctor.specialization?.name?.trim() || "");
+  const specialtyName =
+    getLocalizedSpecialtyCopy(doctor.specialization?.name, specialtySlug, lang).name ||
+    doctor.specialization?.name?.trim();
+
   if (lang === "tr") {
     return specialtyName
-      ? `${specialtyName} odağında düzenli değerlendirme ve koordinasyon yaklaşımıyla çalışır.`
-      : "Koordinasyon destekli klinik bakım sürecinde çalışır.";
+      ? `${specialtyName} odaginda duzenli degerlendirme ve koordinasyon yaklasimiyla calisir.`
+      : "Koordinasyon destekli klinik bakim surecinde calisir.";
   }
 
   return specialtyName
@@ -128,15 +123,19 @@ function getDoctorPreviewText(
 function getDoctorFocusTags(
   doctor: HomepagePreviewDoctorRecord,
   presentation: DoctorPresentation | undefined,
-  lang: SupportedLanguage,
+  lang: Language,
 ) {
   if (presentation?.focusTags?.length) {
     return presentation.focusTags;
   }
 
-  const specialtyName = doctor.specialization?.name?.trim();
+  const specialtySlug = toHomepageSlug(doctor.specialization?.name?.trim() || "");
+  const specialtyName =
+    getLocalizedSpecialtyCopy(doctor.specialization?.name, specialtySlug, lang).name ||
+    doctor.specialization?.name?.trim();
+
   if (!specialtyName) {
-    return lang === "tr" ? ["Klinik Süreç"] : ["Clinic Flow"];
+    return lang === "tr" ? ["Klinik Surec"] : ["Clinic Flow"];
   }
 
   return [specialtyName];
@@ -144,11 +143,13 @@ function getDoctorFocusTags(
 
 function mapDoctorPreviewItem(
   doctor: HomepagePreviewDoctorRecord,
-  lang: SupportedLanguage,
+  lang: Language,
 ): HomepageDoctorPreviewItem {
   const name = [doctor.firstName, doctor.lastName].filter(Boolean).join(" ").trim() || "Doktor";
   const slug = toHomepageSlug(name);
   const presentation = matchDoctorPresentation(doctor, slug);
+  const specialtySlug = toHomepageSlug(doctor.specialization?.name?.trim() || "");
+  const localizedSpecialty = getLocalizedSpecialtyCopy(doctor.specialization?.name, specialtySlug, lang);
 
   return {
     id: doctor.id,
@@ -156,7 +157,7 @@ function mapDoctorPreviewItem(
     name,
     title: doctor.title?.trim() || (lang === "tr" ? "Uzman Hekim" : "Specialist Physician"),
     specialtyName:
-      doctor.specialization?.name?.trim() || (lang === "tr" ? "Genel Konsültasyon" : "General Consultation"),
+      localizedSpecialty.name || (lang === "tr" ? "Genel Konsultasyon" : "General Consultation"),
     imageSrc: doctor.avatarUrl?.trim() || presentation?.imageSrc || DOCTOR_FALLBACK_IMAGE,
     previewText: getDoctorPreviewText(doctor, presentation, lang),
     shortBio: presentation?.shortBio,
@@ -166,20 +167,21 @@ function mapDoctorPreviewItem(
 
 function mapSpecialtyPreviewItem(
   specialty: HomepagePreviewSpecialtyRecord,
-  _index: number,
-  lang: SupportedLanguage,
+  lang: Language,
 ): HomepageSpecialtyPreviewItem & { homepagePriority?: number } {
   const slug = toHomepageSlug(specialty.name);
   const presentation = matchSpecialtyPresentation(slug);
+  const localizedSpecialty = getLocalizedSpecialtyCopy(specialty.name, slug, lang);
 
   return {
     id: specialty.id,
     slug,
-    name: specialty.name,
+    name: localizedSpecialty.name || specialty.name,
     description:
+      localizedSpecialty.description ||
       specialty.description?.trim() ||
       (lang === "tr"
-        ? "Klinik ekip değerlendirmesiyle desteklenen uzmanlık alanı."
+        ? "Klinik ekip degerlendirmesiyle desteklenen uzmanlik alani."
         : "A specialty area supported by coordinated clinic review."),
     imageSrc: specialty.imageUrl?.trim() ? specialty.imageUrl.trim() : SPECIALTY_FALLBACK_IMAGE,
     previewText: presentation?.previewText,
@@ -189,19 +191,21 @@ function mapSpecialtyPreviewItem(
 
 export function shapeHomepagePreview(
   data: HomepagePreviewResponse | undefined,
-  lang: SupportedLanguage,
+  lang: Language,
 ) {
   const doctorItems = (data?.doctors ?? []).map((doctor) => {
     const item = mapDoctorPreviewItem(doctor, lang);
-    const presentation = doctorPresentation.find((entry) => entry.doctorId === doctor.id || entry.slug === item.slug);
+    const presentation = doctorPresentation.find(
+      (entry) => entry.doctorId === doctor.id || entry.slug === item.slug,
+    );
     return {
       ...item,
       homepagePriority: presentation?.homepagePriority,
     };
   });
 
-  const specialtyItems = (data?.specialties ?? []).map((specialty, index) =>
-    mapSpecialtyPreviewItem(specialty, index, lang),
+  const specialtyItems = (data?.specialties ?? []).map((specialty) =>
+    mapSpecialtyPreviewItem(specialty, lang),
   );
 
   return {

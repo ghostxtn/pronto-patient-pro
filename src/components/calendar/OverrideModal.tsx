@@ -4,6 +4,7 @@ import { Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import api, { ApiError } from "@/services/api";
 import type { AvailabilityOverride } from "@/types/calendar";
+import { useLanguage } from "@/contexts/LanguageContext";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -14,13 +15,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -50,6 +45,7 @@ export function OverrideModal({
   override,
   onSaved,
 }: OverrideModalProps) {
+  const { t } = useLanguage();
   const [date, setDate] = useState("");
   const [type, setType] = useState<"blackout" | "custom_hours">("blackout");
   const [startTime, setStartTime] = useState("");
@@ -58,9 +54,7 @@ export function OverrideModal({
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
   useEffect(() => {
-    if (!open) {
-      return;
-    }
+    if (!open) return;
 
     if (mode === "edit" && override) {
       setDate(override.date);
@@ -79,48 +73,24 @@ export function OverrideModal({
   }, [initialDate, initialType, mode, open, override]);
 
   const timeError = useMemo(() => {
-    if (type !== "custom_hours") {
-      return "";
-    }
-
-    if (!startTime || !endTime) {
-      return "Özel saat için başlangıç ve bitiş saati zorunludur.";
-    }
-
-    if (endTime <= startTime) {
-      return "Bitiş saati başlangıç saatinden sonra olmalıdır.";
-    }
-
-    return "";
-  }, [endTime, startTime, type]);
+    if (type !== "custom_hours") return "";
+    if (!startTime || !endTime) return t.specialHoursRequireTimes;
+    return endTime <= startTime ? t.invalidTimeRange : "";
+  }, [endTime, startTime, t, type]);
 
   const isValid = Boolean(date) && !timeError;
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      if (!isValid) {
-        throw new Error("Form bilgileri geçersiz");
-      }
+      if (!isValid) throw new Error(t.invalidForm);
 
-      const payload: {
-        date: string;
-        type: "blackout" | "custom_hours";
-        start_time?: string;
-        end_time?: string;
-        reason?: string;
-      } = {
+      const payload = {
         date,
         type,
+        start_time: type === "custom_hours" ? startTime : undefined,
+        end_time: type === "custom_hours" ? endTime : undefined,
+        reason: reason.trim() || undefined,
       };
-
-      if (type === "custom_hours") {
-        payload.start_time = startTime;
-        payload.end_time = endTime;
-      }
-
-      if (reason.trim()) {
-        payload.reason = reason.trim();
-      }
 
       if (mode === "edit" && override) {
         return api.availabilityOverrides.update(override.id, payload);
@@ -128,41 +98,35 @@ export function OverrideModal({
 
       return api.availabilityOverrides.create({
         doctor_id: doctorId,
-        date: payload.date,
-        type: payload.type,
-        start_time: payload.start_time,
-        end_time: payload.end_time,
-        reason: payload.reason,
+        ...payload,
       });
     },
     onSuccess: () => {
-      toast.success(mode === "edit" ? "İstisna güncellendi" : "İstisna eklendi");
+      toast.success(mode === "edit" ? t.overrideUpdated : t.overrideCreated);
       onSaved();
     },
     onError: (error: unknown) => {
       if (error instanceof ApiError) {
         toast.error(error.message);
-      } else {
-        toast.error(error instanceof Error ? error.message : "Hata oluştu");
+        return;
       }
+
+      toast.error(error instanceof Error ? error.message : t.overrideSaveFailed);
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: async () => {
-      if (!override) {
-        throw new Error("Silinecek istisna bulunamadı");
-      }
-
+      if (!override) throw new Error(t.deleteOverrideTitle);
       return api.availabilityOverrides.remove(override.id);
     },
     onSuccess: () => {
-      toast.success("İstisna silindi");
+      toast.success(t.overrideRemoved);
       setConfirmDeleteOpen(false);
       onSaved();
     },
     onError: (error: unknown) => {
-      toast.error(error instanceof Error ? error.message : "İstisna silinemedi");
+      toast.error(error instanceof Error ? error.message : t.overrideRemoveFailed);
     },
   });
 
@@ -171,38 +135,26 @@ export function OverrideModal({
       <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
         <DialogContent className="sm:max-w-md rounded-2xl">
           <DialogHeader>
-            <DialogTitle>{mode === "edit" ? "İstisnayı Düzenle" : "İstisna Ekle"}</DialogTitle>
-            <DialogDescription>
-              Belirli bir günü kapatın veya o gün için özel çalışma saati tanımlayın.
-            </DialogDescription>
+            <DialogTitle>{mode === "edit" ? t.overrideEditTitle : t.overrideCreateTitle}</DialogTitle>
+            <DialogDescription>{t.overrideModalDesc}</DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="override-date">Tarih</Label>
-              <Input
-                id="override-date"
-                type="date"
-                value={date}
-                onChange={(event) => setDate(event.target.value)}
-                className="rounded-xl"
-              />
+              <Label htmlFor="override-date">{t.date}</Label>
+              <Input id="override-date" type="date" value={date} onChange={(event) => setDate(event.target.value)} className="rounded-xl" />
             </div>
 
             <div className="space-y-3">
-              <Label>Tür</Label>
-              <RadioGroup
-                value={type}
-                onValueChange={(value) => setType(value as "blackout" | "custom_hours")}
-                className="gap-3"
-              >
+              <Label>{t.overrideType}</Label>
+              <RadioGroup value={type} onValueChange={(value) => setType(value as "blackout" | "custom_hours")} className="gap-3">
                 <label htmlFor="override-blackout" className="flex items-center gap-3 rounded-xl border border-border/70 p-3">
                   <RadioGroupItem value="blackout" id="override-blackout" />
-                  <span className="text-sm font-medium">Bu günü kapat (Blackout)</span>
+                  <span className="text-sm font-medium">{t.closeThisDay}</span>
                 </label>
                 <label htmlFor="override-custom-hours" className="flex items-center gap-3 rounded-xl border border-border/70 p-3">
                   <RadioGroupItem value="custom_hours" id="override-custom-hours" />
-                  <span className="text-sm font-medium">Özel saat belirle (Custom hours)</span>
+                  <span className="text-sm font-medium">{t.defineCustomHours}</span>
                 </label>
               </RadioGroup>
             </div>
@@ -210,25 +162,13 @@ export function OverrideModal({
             {type === "custom_hours" ? (
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
-                  <Label htmlFor="override-start-time">Başlangıç saati</Label>
-                  <Input
-                    id="override-start-time"
-                    type="time"
-                    value={startTime}
-                    onChange={(event) => setStartTime(event.target.value)}
-                    className="rounded-xl"
-                  />
+                  <Label htmlFor="override-start-time">{t.startTime}</Label>
+                  <Input id="override-start-time" type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} className="rounded-xl" />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="override-end-time">Bitiş saati</Label>
-                  <Input
-                    id="override-end-time"
-                    type="time"
-                    value={endTime}
-                    onChange={(event) => setEndTime(event.target.value)}
-                    className="rounded-xl"
-                  />
+                  <Label htmlFor="override-end-time">{t.endTime}</Label>
+                  <Input id="override-end-time" type="time" value={endTime} onChange={(event) => setEndTime(event.target.value)} className="rounded-xl" />
                 </div>
               </div>
             ) : null}
@@ -236,41 +176,30 @@ export function OverrideModal({
             {timeError ? <p className="text-sm text-destructive">{timeError}</p> : null}
 
             <div className="space-y-2">
-              <Label htmlFor="override-reason">Sebep</Label>
+              <Label htmlFor="override-reason">{t.reason}</Label>
               <Input
                 id="override-reason"
                 type="text"
                 value={reason}
                 onChange={(event) => setReason(event.target.value)}
-                placeholder="örn. Tatil, Toplantı"
+                placeholder={t.reasonPlaceholder}
                 className="rounded-xl"
               />
             </div>
 
             <div className="flex items-center justify-between gap-3 pt-2">
               {mode === "edit" && override ? (
-                <Button
-                  type="button"
-                  variant="destructive"
-                  className="rounded-xl"
-                  onClick={() => setConfirmDeleteOpen(true)}
-                  disabled={saveMutation.isPending || deleteMutation.isPending}
-                >
+                <Button type="button" variant="destructive" className="rounded-xl" onClick={() => setConfirmDeleteOpen(true)} disabled={saveMutation.isPending || deleteMutation.isPending}>
                   <Trash2 className="h-4 w-4" />
-                  Sil
+                  {t.delete}
                 </Button>
               ) : (
                 <div />
               )}
 
-              <Button
-                type="button"
-                className="rounded-xl"
-                onClick={() => saveMutation.mutate()}
-                disabled={!isValid || saveMutation.isPending}
-              >
+              <Button type="button" className="rounded-xl" onClick={() => saveMutation.mutate()} disabled={!isValid || saveMutation.isPending}>
                 {saveMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                Kaydet
+                {t.save}
               </Button>
             </div>
           </div>
@@ -280,20 +209,13 @@ export function OverrideModal({
       <AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>İstisna silinsin mi?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Bu işlem seçili istisnayı kalıcı olarak kaldırır.
-            </AlertDialogDescription>
+            <AlertDialogTitle>{t.deleteOverrideTitle}</AlertDialogTitle>
+            <AlertDialogDescription>{t.overrideDeleteConfirm}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>İptal</AlertDialogCancel>
-            <Button
-              type="button"
-              variant="destructive"
-              onClick={() => deleteMutation.mutate()}
-              disabled={deleteMutation.isPending}
-            >
-              {deleteMutation.isPending ? "Siliniyor..." : "Sil"}
+            <AlertDialogCancel>{t.cancel}</AlertDialogCancel>
+            <Button type="button" variant="destructive" onClick={() => deleteMutation.mutate()} disabled={deleteMutation.isPending}>
+              {deleteMutation.isPending ? t.deleting : t.delete}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>

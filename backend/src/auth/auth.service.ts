@@ -20,11 +20,13 @@ import { RegisterDto } from './dto/register.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { VerifyAuthOtpDto } from './dto/verify-auth-otp.dto';
 import { AuditService } from '../audit/audit.service';
-import { users, patients } from '../database/schema';
+import { users, patients, trustedDevices } from '../database/schema';
 
 interface RequestContext {
   ipAddress?: string;
   requestId?: string;
+  userAgent?: string;
+  trustedDeviceToken?: string;
 }
 
 type OtpFlowPurpose = 'login' | 'register' | 'google';
@@ -48,6 +50,8 @@ const OTP_TTL_SECONDS = 10 * 60;
 const OTP_MAX_ATTEMPTS = 5;
 const PASSWORD_RESET_TOKEN_BYTES = 32;
 const DEFAULT_PASSWORD_RESET_TTL_MINUTES = 60;
+const TRUSTED_DEVICE_TOKEN_BYTES = 32;
+const DEFAULT_TRUSTED_DEVICE_TTL_DAYS = 30;
 
 @Injectable()
 export class AuthService {
@@ -152,6 +156,35 @@ export class AuthService {
         .update(users)
         .set({ failed_login_attempts: 0, locked_until: null })
         .where(eq(users.id, user.id));
+    }
+
+    if (
+      ctx?.trustedDeviceToken &&
+      (await this.useTrustedDeviceIfValid(
+        user.id,
+        clinicId,
+        ctx.trustedDeviceToken,
+        ctx.userAgent,
+      ))
+    ) {
+      const authResult = await this.issueTokensForUser(user);
+
+      this.auditService.log({
+        clinicId,
+        userId: user.id,
+        userRole: user.role,
+        action: 'LOGIN_SUCCESS',
+        entity: 'auth',
+        entityId: user.id,
+        ipAddress: ctx?.ipAddress,
+        requestId: ctx?.requestId,
+        metadata: { via: 'trusted_device', provider: 'password' },
+      });
+
+      return {
+        ...authResult,
+        trustedDeviceToken: ctx.trustedDeviceToken,
+      };
     }
 
     return this.createOtpChallenge(
@@ -332,6 +365,7 @@ export class AuthService {
       .where(eq(users.id, user.id));
 
     await this.redisService.deleteRefreshToken(user.id);
+    await this.deleteTrustedDevicesForUser(user.id);
 
     this.auditService.log({
       clinicId,
@@ -426,7 +460,7 @@ export class AuthService {
     firstName: string;
     lastName: string;
     avatar: string;
-  }, clinicId: string) {
+  }, clinicId: string, ctx?: RequestContext) {
     console.log('[auth][googleLogin] start', {
       clinicId,
     });
@@ -453,12 +487,31 @@ export class AuthService {
         googleUser.avatar,
       );
 
-      return this.createOtpChallenge({
-        purpose: 'google',
-        clinicId,
-        email: normalizedGoogleUser.email,
-        userId: normalizedGoogleUser.id,
-      });
+      if (
+        ctx?.trustedDeviceToken &&
+        (await this.useTrustedDeviceIfValid(
+          normalizedGoogleUser.id,
+          clinicId,
+          ctx.trustedDeviceToken,
+          ctx.userAgent,
+        ))
+      ) {
+        const authResult = await this.issueTokensForUser(normalizedGoogleUser);
+        return {
+          ...authResult,
+          trustedDeviceToken: ctx.trustedDeviceToken,
+        };
+      }
+
+      return this.createOtpChallenge(
+        {
+          purpose: 'google',
+          clinicId,
+          email: normalizedGoogleUser.email,
+          userId: normalizedGoogleUser.id,
+        },
+        ctx,
+      );
     }
 
     const [emailUser] = await this.db
@@ -494,12 +547,31 @@ export class AuthService {
         await this.ensurePatientProfile(updatedUser, clinicId);
       }
 
-      return this.createOtpChallenge({
-        purpose: 'google',
-        clinicId,
-        email: updatedUser.email,
-        userId: updatedUser.id,
-      });
+      if (
+        ctx?.trustedDeviceToken &&
+        (await this.useTrustedDeviceIfValid(
+          updatedUser.id,
+          clinicId,
+          ctx.trustedDeviceToken,
+          ctx.userAgent,
+        ))
+      ) {
+        const authResult = await this.issueTokensForUser(updatedUser);
+        return {
+          ...authResult,
+          trustedDeviceToken: ctx.trustedDeviceToken,
+        };
+      }
+
+      return this.createOtpChallenge(
+        {
+          purpose: 'google',
+          clinicId,
+          email: updatedUser.email,
+          userId: updatedUser.id,
+        },
+        ctx,
+      );
     }
 
     const [newUser] = await this.db
@@ -522,12 +594,15 @@ export class AuthService {
     });
     await this.ensurePatientProfile(newUser, clinicId);
 
-    return this.createOtpChallenge({
-      purpose: 'google',
-      clinicId,
-      email: newUser.email,
-      userId: newUser.id,
-    });
+    return this.createOtpChallenge(
+      {
+        purpose: 'google',
+        clinicId,
+        email: newUser.email,
+        userId: newUser.id,
+      },
+      ctx,
+    );
   }
 
   private async createOtpChallenge(
@@ -612,6 +687,12 @@ export class AuthService {
     });
 
     const authResult = await this.issueTokensForUser(user);
+    const trustedDeviceToken = await this.issueTrustedDeviceToken(
+      user.id,
+      user.clinic_id,
+      ctx?.userAgent,
+      ctx?.trustedDeviceToken,
+    );
 
     this.auditService.log({
       clinicId: flow.clinicId,
@@ -636,7 +717,10 @@ export class AuthService {
       metadata: { via: 'otp' },
     });
 
-    return authResult;
+    return {
+      ...authResult,
+      trustedDeviceToken,
+    };
   }
 
   private async completeExistingUserFlow(
@@ -658,6 +742,12 @@ export class AuthService {
     }
 
     const authResult = await this.issueTokensForUser(user);
+    const trustedDeviceToken = await this.issueTrustedDeviceToken(
+      user.id,
+      user.clinic_id,
+      ctx?.userAgent,
+      ctx?.trustedDeviceToken,
+    );
 
     this.auditService.log({
       clinicId: flow.clinicId,
@@ -671,7 +761,10 @@ export class AuthService {
       metadata: { via: 'otp', provider: flow.purpose === 'google' ? 'google' : 'password' },
     });
 
-    return authResult;
+    return {
+      ...authResult,
+      trustedDeviceToken,
+    };
   }
 
   private async issueTokensForUser(user: typeof users.$inferSelect) {
@@ -730,6 +823,128 @@ export class AuthService {
     return createHash('sha256').update(token).digest('hex');
   }
 
+  private hashTrustedDeviceToken(token: string) {
+    return createHash('sha256').update(token).digest('hex');
+  }
+
+  private hashUserAgent(userAgent?: string) {
+    if (!userAgent) {
+      return null;
+    }
+
+    return createHash('sha256').update(userAgent).digest('hex');
+  }
+
+  private getTrustedDeviceTtlDays() {
+    const ttlDays = Number(
+      this.configService.get<string>(
+        'TRUSTED_DEVICE_TTL_DAYS',
+        String(DEFAULT_TRUSTED_DEVICE_TTL_DAYS),
+      ),
+    );
+
+    if (!Number.isFinite(ttlDays) || ttlDays <= 0) {
+      return DEFAULT_TRUSTED_DEVICE_TTL_DAYS;
+    }
+
+    return ttlDays;
+  }
+
+  private getTrustedDeviceExpiresAt() {
+    return new Date(Date.now() + this.getTrustedDeviceTtlDays() * 24 * 60 * 60 * 1000);
+  }
+
+  private async useTrustedDeviceIfValid(
+    userId: string,
+    clinicId: string,
+    rawToken: string,
+    userAgent?: string,
+  ) {
+    const tokenHash = this.hashTrustedDeviceToken(rawToken);
+    const [device] = await this.db
+      .select()
+      .from(trustedDevices)
+      .where(
+        and(
+          eq(trustedDevices.user_id, userId),
+          eq(trustedDevices.clinic_id, clinicId),
+          eq(trustedDevices.token_hash, tokenHash),
+        ),
+      )
+      .limit(1);
+
+    if (!device) {
+      return false;
+    }
+
+    if (device.expires_at <= new Date()) {
+      await this.db
+        .delete(trustedDevices)
+        .where(eq(trustedDevices.id, device.id));
+      return false;
+    }
+
+    const userAgentHash = this.hashUserAgent(userAgent);
+    if (device.user_agent_hash && userAgentHash && device.user_agent_hash !== userAgentHash) {
+      return false;
+    }
+
+    await this.db
+      .update(trustedDevices)
+      .set({
+        last_used_at: new Date(),
+        updated_at: new Date(),
+        expires_at: this.getTrustedDeviceExpiresAt(),
+      })
+      .where(eq(trustedDevices.id, device.id));
+
+    return true;
+  }
+
+  private async issueTrustedDeviceToken(
+    userId: string,
+    clinicId: string,
+    userAgent?: string,
+    existingRawToken?: string,
+  ) {
+    const rawToken = randomBytes(TRUSTED_DEVICE_TOKEN_BYTES).toString('hex');
+    const tokenHash = this.hashTrustedDeviceToken(rawToken);
+    const userAgentHash = this.hashUserAgent(userAgent);
+
+    if (existingRawToken) {
+      await this.db
+        .delete(trustedDevices)
+        .where(
+          and(
+            eq(trustedDevices.user_id, userId),
+            eq(trustedDevices.token_hash, this.hashTrustedDeviceToken(existingRawToken)),
+          ),
+        );
+    }
+
+    await this.db
+      .delete(trustedDevices)
+      .where(
+        and(
+          eq(trustedDevices.user_id, userId),
+          eq(trustedDevices.clinic_id, clinicId),
+          sql`${trustedDevices.expires_at} <= now()`,
+        ),
+      );
+
+    await this.db.insert(trustedDevices).values({
+      user_id: userId,
+      clinic_id: clinicId,
+      token_hash: tokenHash,
+      user_agent_hash: userAgentHash,
+      expires_at: this.getTrustedDeviceExpiresAt(),
+      last_used_at: new Date(),
+      updated_at: new Date(),
+    });
+
+    return rawToken;
+  }
+
   private getPasswordResetTtlMinutes() {
     const ttlMinutes = Number(
       this.configService.get<string>(
@@ -754,6 +969,12 @@ export class AuthService {
         updated_at: new Date(),
       })
       .where(eq(users.id, userId));
+  }
+
+  private async deleteTrustedDevicesForUser(userId: string) {
+    await this.db
+      .delete(trustedDevices)
+      .where(eq(trustedDevices.user_id, userId));
   }
 
   private async generateTokens(

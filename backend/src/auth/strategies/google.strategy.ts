@@ -56,7 +56,15 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
         firstName,
         lastName,
         avatar,
-      }, clinicId);
+      }, clinicId, {
+        ipAddress:
+          req.headers['x-forwarded-for']?.toString().split(',')[0]?.trim() ||
+          req.headers['x-real-ip']?.toString() ||
+          req.ip,
+        requestId: (req as any).requestId,
+        userAgent: this.getUserAgent(req),
+        trustedDeviceToken: this.getTrustedDeviceToken(req),
+      });
 
       console.log('[auth][googleStrategy] validate success', {
         email,
@@ -67,5 +75,29 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
       console.error('[auth][googleStrategy] validate failed', error);
       done(error as Error, false);
     }
+  }
+
+  private getTrustedDeviceToken(req: TenantRequest) {
+    const cookieHeader = req.headers.cookie;
+
+    if (!cookieHeader) {
+      return undefined;
+    }
+
+    const cookies = cookieHeader.split(';').map((part) => part.trim());
+    const trustedCookie = cookies.find((cookie) =>
+      cookie.startsWith('trusted_device_token='),
+    );
+
+    if (!trustedCookie) {
+      return undefined;
+    }
+
+    return decodeURIComponent(trustedCookie.split('=').slice(1).join('='));
+  }
+
+  private getUserAgent(req: TenantRequest) {
+    const userAgent = req.headers['user-agent'];
+    return Array.isArray(userAgent) ? userAgent[0] : userAgent;
   }
 }

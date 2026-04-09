@@ -3,7 +3,11 @@ import {
   doctorPresentation,
   type DoctorPresentation,
 } from "@/data/doctorPresentation";
-import { toHomepageSlug } from "@/lib/homepage-preview";
+import {
+  getLocalizedSpecialtyCopy,
+  toHomepageSlug,
+} from "@/lib/specialty-localization";
+import type { Language } from "@/i18n/config";
 
 export type PublicDoctorRecord = {
   id: string;
@@ -50,33 +54,44 @@ function sortDoctors(
   return left.fullName.localeCompare(right.fullName, "tr");
 }
 
-export function shapeDoctorDiscovery(records: PublicDoctorRecord[] | undefined) {
+export function shapeDoctorDiscovery(
+  records: PublicDoctorRecord[] | undefined,
+  lang: Language,
+) {
   return (records ?? [])
     .map((record) => {
       const fullName =
-        [record.firstName, record.lastName].filter(Boolean).join(" ").trim() || "Doktor";
+        [record.firstName, record.lastName].filter(Boolean).join(" ").trim() ||
+        (lang === "tr" ? "Doktor" : "Doctor");
       const slug = toHomepageSlug(fullName);
       const presentation = matchPresentation(record, slug);
+      const rawSpecialtyName = record.specialization?.name?.trim() || "";
+      const specialtySlug = toHomepageSlug(rawSpecialtyName);
+      const localizedSpecialty = getLocalizedSpecialtyCopy(rawSpecialtyName, specialtySlug, lang);
+      const specialtyName =
+        localizedSpecialty.name || (lang === "tr" ? "Genel Konsultasyon" : "General Consultation");
 
       const item: DoctorDiscoveryItem & { listingPriority?: number } = {
         id: record.id,
         slug,
         fullName,
-        title: record.title?.trim() || "Uzman Hekim",
+        title: record.title?.trim() || (lang === "tr" ? "Uzman Hekim" : "Specialist Physician"),
         specialtyId: record.specialization?.id ?? undefined,
-        specialtyName: record.specialization?.name?.trim() || "Genel Konsultasyon",
+        specialtyName,
         imageSrc: record.avatarUrl?.trim() || presentation?.imageSrc || DOCTOR_FALLBACK_IMAGE,
         previewText:
           presentation?.previewText ||
           record.bio?.trim() ||
-          "Klinik koordinasyon ve dogru yonlendirme odakli hasta surecinde calisir.",
+          (lang === "tr"
+            ? "Klinik koordinasyon ve dogru yonlendirme odakli hasta surecinde calisir."
+            : "Works with a patient flow focused on clinical coordination and accurate direction."),
         biography: presentation?.shortBio || record.bio?.trim() || undefined,
         focusTags:
           presentation?.focusTags?.length
             ? presentation.focusTags
-            : record.specialization?.name?.trim()
-              ? [record.specialization.name.trim()]
-              : ["Klinik Surec"],
+            : specialtyName
+              ? [specialtyName]
+              : [lang === "tr" ? "Klinik Surec" : "Clinic Flow"],
         listingPriority: presentation?.listingPriority,
       };
 

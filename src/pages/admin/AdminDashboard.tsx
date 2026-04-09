@@ -1,23 +1,29 @@
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
+import { format } from "date-fns";
+import { enUS, tr as trLocale } from "date-fns/locale";
+import { Users, Stethoscope, CalendarDays, Activity, TrendingUp, Clock } from "lucide-react";
 import api from "@/services/api";
 import { hasActiveDoctorProfile } from "@/lib/doctor-access";
 import { useLanguage } from "@/contexts/LanguageContext";
 import AppLayout from "@/components/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { motion } from "framer-motion";
-import { Users, Stethoscope, CalendarDays, Activity, TrendingUp, Clock } from "lucide-react";
-import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 
 const fadeUp = {
   hidden: { opacity: 0, y: 20 },
-  visible: (i: number) => ({ opacity: 1, y: 0, transition: { delay: i * 0.08, duration: 0.5, ease: [0.22, 1, 0.36, 1] as const } }),
+  visible: (i: number) => ({
+    opacity: 1,
+    y: 0,
+    transition: { delay: i * 0.08, duration: 0.5, ease: [0.22, 1, 0.36, 1] as const },
+  }),
 };
 
 export default function AdminDashboard() {
-  const { t } = useLanguage();
+  const { lang, t } = useLanguage();
+  const locale = lang === "tr" ? trLocale : enUS;
   const navigate = useNavigate();
 
   const { data: stats } = useQuery({
@@ -37,6 +43,7 @@ export default function AdminDashboard() {
       };
     },
   });
+
   const { data: recentAppointments } = useQuery({
     queryKey: ["admin-recent-appointments"],
     queryFn: async () => {
@@ -47,14 +54,11 @@ export default function AdminDashboard() {
           patientDisplayName: `${appointment.patient?.firstName ?? ""} ${appointment.patient?.lastName ?? ""}`.trim(),
           doctorDisplayName: `${appointment.doctor?.title ?? ""} ${appointment.doctor?.firstName ?? ""} ${appointment.doctor?.lastName ?? ""}`.trim(),
         }))
-        .sort((a: any, b: any) => {
-          const aDate = new Date(a.created_at ?? a.appointment_date).getTime();
-          const bDate = new Date(b.created_at ?? b.appointment_date).getTime();
-          return bDate - aDate;
-        })
+        .sort((a: any, b: any) => new Date(b.created_at ?? b.appointment_date).getTime() - new Date(a.created_at ?? a.appointment_date).getTime())
         .slice(0, 8);
     },
   });
+
   const { data: myDoctorProfile } = useQuery({
     queryKey: ["admin-my-doctor-profile"],
     queryFn: async () => api.doctors.me(),
@@ -66,6 +70,13 @@ export default function AdminDashboard() {
     { label: t.appointments, value: stats?.appointments ?? 0, icon: CalendarDays, iconBg: "#fff8e6", iconColor: "#f5a623", to: "/admin/appointments" },
     { label: t.confirmedAppointments, value: stats?.confirmed ?? 0, icon: Clock, iconBg: "#eaf5ff", iconColor: "#2f75ca", to: "/admin/appointments?status=confirmed" },
   ];
+
+  const statusLabels: Record<string, string> = {
+    pending: t.pending,
+    confirmed: t.confirmed,
+    completed: t.completed,
+    cancelled: t.cancelled,
+  };
 
   const statusColor: Record<string, string> = {
     pending: "border-[rgba(245,166,35,0.3)] bg-[#fff8e6] text-[#f5a623]",
@@ -85,6 +96,7 @@ export default function AdminDashboard() {
             {t.adminDashboardDesc}
           </p>
         </motion.div>
+
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {statCards.map((s, i) => (
             <motion.div key={s.label} custom={i + 1} variants={fadeUp}>
@@ -94,10 +106,7 @@ export default function AdminDashboard() {
               >
                 <CardContent className="p-5">
                   <div className="mb-4 flex items-start justify-between gap-3">
-                    <div
-                      className="flex h-12 w-12 items-center justify-center rounded-xl"
-                      style={{ backgroundColor: s.iconBg }}
-                    >
+                    <div className="flex h-12 w-12 items-center justify-center rounded-xl" style={{ backgroundColor: s.iconBg }}>
                       <s.icon className="h-5 w-5" style={{ color: s.iconColor }} />
                     </div>
                     <TrendingUp className="h-4 w-4 shrink-0 text-[#65a98f]" />
@@ -113,40 +122,33 @@ export default function AdminDashboard() {
             </motion.div>
           ))}
         </div>
-        {hasActiveDoctorProfile(myDoctorProfile) && (
+
+        {hasActiveDoctorProfile(myDoctorProfile) ? (
           <motion.div custom={5} variants={fadeUp}>
             <Card className="rounded-2xl border border-[#b5d1cc] bg-white shadow-[0_2px_12px_rgba(79,143,230,0.08)]">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg text-[#1a2e3b]" style={{ fontFamily: "Manrope, sans-serif" }}>
                   <Stethoscope className="h-5 w-5 text-[#4f8fe6]" />
-                  You also have an active doctor profile
+                  {t.activeDoctorProfileTitle}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <p className="text-sm text-[#5a7a8a]" style={{ fontFamily: "Inter, sans-serif" }}>
-                  You can quickly access your doctor tools from here.
+                  {t.activeDoctorProfileDesc}
                 </p>
                 <div className="flex flex-col sm:flex-row gap-3">
-                  <Button
-                    className="rounded-[10px] border border-[#4f8fe6] bg-[#4f8fe6] text-white hover:bg-[#2f75ca]"
-                    style={{ fontFamily: "Inter, sans-serif" }}
-                    onClick={() => navigate("/doctor/schedule")}
-                  >
-                    Go to My Doctor Schedule
+                  <Button className="rounded-[10px] border border-[#4f8fe6] bg-[#4f8fe6] text-white hover:bg-[#2f75ca]" style={{ fontFamily: "Inter, sans-serif" }} onClick={() => navigate("/doctor/schedule")}>
+                    {t.goToDoctorSchedule}
                   </Button>
-                  <Button
-                    variant="outline"
-                    className="rounded-[10px] border-[#b5d1cc] bg-white text-[#4f8fe6] hover:bg-[#eaf5ff] hover:text-[#2f75ca]"
-                    style={{ fontFamily: "Inter, sans-serif" }}
-                    onClick={() => navigate("/doctor/appointments")}
-                  >
-                    View My Doctor Appointments
+                  <Button variant="outline" className="rounded-[10px] border-[#b5d1cc] bg-white text-[#4f8fe6] hover:bg-[#eaf5ff] hover:text-[#2f75ca]" style={{ fontFamily: "Inter, sans-serif" }} onClick={() => navigate("/doctor/appointments")}>
+                    {t.viewDoctorAppointments}
                   </Button>
                 </div>
               </CardContent>
             </Card>
           </motion.div>
-        )}
+        ) : null}
+
         <motion.div custom={6} variants={fadeUp}>
           <Card className="rounded-2xl border border-[#b5d1cc] bg-white shadow-[0_2px_12px_rgba(79,143,230,0.08)]">
             <CardHeader>
@@ -163,24 +165,17 @@ export default function AdminDashboard() {
               ) : (
                 <div className="space-y-3">
                   {recentAppointments.map((apt: any) => (
-                    <div
-                      key={apt.id}
-                      className="flex items-center justify-between gap-3 rounded-xl border border-transparent bg-[#f4f8fd] p-4 transition-colors hover:bg-[#eaf5ff]"
-                    >
+                    <div key={apt.id} className="flex items-center justify-between gap-3 rounded-xl border border-transparent bg-[#f4f8fd] p-4 transition-colors hover:bg-[#eaf5ff]">
                       <div className="min-w-0">
                         <p className="truncate text-sm font-medium text-[#1a2e3b]" style={{ fontFamily: "Inter, sans-serif" }}>
                           {apt.patientDisplayName || t.patient} → {apt.doctorDisplayName || t.doctor}
                         </p>
                         <p className="mt-1 text-xs text-[#5a7a8a]" style={{ fontFamily: "Inter, sans-serif" }}>
-                          {format(new Date(apt.appointment_date), "MMM d, yyyy")} · {apt.start_time?.slice(0, 5)}
+                          {format(new Date(apt.appointment_date), "MMM d, yyyy", { locale })} · {apt.start_time?.slice(0, 5)}
                         </p>
                       </div>
-                      <Badge
-                        variant="outline"
-                        className={`shrink-0 rounded-full border px-3 py-1 capitalize ${statusColor[apt.status] ?? ""}`}
-                        style={{ fontFamily: "Inter, sans-serif" }}
-                      >
-                        {apt.status}
+                      <Badge variant="outline" className={`shrink-0 rounded-full border px-3 py-1 ${statusColor[apt.status] ?? ""}`} style={{ fontFamily: "Inter, sans-serif" }}>
+                        {statusLabels[apt.status] ?? apt.status}
                       </Badge>
                     </div>
                   ))}

@@ -24,6 +24,8 @@ import { ResetPasswordDto } from './dto/reset-password.dto';
 import { VerifyAuthOtpDto } from './dto/verify-auth-otp.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
+const TRUSTED_DEVICE_COOKIE = 'trusted_device_token';
+
 @Controller('auth')
 export class AuthController {
   constructor(
@@ -35,28 +37,44 @@ export class AuthController {
   @Public()
   @Throttle({ global: { ttl: 3600000, limit: 10 } })
   @HttpCode(201)
-  register(@Body() dto: RegisterDto, @Req() req: TenantRequest & Request) {
-    return this.authService.register(dto, req.tenant!.clinicId, {
+  async register(
+    @Body() dto: RegisterDto,
+    @Req() req: TenantRequest & Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.authService.register(dto, req.tenant!.clinicId, {
       ipAddress:
         req.headers['x-forwarded-for']?.toString().split(',')[0]?.trim() ||
         req.headers['x-real-ip']?.toString() ||
         req.ip,
       requestId: (req as any).requestId,
+      userAgent: this.getUserAgent(req),
+      trustedDeviceToken: this.getTrustedDeviceToken(req),
     });
+    this.applyTrustedDeviceCookie(res, (result as any).trustedDeviceToken);
+    return result;
   }
 
   @Post('login')
   @Public()
   @Throttle({ global: { ttl: 60000, limit: 10 } })
   @HttpCode(200)
-  login(@Body() dto: LoginDto, @Req() req: TenantRequest & Request) {
-    return this.authService.login(dto, req.tenant!.clinicId, {
+  async login(
+    @Body() dto: LoginDto,
+    @Req() req: TenantRequest & Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.authService.login(dto, req.tenant!.clinicId, {
       ipAddress:
         req.headers['x-forwarded-for']?.toString().split(',')[0]?.trim() ||
         req.headers['x-real-ip']?.toString() ||
         req.ip,
       requestId: (req as any).requestId,
+      userAgent: this.getUserAgent(req),
+      trustedDeviceToken: this.getTrustedDeviceToken(req),
     });
+    this.applyTrustedDeviceCookie(res, (result as any).trustedDeviceToken);
+    return result;
   }
 
   @Post('refresh')
@@ -70,14 +88,22 @@ export class AuthController {
   @Public()
   @Throttle({ global: { ttl: 60000, limit: 20 } })
   @HttpCode(200)
-  verifyOtp(@Body() dto: VerifyAuthOtpDto, @Req() req: TenantRequest & Request) {
-    return this.authService.verifyOtp(dto, req.tenant!.clinicId, {
+  async verifyOtp(
+    @Body() dto: VerifyAuthOtpDto,
+    @Req() req: TenantRequest & Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.authService.verifyOtp(dto, req.tenant!.clinicId, {
       ipAddress:
         req.headers['x-forwarded-for']?.toString().split(',')[0]?.trim() ||
         req.headers['x-real-ip']?.toString() ||
         req.ip,
       requestId: (req as any).requestId,
+      userAgent: this.getUserAgent(req),
+      trustedDeviceToken: this.getTrustedDeviceToken(req),
     });
+    this.applyTrustedDeviceCookie(res, (result as any).trustedDeviceToken);
+    return result;
   }
 
   @Post('resend-otp')
@@ -162,12 +188,13 @@ export class AuthController {
 
     const frontendUrl = 'http://localhost:5173';
 
-    const { accessToken, refreshToken, user, flowToken, email } = req.user as {
+    const { accessToken, refreshToken, user, flowToken, email, trustedDeviceToken } = req.user as {
       accessToken?: string;
       refreshToken?: string;
       user?: { role?: string };
       flowToken?: string;
       email?: string;
+      trustedDeviceToken?: string;
     };
 
     console.log('[auth][googleCallback] redirecting to frontend', {
@@ -183,6 +210,8 @@ export class AuthController {
       );
     }
 
+    this.applyTrustedDeviceCookie(res, trustedDeviceToken);
+
     return res.redirect(
       `${frontendUrl}/auth/callback?accessToken=${encodeURIComponent(accessToken || '')}&refreshToken=${encodeURIComponent(refreshToken || '')}&role=${encodeURIComponent(user?.role || 'patient')}`,
     );
@@ -197,5 +226,43 @@ export class AuthController {
     }
 
     return this.configService.get<string>('FRONTEND_URL', 'http://localhost:5173');
+  }
+
+  private getTrustedDeviceToken(req: Request) {
+    const cookieHeader = req.headers.cookie;
+
+    if (!cookieHeader) {
+      return undefined;
+    }
+
+    const cookies = cookieHeader.split(';').map((part) => part.trim());
+    const trustedCookie = cookies.find((cookie) =>
+      cookie.startsWith(`${TRUSTED_DEVICE_COOKIE}=`),
+    );
+
+    if (!trustedCookie) {
+      return undefined;
+    }
+
+    return decodeURIComponent(trustedCookie.split('=').slice(1).join('='));
+  }
+
+  private getUserAgent(req: Request) {
+    const userAgent = req.headers['user-agent'];
+    return Array.isArray(userAgent) ? userAgent[0] : userAgent;
+  }
+
+  private applyTrustedDeviceCookie(res: Response, token?: string) {
+    if (!token) {
+      return;
+    }
+
+    res.cookie(TRUSTED_DEVICE_COOKIE, token, {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: this.configService.get<string>('NODE_ENV') === 'production',
+      maxAge: 30 * 24 * 60 * 60 * 1000,
+      path: '/',
+    });
   }
 }

@@ -1,30 +1,18 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
-import { tr } from "date-fns/locale";
-import {
-  AlertCircle,
-  CheckCircle2,
-  FileText,
-  Loader2,
-  XCircle,
-} from "lucide-react";
+import { enUS, tr as trLocale } from "date-fns/locale";
+import { AlertCircle, CheckCircle2, FileText, Loader2, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { cn } from "@/lib/utils";
 import api from "@/services/api";
 import type { Appointment, ClinicalNote } from "@/types/calendar";
+import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -42,8 +30,9 @@ export function AppointmentDetailSheet({
   onStatusUpdate,
 }: AppointmentDetailSheetProps) {
   const { user } = useAuth();
-  const { t } = useLanguage();
+  const { lang, t } = useLanguage();
   const queryClient = useQueryClient();
+  const locale = lang === "tr" ? trLocale : enUS;
   const isStaff = user?.role === "staff";
   const [isNoteFormOpen, setIsNoteFormOpen] = useState(false);
   const [diagnosis, setDiagnosis] = useState("");
@@ -59,7 +48,7 @@ export function AppointmentDetailSheet({
       setPrescription("");
       setNotes("");
     }
-  }, [open, appointment?.id]);
+  }, [appointment?.id, open]);
 
   const statusConfig: Record<string, { color: string; icon: React.ElementType; label: string }> = {
     pending: { color: "bg-warning/10 text-warning border-warning/20", icon: AlertCircle, label: t.pending },
@@ -74,39 +63,29 @@ export function AppointmentDetailSheet({
     enabled: !isStaff && open && Boolean(appointment?.patient.id),
   });
 
-  const hasAtLeastOneField = [diagnosis, treatment, prescription, notes].some(
-    (value) => value.trim().length > 0,
+  const hasAtLeastOneField = useMemo(
+    () => [diagnosis, treatment, prescription, notes].some((value) => value.trim().length > 0),
+    [diagnosis, notes, prescription, treatment],
   );
 
   const createClinicalNote = useMutation({
     mutationFn: async () => {
       if (!appointment?.id || !appointment?.patient.id || !appointment.doctor_id) {
-        throw new Error("Missing data");
+        throw new Error(t.missingData);
       }
 
-      const payload: {
-        patient_id: string;
-        doctor_id: string;
-        appointment_id: string;
-        diagnosis?: string;
-        treatment?: string;
-        prescription?: string;
-        notes?: string;
-      } = {
+      return api.clinicalNotes.create({
         patient_id: appointment.patient.id,
         doctor_id: appointment.doctor_id,
         appointment_id: appointment.id,
-      };
-
-      if (diagnosis.trim()) payload.diagnosis = diagnosis.trim();
-      if (treatment.trim()) payload.treatment = treatment.trim();
-      if (prescription.trim()) payload.prescription = prescription.trim();
-      if (notes.trim()) payload.notes = notes.trim();
-
-      return api.clinicalNotes.create(payload);
+        diagnosis: diagnosis.trim() || undefined,
+        treatment: treatment.trim() || undefined,
+        prescription: prescription.trim() || undefined,
+        notes: notes.trim() || undefined,
+      });
     },
     onSuccess: () => {
-      toast.success("Klinik not kaydedildi");
+      toast.success(t.clinicalNoteSaved);
       setIsNoteFormOpen(false);
       setDiagnosis("");
       setTreatment("");
@@ -114,8 +93,9 @@ export function AppointmentDetailSheet({
       setNotes("");
       queryClient.invalidateQueries({ queryKey: ["clinical-notes", appointment?.patient.id] });
     },
-    onError: (err: unknown) =>
-      toast.error(err instanceof Error ? err.message : "Klinik not kaydedilemedi"),
+    onError: (err: unknown) => {
+      toast.error(err instanceof Error ? err.message : t.clinicalNoteSaveFailed);
+    },
   });
 
   const patientName = (
@@ -144,33 +124,23 @@ export function AppointmentDetailSheet({
             <div className="space-y-4">
               <div className="flex items-center gap-3">
                 <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-secondary to-success">
-                  <span className="font-display font-bold text-secondary-foreground">
-                    {patientName[0] || "P"}
-                  </span>
+                  <span className="font-display font-bold text-secondary-foreground">{patientName[0] || "P"}</span>
                 </div>
                 <div>
                   <div className="font-semibold">{patientName}</div>
-                  {appointment.patient.email ? (
-                    <div className="text-sm text-muted-foreground">{appointment.patient.email}</div>
-                  ) : null}
-                  {appointment.patient.phone ? (
-                    <div className="text-sm text-muted-foreground">{appointment.patient.phone}</div>
-                  ) : null}
+                  {appointment.patient.email ? <div className="text-sm text-muted-foreground">{appointment.patient.email}</div> : null}
+                  {appointment.patient.phone ? <div className="text-sm text-muted-foreground">{appointment.patient.phone}</div> : null}
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div className="rounded-xl bg-muted p-3">
                   <div className="mb-1 text-muted-foreground">{t.date}</div>
-                  <div className="font-medium">
-                    {format(parseISO(appointment.appointment_date), "EEE, MMM d, yyyy")}
-                  </div>
+                  <div className="font-medium">{format(parseISO(appointment.appointment_date), "EEE, MMM d, yyyy", { locale })}</div>
                 </div>
                 <div className="rounded-xl bg-muted p-3">
                   <div className="mb-1 text-muted-foreground">{t.time}</div>
-                  <div className="font-medium">
-                    {appointment.start_time.slice(0, 5)} - {appointment.end_time.slice(0, 5)}
-                  </div>
+                  <div className="font-medium">{appointment.start_time.slice(0, 5)} - {appointment.end_time.slice(0, 5)}</div>
                 </div>
               </div>
 
@@ -184,28 +154,23 @@ export function AppointmentDetailSheet({
               ) : null}
 
               {appointment.status === "confirmed" && onStatusUpdate ? (
-                <Button
-                  className="w-full rounded-xl"
-                  onClick={() => onStatusUpdate(appointment.id, "completed")}
-                >
+                <Button className="w-full rounded-xl" onClick={() => onStatusUpdate(appointment.id, "completed")}>
                   <CheckCircle2 className="mr-2 h-4 w-4" /> {t.markCompleted}
                 </Button>
               ) : null}
 
-              {!isStaff && (
+              {!isStaff ? (
                 <div className="border-t pt-4">
                   <div className="space-y-4">
                     <div>
-                      <h4 className="font-display font-semibold">Geçmiş Notlar</h4>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        Hastaya ait önceki klinik notlar burada listelenir.
-                      </p>
+                      <h4 className="font-display font-semibold">{t.previousNotes}</h4>
+                      <p className="mt-1 text-sm text-muted-foreground">{t.previousNotesDesc}</p>
                     </div>
 
                     {isClinicalNotesLoading ? (
                       <div className="flex items-center gap-2 rounded-xl bg-muted p-3 text-sm text-muted-foreground">
                         <Loader2 className="h-4 w-4 animate-spin" />
-                        Klinik notlar yükleniyor...
+                        {t.clinicalNotesLoading}
                       </div>
                     ) : clinicalNotes && clinicalNotes.length > 0 ? (
                       <div className="space-y-3">
@@ -214,39 +179,31 @@ export function AppointmentDetailSheet({
                             <CardHeader className="space-y-2 pb-3">
                               <div className="flex items-start justify-between gap-3">
                                 <CardTitle className="text-base font-semibold">
-                                  {[note.doctor.title, note.doctor.firstName, note.doctor.lastName]
-                                    .filter(Boolean)
-                                    .join(" ")}
+                                  {[note.doctor.title, note.doctor.firstName, note.doctor.lastName].filter(Boolean).join(" ")}
                                 </CardTitle>
                                 <span className="text-xs text-muted-foreground">
-                                  {format(new Date(note.created_at), "d MMMM yyyy, HH:mm", {
-                                    locale: tr,
-                                  })}
+                                  {format(new Date(note.created_at), "d MMMM yyyy, HH:mm", { locale })}
                                 </span>
                               </div>
                             </CardHeader>
                             <CardContent className="space-y-2 text-sm">
-                              {note.diagnosis ? <p><span className="font-medium">Tanı:</span> {note.diagnosis}</p> : null}
-                              {note.treatment ? <p><span className="font-medium">Tedavi:</span> {note.treatment}</p> : null}
-                              {note.prescription ? <p><span className="font-medium">Reçete:</span> {note.prescription}</p> : null}
-                              {note.notes ? <p><span className="font-medium">Not:</span> {note.notes}</p> : null}
+                              {note.diagnosis ? <p><span className="font-medium">{t.diagnosis}:</span> {note.diagnosis}</p> : null}
+                              {note.treatment ? <p><span className="font-medium">{t.treatment}:</span> {note.treatment}</p> : null}
+                              {note.prescription ? <p><span className="font-medium">{t.prescription}:</span> {note.prescription}</p> : null}
+                              {note.notes ? <p><span className="font-medium">{t.notes}:</span> {note.notes}</p> : null}
                             </CardContent>
                           </Card>
                         ))}
                       </div>
                     ) : (
-                      <p className="text-sm text-muted-foreground">
-                        Henüz klinik not eklenmemiş.
-                      </p>
+                      <p className="text-sm text-muted-foreground">{t.noClinicalNotesYet}</p>
                     )}
 
                     <div className="space-y-3 rounded-2xl bg-muted/40 p-4">
                       <div className="flex items-center justify-between gap-3">
                         <div>
-                          <h4 className="font-display font-semibold">Yeni Not Ekle</h4>
-                          <p className="mt-1 text-sm text-muted-foreground">
-                            Tanı, tedavi, reçete veya genel not bilgisi ekleyin.
-                          </p>
+                          <h4 className="font-display font-semibold">{t.newNoteTitle}</h4>
+                          <p className="mt-1 text-sm text-muted-foreground">{t.newNoteDesc}</p>
                         </div>
                         <Button
                           type="button"
@@ -254,54 +211,30 @@ export function AppointmentDetailSheet({
                           className="rounded-xl"
                           onClick={() => setIsNoteFormOpen((current) => !current)}
                         >
-                          ＋ Yeni Klinik Not Ekle
+                          {t.addNewClinicalNote}
                         </Button>
                       </div>
 
                       {isNoteFormOpen ? (
                         <div className="space-y-4">
                           <div className="space-y-2">
-                            <Label htmlFor="clinical-note-diagnosis">Tanı</Label>
-                            <Textarea
-                              id="clinical-note-diagnosis"
-                              value={diagnosis}
-                              onChange={(e) => setDiagnosis(e.target.value)}
-                              className="rounded-xl text-sm"
-                              rows={3}
-                            />
+                            <Label htmlFor="clinical-note-diagnosis">{t.diagnosis}</Label>
+                            <Textarea id="clinical-note-diagnosis" value={diagnosis} onChange={(e) => setDiagnosis(e.target.value)} className="rounded-xl text-sm" rows={3} />
                           </div>
 
                           <div className="space-y-2">
-                            <Label htmlFor="clinical-note-treatment">Tedavi</Label>
-                            <Textarea
-                              id="clinical-note-treatment"
-                              value={treatment}
-                              onChange={(e) => setTreatment(e.target.value)}
-                              className="rounded-xl text-sm"
-                              rows={3}
-                            />
+                            <Label htmlFor="clinical-note-treatment">{t.treatment}</Label>
+                            <Textarea id="clinical-note-treatment" value={treatment} onChange={(e) => setTreatment(e.target.value)} className="rounded-xl text-sm" rows={3} />
                           </div>
 
                           <div className="space-y-2">
-                            <Label htmlFor="clinical-note-prescription">Reçete</Label>
-                            <Textarea
-                              id="clinical-note-prescription"
-                              value={prescription}
-                              onChange={(e) => setPrescription(e.target.value)}
-                              className="rounded-xl text-sm"
-                              rows={3}
-                            />
+                            <Label htmlFor="clinical-note-prescription">{t.prescription}</Label>
+                            <Textarea id="clinical-note-prescription" value={prescription} onChange={(e) => setPrescription(e.target.value)} className="rounded-xl text-sm" rows={3} />
                           </div>
 
                           <div className="space-y-2">
-                            <Label htmlFor="clinical-note-notes">Genel Not</Label>
-                            <Textarea
-                              id="clinical-note-notes"
-                              value={notes}
-                              onChange={(e) => setNotes(e.target.value)}
-                              className="rounded-xl text-sm"
-                              rows={4}
-                            />
+                            <Label htmlFor="clinical-note-notes">{t.generalNote}</Label>
+                            <Textarea id="clinical-note-notes" value={notes} onChange={(e) => setNotes(e.target.value)} className="rounded-xl text-sm" rows={4} />
                           </div>
 
                           <Button
@@ -310,17 +243,15 @@ export function AppointmentDetailSheet({
                             onClick={() => createClinicalNote.mutate()}
                             disabled={!hasAtLeastOneField || createClinicalNote.isPending}
                           >
-                            {createClinicalNote.isPending ? (
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            ) : null}
-                            Kaydet
+                            {createClinicalNote.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                            {t.save}
                           </Button>
                         </div>
                       ) : null}
                     </div>
                   </div>
                 </div>
-              )}
+              ) : null}
             </div>
           </>
         ) : null}

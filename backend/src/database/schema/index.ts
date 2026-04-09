@@ -11,3 +11,4 @@ export * from './appointment-files.schema';
 export * from './patient-clinical-notes.schema';
 export * from './clinic-encryption-keys.schema';
 export * from './audit-logs.schema';
+export * from './trusted-devices.schema';

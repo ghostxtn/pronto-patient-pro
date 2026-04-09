@@ -5,9 +5,11 @@ import AuthScreen from "@/components/auth/AuthScreen";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useLanguage } from "@/contexts/LanguageContext";
 import api from "@/services/api";
 
 export default function ForgotPassword() {
+  const { t } = useLanguage();
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -22,7 +24,7 @@ export default function ForgotPassword() {
       await api.auth.forgotPassword(email);
       setSubmitted(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Sifre sifirlama e-postasi gonderilemedi.");
+      setError(err instanceof Error ? err.message : t.forgotPasswordFailed);
     } finally {
       setLoading(false);
     }
@@ -35,10 +37,10 @@ export default function ForgotPassword() {
           className="text-2xl font-medium tracking-tight text-[#1a2e3b]"
           style={{ fontFamily: "Manrope, sans-serif" }}
         >
-          Sifrenizi mi unuttunuz?
+          {t.forgotPasswordTitle}
         </h1>
         <p className="mt-1 text-sm font-light text-[#5a7a8a]">
-          Hesabinizla baglantili e-posta adresini girin.
+          {t.forgotPasswordDesc}
         </p>
       </div>
 
@@ -46,7 +48,7 @@ export default function ForgotPassword() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="email" className="text-[11px] font-medium uppercase tracking-widest text-[#5a7a8a]">
-              E-posta
+              {t.email}
             </Label>
             <div className="relative">
               <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#7c96a4]" />
@@ -74,24 +76,24 @@ export default function ForgotPassword() {
             disabled={loading}
           >
             {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            Reset baglantisi gonder
+            {t.sendResetLink}
           </Button>
         </form>
       ) : (
         <div className="space-y-5">
           <div className="rounded-2xl border border-[#d7eadf] bg-[#f6fbf8] px-4 py-4 text-sm text-[#335b4a]">
-            Eger bu e-posta ile bir hesap varsa, sifre sifirlama baglantisi gonderildi.
+            {t.resetEmailSent}
           </div>
           <p className="text-sm text-[#5a7a8a]">
-            E-postadaki baglantiyi kullanarak yeni sifrenizi belirleyin. Baglanti belirli bir sure sonra gecersiz olur.
+            {t.resetEmailFollowup}
           </p>
         </div>
       )}
 
       <p className="mt-6 text-center text-sm text-[#5a7a8a]">
-        Girisi hatirladiniz mi?{" "}
+        {t.rememberPassword}{" "}
         <Link to="/auth" className="font-medium text-[#005cae] hover:underline">
-          Oturum ac
+          {t.loginInstead}
         </Link>
       </p>
     </AuthScreen>

@@ -32,7 +32,7 @@ const fadeUp = {
 function getDoctorName(doc: any) {
   const firstName = doc.firstName ?? doc.profiles?.first_name ?? "";
   const lastName = doc.lastName ?? doc.profiles?.last_name ?? "";
-  return `${firstName} ${lastName}`.trim() || "Unknown";
+  return `${firstName} ${lastName}`.trim() || "";
 }
 
 function getDoctorInitials(doc: any) {
@@ -164,7 +164,7 @@ export default function ManageDoctors() {
 
     const userId = getDoctorUserId(doctor);
     if (!userId) {
-      toast.error("Doktor kullanicisi bulunamadi");
+      toast.error(t.doctorUserMissing);
       return;
     }
 
@@ -192,9 +192,9 @@ export default function ManageDoctors() {
         ) ?? current,
       );
 
-      toast.success("Doktor fotografi guncellendi");
+      toast.success(t.photoUpdated);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Fotograf yuklenemedi");
+      toast.error(error instanceof Error ? error.message : t.photoUploadFailed);
     } finally {
       setUploadingByUserId((current) => ({ ...current, [userId]: false }));
     }
@@ -240,7 +240,7 @@ export default function ManageDoctors() {
                 e.currentTarget.style.background = "#4f8fe6";
               }}
             >
-              Add Doctor
+              {t.addDoctorAction}
             </button>
           </div>
         </motion.div>
@@ -294,7 +294,7 @@ export default function ManageDoctors() {
               transition: "all 0.15s",
             }}
           >
-            All
+            {t.all}
           </button>
         </div>
 
@@ -454,7 +454,7 @@ export default function ManageDoctors() {
                                     }}
                                   >
                                     {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                                    Fotoğraf Yükle
+                                    {t.uploadPhoto}
                                   </Button>
                                 </div>
                               </div>
@@ -555,7 +555,7 @@ export default function ManageDoctors() {
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label>First Name</Label>
+                  <Label>{t.firstName}</Label>
                   <Input
                     value={editDoctor.firstName ?? ""}
                     onChange={(e) => setEditDoctor({ ...editDoctor, firstName: e.target.value })}
@@ -563,7 +563,7 @@ export default function ManageDoctors() {
                 </div>
 
                 <div>
-                  <Label>Last Name</Label>
+                  <Label>{t.lastName}</Label>
                   <Input
                     value={editDoctor.lastName ?? ""}
                     onChange={(e) => setEditDoctor({ ...editDoctor, lastName: e.target.value })}
@@ -572,7 +572,7 @@ export default function ManageDoctors() {
               </div>
 
               <div>
-                <Label>Email</Label>
+                <Label>{t.email}</Label>
                 <Input
                   type="email"
                   value={editDoctor.email ?? ""}
@@ -587,7 +587,7 @@ export default function ManageDoctors() {
                   onValueChange={(value) => setEditDoctor({ ...editDoctor, specializationId: value })}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select" />
+                    <SelectValue placeholder={t.select} />
                   </SelectTrigger>
                   <SelectContent>
                     {specializations?.map((specialization: any) => (
@@ -600,7 +600,7 @@ export default function ManageDoctors() {
               </div>
 
               <div>
-                <Label>Title</Label>
+                <Label>{t.title}</Label>
                 <Input
                   value={editDoctor.title ?? ""}
                   onChange={(e) => setEditDoctor({ ...editDoctor, title: e.target.value })}
@@ -616,7 +616,7 @@ export default function ManageDoctors() {
               </div>
 
               <div>
-                <Label>Phone</Label>
+                <Label>{t.phone}</Label>
                 <Input
                   value={editDoctor.phone ?? ""}
                   onChange={(e) => setEditDoctor({ ...editDoctor, phone: e.target.value })}
@@ -639,31 +639,31 @@ export default function ManageDoctors() {
       {addOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="w-[420px] space-y-4 rounded-xl bg-white p-6 shadow-xl">
-            <h2 className="text-lg font-semibold">Add Doctor</h2>
+            <h2 className="text-lg font-semibold">{t.addDoctorAction}</h2>
 
             <input
-              placeholder="First Name"
+              placeholder={t.firstName}
               value={newDoctor.firstName}
               onChange={(e) => setNewDoctor({ ...newDoctor, firstName: e.target.value })}
               className="w-full rounded border p-2"
             />
 
             <input
-              placeholder="Last Name"
+              placeholder={t.lastName}
               value={newDoctor.lastName}
               onChange={(e) => setNewDoctor({ ...newDoctor, lastName: e.target.value })}
               className="w-full rounded border p-2"
             />
 
             <input
-              placeholder="Email"
+              placeholder={t.email}
               value={newDoctor.email}
               onChange={(e) => setNewDoctor({ ...newDoctor, email: e.target.value })}
               className="w-full rounded border p-2"
             />
 
             <input
-              placeholder="Password"
+              placeholder={t.password}
               type="password"
               value={newDoctor.password}
               onChange={(e) => setNewDoctor({ ...newDoctor, password: e.target.value })}
@@ -675,7 +675,7 @@ export default function ManageDoctors() {
               onChange={(e) => setNewDoctor({ ...newDoctor, specializationId: e.target.value })}
               className="w-full rounded border p-2"
             >
-              <option value="">Select Specialization</option>
+              <option value="">{t.selectSpecialization}</option>
               {specializations?.map((specialization: any) => (
                 <option key={specialization.id} value={specialization.id}>
                   {specialization.name}
@@ -684,7 +684,7 @@ export default function ManageDoctors() {
             </select>
 
             <input
-              placeholder="Title"
+              placeholder={t.title}
               value={newDoctor.title}
               onChange={(e) => setNewDoctor({ ...newDoctor, title: e.target.value })}
               className="w-full rounded border p-2"
@@ -698,7 +698,7 @@ export default function ManageDoctors() {
             />
 
             <input
-              placeholder="Phone"
+              placeholder={t.phone}
               value={newDoctor.phone}
               onChange={(e) => setNewDoctor({ ...newDoctor, phone: e.target.value })}
               className="w-full rounded border p-2"
@@ -706,10 +706,10 @@ export default function ManageDoctors() {
 
             <div className="flex justify-end gap-2">
               <button onClick={() => setAddOpen(false)} className="rounded border px-3 py-2">
-                Cancel
+                {t.cancel}
               </button>
               <button onClick={createDoctor} className="rounded bg-blue-600 px-4 py-2 text-white">
-                Create
+                {t.create}
               </button>
             </div>
           </div>

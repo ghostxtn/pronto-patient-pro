@@ -3,12 +3,15 @@ import { motion } from "framer-motion";
 import { ArrowLeft } from "lucide-react";
 import { Link } from "react-router-dom";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface AuthScreenProps {
   children: ReactNode;
 }
 
 export default function AuthScreen({ children }: AuthScreenProps) {
+  const { t } = useLanguage();
+
   return (
     <motion.div
       initial={{ opacity: 0, x: 30 }}
@@ -19,9 +22,7 @@ export default function AuthScreen({ children }: AuthScreenProps) {
     >
       <div
         className="relative hidden lg:flex lg:w-1/2 items-center justify-center overflow-hidden"
-        style={{
-          background: "linear-gradient(145deg, #c8e6f5 0%, #b5d1cc 40%, #9ecfbd 100%)",
-        }}
+        style={{ background: "linear-gradient(145deg, #c8e6f5 0%, #b5d1cc 40%, #9ecfbd 100%)" }}
       >
         <div className="absolute left-[-5rem] top-[-4rem] h-64 w-64 rounded-full bg-[#4f8fe6] opacity-20 blur-[80px]" />
         <div className="absolute bottom-[-5rem] right-[-4rem] h-72 w-72 rounded-full bg-[#236a53] opacity-15 blur-[90px]" />
@@ -39,31 +40,20 @@ export default function AuthScreen({ children }: AuthScreenProps) {
             </div>
 
             <div className="mt-8 space-y-3">
-              <h2
-                className="text-2xl font-light tracking-tight text-[#081e2a]"
-                style={{ fontFamily: "Manrope, sans-serif" }}
-              >
-                Saginiz, <strong className="font-semibold text-[#005cae]">onceligimiz.</strong>
+              <h2 className="text-2xl font-light tracking-tight text-[#081e2a]" style={{ fontFamily: "Manrope, sans-serif" }}>
+                {t.heroTitle1} <strong className="font-semibold text-[#005cae]">{t.heroTitle2}</strong>
               </h2>
-              <p className="text-sm text-[#3a5a6a]">
-                Modern klinik yonetimi ile randevularinizi kolayca planlayin.
-              </p>
+              <p className="text-sm text-[#3a5a6a]">{t.authHeroDesc}</p>
             </div>
 
             <div className="mt-6 flex gap-2">
               {[
-                ["2.4k+", "Hasta"],
-                ["98%", "Memnuniyet"],
-                ["7/24", "Destek"],
+                ["2.4k+", t.authHeroPatients],
+                ["98%", t.authHeroSatisfaction],
+                ["7/24", t.authHeroSupport],
               ].map(([value, label]) => (
-                <div
-                  key={label}
-                  className="flex-1 rounded-2xl border border-white/35 bg-white/25 p-3 text-center"
-                >
-                  <div
-                    className="text-lg font-semibold text-[#081e2a]"
-                    style={{ fontFamily: "Manrope, sans-serif" }}
-                  >
+                <div key={label} className="flex-1 rounded-2xl border border-white/35 bg-white/25 p-3 text-center">
+                  <div className="text-lg font-semibold text-[#081e2a]" style={{ fontFamily: "Manrope, sans-serif" }}>
                     {value}
                   </div>
                   <div className="text-[11px] text-[#3a5a6a]">{label}</div>
@@ -79,7 +69,7 @@ export default function AuthScreen({ children }: AuthScreenProps) {
           <div className="mb-4 flex items-center justify-between">
             <Link to="/auth" className="inline-flex items-center gap-2 text-sm text-[#5a7a8a] hover:text-[#1a2e3b]">
               <ArrowLeft className="h-4 w-4" />
-              Girise don
+              {t.backToLogin}
             </Link>
             <LanguageSwitcher />
           </div>
@@ -91,10 +81,7 @@ export default function AuthScreen({ children }: AuthScreenProps) {
                 <rect x="13" y="0" width="18" height="22" rx="9" fill="#4f8fe6" />
                 <rect x="13" y="22" width="18" height="22" rx="9" fill="#4f8fe6" />
               </svg>
-              <span
-                className="text-[15px] font-light tracking-tight text-[#081e2a]"
-                style={{ fontFamily: "Manrope, sans-serif" }}
-              >
+              <span className="text-[15px] font-light tracking-tight text-[#081e2a]" style={{ fontFamily: "Manrope, sans-serif" }}>
                 Pronto Klinik
               </span>
             </div>
