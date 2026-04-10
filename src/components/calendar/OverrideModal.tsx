@@ -15,7 +15,13 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -50,7 +56,6 @@ export function OverrideModal({
   const [type, setType] = useState<"blackout" | "custom_hours">("blackout");
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
-  const [reason, setReason] = useState("");
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
   useEffect(() => {
@@ -61,7 +66,6 @@ export function OverrideModal({
       setType(override.type);
       setStartTime(toTimeValue(override.start_time));
       setEndTime(toTimeValue(override.end_time));
-      setReason(override.reason ?? "");
       return;
     }
 
@@ -69,7 +73,6 @@ export function OverrideModal({
     setType(initialType);
     setStartTime("");
     setEndTime("");
-    setReason("");
   }, [initialDate, initialType, mode, open, override]);
 
   const timeError = useMemo(() => {
@@ -89,7 +92,6 @@ export function OverrideModal({
         type,
         start_time: type === "custom_hours" ? startTime : undefined,
         end_time: type === "custom_hours" ? endTime : undefined,
-        reason: reason.trim() || undefined,
       };
 
       if (mode === "edit" && override) {
@@ -132,64 +134,103 @@ export function OverrideModal({
 
   return (
     <>
-      <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
-        <DialogContent className="sm:max-w-md rounded-2xl">
-          <DialogHeader>
-            <DialogTitle>{mode === "edit" ? t.overrideEditTitle : t.overrideCreateTitle}</DialogTitle>
-            <DialogDescription>{t.overrideModalDesc}</DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="override-date">{t.date}</Label>
-              <Input id="override-date" type="date" value={date} onChange={(event) => setDate(event.target.value)} className="rounded-xl" />
-            </div>
-
-            <div className="space-y-3">
-              <Label>{t.overrideType}</Label>
-              <RadioGroup value={type} onValueChange={(value) => setType(value as "blackout" | "custom_hours")} className="gap-3">
-                <label htmlFor="override-blackout" className="flex items-center gap-3 rounded-xl border border-border/70 p-3">
-                  <RadioGroupItem value="blackout" id="override-blackout" />
-                  <span className="text-sm font-medium">{t.closeThisDay}</span>
-                </label>
-                <label htmlFor="override-custom-hours" className="flex items-center gap-3 rounded-xl border border-border/70 p-3">
-                  <RadioGroupItem value="custom_hours" id="override-custom-hours" />
-                  <span className="text-sm font-medium">{t.defineCustomHours}</span>
-                </label>
-              </RadioGroup>
-            </div>
-
-            {type === "custom_hours" ? (
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label htmlFor="override-start-time">{t.startTime}</Label>
-                  <Input id="override-start-time" type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} className="rounded-xl" />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="override-end-time">{t.endTime}</Label>
-                  <Input id="override-end-time" type="time" value={endTime} onChange={(event) => setEndTime(event.target.value)} className="rounded-xl" />
-                </div>
+      <Sheet open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
+        <SheetContent
+          side="right"
+          overlayClassName="bg-foreground/10 backdrop-blur-sm data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
+          className="w-full overflow-y-auto border-l border-border/40 bg-background/95 backdrop-blur-2xl px-0 shadow-2xl sm:max-w-[32rem]"
+        >
+          <SheetHeader className="border-b border-border/50 px-6 pb-5 pt-8">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                  {t.overrideType}
+                </p>
+                <SheetTitle className="mt-2 font-display text-[1.45rem]">
+                  {mode === "edit" ? t.overrideEditTitle : t.overrideCreateTitle}
+                </SheetTitle>
               </div>
-            ) : null}
+            </div>
+            <SheetDescription className="text-sm">
+              {t.overrideModalDesc}
+            </SheetDescription>
+          </SheetHeader>
 
-            {timeError ? <p className="text-sm text-destructive">{timeError}</p> : null}
+          <div className="space-y-5 px-6 py-6">
+            <div className="space-y-4 rounded-[24px] border border-border/60 bg-card/90 p-4 shadow-soft">
+              <div className="space-y-2">
+                <Label htmlFor="override-date">{t.date}</Label>
+                <Input
+                  id="override-date"
+                  type="date"
+                  value={date}
+                  onChange={(event) => setDate(event.target.value)}
+                  className="rounded-xl"
+                />
+              </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="override-reason">{t.reason}</Label>
-              <Input
-                id="override-reason"
-                type="text"
-                value={reason}
-                onChange={(event) => setReason(event.target.value)}
-                placeholder={t.reasonPlaceholder}
-                className="rounded-xl"
-              />
+              <div className="space-y-3">
+                <Label>{t.overrideType}</Label>
+                <RadioGroup
+                  value={type}
+                  onValueChange={(value) => setType(value as "blackout" | "custom_hours")}
+                  className="gap-3"
+                >
+                  <label
+                    htmlFor="override-blackout"
+                    className="flex items-center gap-3 rounded-[20px] border border-border/70 bg-background/70 p-3"
+                  >
+                    <RadioGroupItem value="blackout" id="override-blackout" />
+                    <span className="text-sm font-medium">{t.closeThisDay}</span>
+                  </label>
+                  <label
+                    htmlFor="override-custom-hours"
+                    className="flex items-center gap-3 rounded-[20px] border border-border/70 bg-background/70 p-3"
+                  >
+                    <RadioGroupItem value="custom_hours" id="override-custom-hours" />
+                    <span className="text-sm font-medium">{t.defineCustomHours}</span>
+                  </label>
+                </RadioGroup>
+              </div>
+
+              {type === "custom_hours" ? (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="override-start-time">{t.startTime}</Label>
+                    <Input
+                      id="override-start-time"
+                      type="time"
+                      value={startTime}
+                      onChange={(event) => setStartTime(event.target.value)}
+                      className="rounded-xl"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="override-end-time">{t.endTime}</Label>
+                    <Input
+                      id="override-end-time"
+                      type="time"
+                      value={endTime}
+                      onChange={(event) => setEndTime(event.target.value)}
+                      className="rounded-xl"
+                    />
+                  </div>
+                </div>
+              ) : null}
+
+              {timeError ? <p className="text-sm text-destructive">{timeError}</p> : null}
             </div>
 
-            <div className="flex items-center justify-between gap-3 pt-2">
+            <div className="flex items-center justify-between gap-3">
               {mode === "edit" && override ? (
-                <Button type="button" variant="destructive" className="rounded-xl" onClick={() => setConfirmDeleteOpen(true)} disabled={saveMutation.isPending || deleteMutation.isPending}>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  className="rounded-xl"
+                  onClick={() => setConfirmDeleteOpen(true)}
+                  disabled={saveMutation.isPending || deleteMutation.isPending}
+                >
                   <Trash2 className="h-4 w-4" />
                   {t.delete}
                 </Button>
@@ -197,14 +238,19 @@ export function OverrideModal({
                 <div />
               )}
 
-              <Button type="button" className="rounded-xl" onClick={() => saveMutation.mutate()} disabled={!isValid || saveMutation.isPending}>
+              <Button
+                type="button"
+                className="rounded-xl"
+                onClick={() => saveMutation.mutate()}
+                disabled={!isValid || saveMutation.isPending}
+              >
                 {saveMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                 {t.save}
               </Button>
             </div>
           </div>
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
 
       <AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
         <AlertDialogContent>

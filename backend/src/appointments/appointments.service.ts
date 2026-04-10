@@ -1,5 +1,12 @@
 import { ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { and, eq, gte, lte } from 'drizzle-orm';
+import { and, eq, gte, lte, ne } from 'drizzle-orm';
+import { AvailabilityService } from '../availability/availability.service';
+import {
+  isExpiredStartTime,
+  rangeContains,
+  rangesOverlap,
+  timeToMinutes,
+} from '../availability/calendar-time.utils';
 import { appointmentNotes, appointments, doctors, patients, users } from '../database/schema';
 import { EncryptionService } from '../encryption/encryption.service';
 import { CreateAppointmentNoteDto } from './dto/create-appointment-note.dto';
@@ -14,30 +21,47 @@ export class AppointmentsService {
   constructor(
     @Inject('DRIZZLE') private readonly db: any,
     private readonly encryptionService: EncryptionService,
+    private readonly availabilityService: AvailabilityService,
   ) {}
 
-  async create(dto: CreateAppointmentDto, clinicId: string, userRole: string, userId: string) {
-    if (userRole === 'patient') {
-      const [patient] = await this.db
-        .select()
-        .from(patients)
-        .where(and(eq(patients.user_id, userId), eq(patients.clinic_id, clinicId)))
-        .limit(1);
+  async create(
+    dto: CreateAppointmentDto,
+    clinicId: string,
+    userRole: string,
+    userId: string,
+  ) {
+    const patientId = await this.resolvePatientId(
+      dto.patientId,
+      clinicId,
+      userRole,
+      userId,
+    );
 
-      if (!patient) {
-        throw new ForbiddenException('Patient record not found');
-      }
+    await this.ensureDoctorInClinic(dto.doctorId, clinicId);
+    await this.ensurePatientInClinic(patientId, clinicId);
 
-      // Patient her zaman kendi adına randevu alır, patientId'yi override et
-      dto.patientId = patient.id;
-    }
+    this.validateAppointmentRange(dto.appointmentDate, dto.startTime, dto.endTime);
+    await this.assertRequestedRangeIsBookable(
+      clinicId,
+      dto.doctorId,
+      dto.appointmentDate,
+      dto.startTime,
+      dto.endTime,
+    );
+    await this.assertNoAppointmentOverlap(
+      clinicId,
+      dto.doctorId,
+      dto.appointmentDate,
+      dto.startTime,
+      dto.endTime,
+    );
 
     const [appointment] = await this.db
       .insert(appointments)
       .values({
         clinic_id: clinicId,
         doctor_id: dto.doctorId,
-        patient_id: dto.patientId,
+        patient_id: patientId,
         appointment_date: dto.appointmentDate,
         start_time: dto.startTime,
         end_time: dto.endTime,
@@ -169,7 +193,38 @@ export class AppointmentsService {
   }
 
   async update(id: string, dto: UpdateAppointmentDto, clinicId: string) {
-    await this.findById(id, clinicId);
+    const currentAppointment = await this.findById(id, clinicId);
+
+    await this.ensureDoctorInClinic(currentAppointment.doctor_id, clinicId);
+    await this.ensurePatientInClinic(currentAppointment.patient_id, clinicId);
+
+    const nextAppointmentDate =
+      dto.appointmentDate ?? currentAppointment.appointment_date;
+    const nextStartTime = dto.startTime ?? currentAppointment.start_time.slice(0, 5);
+    const nextEndTime = dto.endTime ?? currentAppointment.end_time.slice(0, 5);
+    const scheduleChanged =
+      nextAppointmentDate !== currentAppointment.appointment_date ||
+      nextStartTime !== currentAppointment.start_time.slice(0, 5) ||
+      nextEndTime !== currentAppointment.end_time.slice(0, 5);
+
+    if (scheduleChanged) {
+      this.validateAppointmentRange(nextAppointmentDate, nextStartTime, nextEndTime);
+      await this.assertRequestedRangeIsBookable(
+        clinicId,
+        currentAppointment.doctor_id,
+        nextAppointmentDate,
+        nextStartTime,
+        nextEndTime,
+      );
+      await this.assertNoAppointmentOverlap(
+        clinicId,
+        currentAppointment.doctor_id,
+        nextAppointmentDate,
+        nextStartTime,
+        nextEndTime,
+        id,
+      );
+    }
 
     const updateData: Record<string, unknown> = {
       updated_at: new Date(),
@@ -356,5 +411,144 @@ export class AppointmentsService {
       this.NOTE_ENCRYPTED_FIELDS,
       clinicId,
     );
+  }
+
+  private async resolvePatientId(
+    patientId: string,
+    clinicId: string,
+    userRole: string,
+    userId: string,
+  ) {
+    if (userRole !== 'patient') {
+      return patientId;
+    }
+
+    const [patient] = await this.db
+      .select()
+      .from(patients)
+      .where(and(eq(patients.user_id, userId), eq(patients.clinic_id, clinicId)))
+      .limit(1);
+
+    if (!patient) {
+      throw new ForbiddenException('Patient record not found');
+    }
+
+    return patient.id;
+  }
+
+  private async ensureDoctorInClinic(doctorId: string, clinicId: string) {
+    const [doctor] = await this.db
+      .select({ id: doctors.id })
+      .from(doctors)
+      .where(and(eq(doctors.id, doctorId), eq(doctors.clinic_id, clinicId)))
+      .limit(1);
+
+    if (!doctor) {
+      throw new NotFoundException('Doctor not found in this clinic');
+    }
+  }
+
+  private async ensurePatientInClinic(patientId: string, clinicId: string) {
+    const [patient] = await this.db
+      .select({ id: patients.id })
+      .from(patients)
+      .where(and(eq(patients.id, patientId), eq(patients.clinic_id, clinicId)))
+      .limit(1);
+
+    if (!patient) {
+      throw new NotFoundException('Patient not found in this clinic');
+    }
+  }
+
+  private validateAppointmentRange(
+    appointmentDate: string,
+    startTime: string,
+    endTime: string,
+  ) {
+    if (startTime >= endTime) {
+      throw new ForbiddenException('Appointment end time must be after start time');
+    }
+
+    if (isExpiredStartTime(appointmentDate, startTime)) {
+      throw new ForbiddenException('Requested appointment time has expired');
+    }
+  }
+
+  private async assertRequestedRangeIsBookable(
+    clinicId: string,
+    doctorId: string,
+    appointmentDate: string,
+    startTime: string,
+    endTime: string,
+  ) {
+    const availabilityContext = await this.availabilityService.getAvailabilityContext(
+      clinicId,
+      doctorId,
+      appointmentDate,
+    );
+    const requestedRange = {
+      start: timeToMinutes(startTime),
+      end: timeToMinutes(endTime),
+    };
+    const hasBookableStart = availabilityContext.slotEntries.some(
+      (slotEntry) => slotEntry.startTime === startTime,
+    );
+    const hasFullCoverage = availabilityContext.availabilityRanges.some((range) =>
+      rangeContains(range, requestedRange),
+    );
+
+    if (!hasBookableStart || !hasFullCoverage) {
+      throw new ForbiddenException('Requested time range is not bookable');
+    }
+  }
+
+  // Keep overlap as a separate invariant so expired/not-bookable/overlap stay distinct.
+  private async assertNoAppointmentOverlap(
+    clinicId: string,
+    doctorId: string,
+    appointmentDate: string,
+    startTime: string,
+    endTime: string,
+    excludeAppointmentId?: string,
+  ) {
+    const conditions = [
+      eq(appointments.clinic_id, clinicId),
+      eq(appointments.doctor_id, doctorId),
+      eq(appointments.appointment_date, appointmentDate),
+      ne(appointments.status, 'cancelled'),
+    ];
+
+    if (excludeAppointmentId) {
+      conditions.push(ne(appointments.id, excludeAppointmentId));
+    }
+
+    const existingAppointments = await this.db
+      .select({
+        start_time: appointments.start_time,
+        end_time: appointments.end_time,
+      })
+      .from(appointments)
+      .where(and(...conditions));
+
+    const requestedRange = {
+      start: timeToMinutes(startTime),
+      end: timeToMinutes(endTime),
+    };
+    const hasOverlap = existingAppointments.some((appointment: {
+      start_time: string;
+      end_time: string;
+    }) =>
+      rangesOverlap(
+        requestedRange,
+        {
+          start: timeToMinutes(appointment.start_time),
+          end: timeToMinutes(appointment.end_time),
+        },
+      ),
+    );
+
+    if (hasOverlap) {
+      throw new ForbiddenException('Doctor already has an appointment in this time range');
+    }
   }
 }

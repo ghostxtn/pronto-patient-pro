@@ -19,6 +19,10 @@ function parseTimeToDate(baseDate: Date, time: string) {
   return setMinutes(setHours(baseDate, hours), minutes);
 }
 
+export function parseDateOnly(value: string) {
+  return parseISO(`${value}T00:00:00`);
+}
+
 export function availabilityToEvents(
   slots: AvailabilitySlot[],
   weekStart: Date,
