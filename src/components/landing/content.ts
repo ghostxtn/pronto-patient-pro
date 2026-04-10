@@ -116,10 +116,10 @@ const sharedImages = {
 const trContent: LandingContent = {
   brand: {
     name: "MediBook",
-    label: "Koordinasyon destekli klinik bakim",
+    label: "Koordinasyon destekli klinik bakım",
   },
   navigation: [
-    { label: "Uzmanlık Alanları", href: "/specialties" },
+    { label: "Uzmanlık Alanlarımız", href: "/specialties" },
     { label: "Doktorlarımız", href: "/doctors" },
     { label: "Randevu Süreci", href: "/appointment-process" },
     { label: "İletişim", href: "/contact" },
@@ -129,7 +129,7 @@ const trContent: LandingContent = {
     requestLabel: "Randevu Talebi",
   },
   hero: {
-    eyebrow: "Koordinasyon destekli klinik bakim",
+    eyebrow: "Koordinasyon destekli klinik bakım",
     title: "Doğru uzmanlığa, daha düzenli bir randevu süreciyle ulaşın.",
     description:
       "Randevu talebinizi oluşturun. Klinik ekibimiz ihtiyacınızı değerlendirip uygun uzmanlık ve zaman planlaması için sizinle iletişime geçsin.",
@@ -182,14 +182,14 @@ const trContent: LandingContent = {
       title:
         "Talep, değerlendirme ve onay; doğru uzmanlığa ulaşmak için tek bir akışta ilerler.",
       description:
-        "Randevu talebiniz klinik ekibi tarafından değerlendirilir, uygun uzmanlık eşlemesiyle netleştirilir.",
+        "Randevu talebiniz klinik ekibi tarafından değerlendirilir, uygun uzmanlık eşleşmesiyle netleştirilir.",
       points: [
         "Talep Oluşturun: İhtiyacınızı ve temel tercihlerinizi paylaşın.",
         "Değerlendirme ve Yönlendirme: Klinik ekibi uygun uzmanlık adımını belirlesin.",
         "Onay ve Takip: Süreç netleştirilir, bilgilendirmeler paylaşılır.",
       ],
       note:
-        "Bu akış hız vaatlerinden çok doğru uzmanlık eşlemesini önceleyecek şekilde kurulur.",
+        "Bu akış hız vaatlerinden çok doğru uzmanlık eşleşmesini önceleyecek şekilde kurulur.",
       action: {
         label: "Randevu Sürecini Gör",
         href: "/appointment-process",
@@ -235,7 +235,7 @@ const trContent: LandingContent = {
       "Telefon, kısa adres, temel erişim notları ve güncel çalışma bilgilerine tek noktadan ulaşın.",
     phone: "+90 (212) 000 00 00",
     address: "Örnek Mahallesi, Sağlık Caddesi No:1, İstanbul",
-    hours: "Hafta içi 09:00 – 18:00 · Cumartesi 09:00 – 14:00",
+    hours: "Hafta içi 09:00 - 18:00 · Cumartesi 09:00 - 14:00",
     accessNote: "Engelsiz giriş ve asansör erişimi mevcuttur.",
     primaryAction: {
       label: "İletişim ve Ulaşım",
@@ -265,7 +265,7 @@ const trContent: LandingContent = {
       {
         question: "Talebime ne kadar sürede dönüş yapılır?",
         answer:
-          "Geri dönüş süresi klinik yoğunluğuna göre değişebilir. Amaç otomatik hız vaadi değil, doğru uzmanlık eşlesmesiyle net bilgilendirme sağlamaktır.",
+          "Geri dönüş süresi klinik yoğunluğuna göre değişebilir. Amaç otomatik hız vaadi değil, doğru uzmanlık eşleşmesiyle net bilgilendirme sağlamaktır.",
       },
       {
         question: "Doktor seçebilir miyim?",
@@ -315,7 +315,7 @@ const trContent: LandingContent = {
       { label: "Kullanım Koşulları", href: "/legal/terms-of-use" },
       { label: "İletişim", href: "/contact" },
     ],
-    copyright: "© 2026 MediBook. Tüm hakları saklıdır.",
+    copyright: "(c) 2026 MediBook. Tüm hakları saklıdır.",
   },
 };
 
@@ -338,7 +338,7 @@ const enContent: LandingContent = {
     eyebrow: "Coordination-led clinic care",
     title: "Reach the right specialty through a more orderly appointment flow.",
     description:
-      "Create your appointment request. The clinic team reviews your need and contacts you to coordinate the right specialty and timing.",
+      "Create your appointment request. The clinic team reviews your needs and contacts you to coordinate the right specialty and timing.",
     primaryAction: {
       label: "Create Appointment Request",
       href: "/request-appointment",
@@ -437,10 +437,10 @@ const enContent: LandingContent = {
     eyebrow: "Contact & Directions",
     title: "Clinic access, working hours, and key information in one place.",
     description:
-      "Phone, address, accessibility notes, and current working hours — available from a single point.",
+      "Phone, address, accessibility notes, and current working hours are available from a single point.",
     phone: "+90 (212) 000 00 00",
-    address: "Örnek Mahallesi, Sağlık Caddesi No:1, İstanbul",
-    hours: "Weekdays 09:00 – 18:00 · Saturday 09:00 – 14:00",
+    address: "Ornek Mahallesi, Saglik Caddesi No:1, Istanbul",
+    hours: "Weekdays 09:00 - 18:00 · Saturday 09:00 - 14:00",
     accessNote: "Step-free entrance and elevator access available.",
     primaryAction: {
       label: "Contact & Directions",

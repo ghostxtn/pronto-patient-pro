@@ -62,11 +62,11 @@ export default function Auth() {
     }
 
     if (pendingOtp.source === "signup") {
-      return "Hesabinizi tamamlamak icin e-postaniza gonderilen 6 haneli kodu girin.";
+      return t.otpSignupDesc;
     }
 
-    return "Giris islemini tamamlamak icin e-postaniza gonderilen 6 haneli kodu girin.";
-  }, [pendingOtp]);
+    return t.otpLoginDesc;
+  }, [pendingOtp, t]);
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -88,7 +88,7 @@ export default function Auth() {
           flowToken: result.flowToken,
           email: result.email,
         });
-        toast.success("Dogrulama kodu e-posta adresinize gonderildi.");
+        toast.success(t.otpCodeSent);
       }
     } catch (err: any) {
       toast.error(err.message);
@@ -134,7 +134,7 @@ export default function Auth() {
         email: result.email,
       });
       setOtpCode("");
-      toast.success("Yeni dogrulama kodu gonderildi.");
+      toast.success(t.otpCodeResent);
     } catch (err: any) {
       toast.error(err.message);
     } finally {
@@ -187,18 +187,18 @@ export default function Auth() {
                 className="text-2xl font-light tracking-tight text-[#081e2a]"
                 style={{ fontFamily: "Manrope, sans-serif" }}
               >
-                Saginiz, <strong className="font-semibold text-[#005cae]">onceligimiz.</strong>
+                {t.heroTitle1} <strong className="font-semibold text-[#005cae]">{t.heroTitle2.toLowerCase()}</strong>
               </h2>
               <p className="text-sm text-[#3a5a6a]">
-                Modern klinik yonetimi ile randevularinizi kolayca planlayin.
+                {t.authHeroDesc}
               </p>
             </div>
 
             <div className="mt-6 flex gap-2">
               {[
-                ["2.4k+", "Hasta"],
-                ["98%", "Memnuniyet"],
-                ["7/24", "Destek"],
+                ["2.4k+", t.authHeroPatients],
+                ["98%", t.authHeroSatisfaction],
+                ["7/24", t.authHeroSupport],
               ].map(([value, label]) => (
                 <div
                   key={label}
@@ -223,7 +223,7 @@ export default function Auth() {
           <div className="mb-4 flex items-center justify-between">
             <Link to="/" className="inline-flex items-center gap-2 text-sm text-[#5a7a8a] hover:text-[#1a2e3b]">
               <ArrowLeft className="h-4 w-4" />
-              Ana sayfaya don
+              {t.backToHome}
             </Link>
             <LanguageSwitcher />
           </div>
@@ -250,10 +250,10 @@ export default function Auth() {
                     className="text-2xl font-medium tracking-tight text-[#1a2e3b]"
                     style={{ fontFamily: "Manrope, sans-serif" }}
                   >
-                    {isSignUp ? "Hesap Olustur" : "Tekrar hos geldiniz"}
+                    {isSignUp ? t.createAccountTitle : t.welcomeBack}
                   </h1>
                   <p className="mt-1 text-sm font-light text-[#5a7a8a]">
-                    {isSignUp ? "Bilgilerinizi girin" : "Hesabiniza giris yapin"}
+                    {isSignUp ? t.enterYourDetails : t.signInToAccount}
                   </p>
                 </div>
 
@@ -269,7 +269,7 @@ export default function Auth() {
                       <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18A11.05 11.05 0 001 12c0 1.78.43 3.46 1.18 4.93l3.66-2.84z" fill="#FBBC05" />
                       <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
                     </svg>
-                    Google ile devam et
+                    {t.continueWithGoogle}
                   </Button>
                 </div>
 
@@ -278,7 +278,7 @@ export default function Auth() {
                     <div className="w-full border-t border-[#f0f4f8]" />
                   </div>
                   <div className="relative flex justify-center">
-                    <span className="bg-white px-3 text-xs text-[#5a7a8a]">veya</span>
+                    <span className="bg-white px-3 text-xs text-[#5a7a8a]">{t.orContinueWithEmail}</span>
                   </div>
                 </div>
 
@@ -287,7 +287,7 @@ export default function Auth() {
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-2">
                         <Label htmlFor="firstName" className="text-[11px] font-medium uppercase tracking-widest text-[#5a7a8a]">
-                          {t.firstName || "Ad"}
+                          {t.firstName}
                         </Label>
                         <div className="relative">
                           <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#7c96a4]" />
@@ -303,7 +303,7 @@ export default function Auth() {
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="lastName" className="text-[11px] font-medium uppercase tracking-widest text-[#5a7a8a]">
-                          {t.lastName || "Soyad"}
+                          {t.lastName}
                         </Label>
                         <div className="relative">
                           <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#7c96a4]" />
@@ -358,7 +358,7 @@ export default function Auth() {
                   {!isSignUp ? (
                     <div className="flex justify-end">
                       <Link to="/forgot-password" className="text-sm font-medium text-[#005cae] hover:underline">
-                        Forgot password?
+                        {t.forgotPassword}
                       </Link>
                     </div>
                   ) : null}
@@ -394,7 +394,7 @@ export default function Auth() {
                     className="text-2xl font-medium tracking-tight text-[#1a2e3b]"
                     style={{ fontFamily: "Manrope, sans-serif" }}
                   >
-                    E-posta dogrulamasi
+                    {t.emailVerification}
                   </h1>
                   <p className="mt-2 text-sm font-light text-[#5a7a8a]">{otpDescription}</p>
                   <p className="mt-3 text-sm font-medium text-[#1a2e3b]">{pendingOtp.email}</p>
@@ -403,7 +403,7 @@ export default function Auth() {
                 <form onSubmit={handleVerifyOtp} className="space-y-5">
                   <div className="space-y-2">
                     <Label htmlFor="otp" className="text-[11px] font-medium uppercase tracking-widest text-[#5a7a8a]">
-                      Dogrulama Kodu
+                      {t.otpCodeLabel}
                     </Label>
                     <InputOTP
                       id="otp"
@@ -430,7 +430,7 @@ export default function Auth() {
                     disabled={loading || otpCode.length !== 6}
                   >
                     {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Kodu dogrula
+                    {t.verifyCode}
                   </Button>
                 </form>
 
@@ -441,7 +441,7 @@ export default function Auth() {
                     onClick={handleResendOtp}
                     disabled={loading}
                   >
-                    Kodu tekrar gonder
+                    {t.resendCode}
                   </button>
                   <button
                     type="button"
@@ -449,7 +449,7 @@ export default function Auth() {
                     onClick={handleCancelOtp}
                     disabled={loading}
                   >
-                    Geri don
+                    {t.goBack}
                   </button>
                 </div>
               </>

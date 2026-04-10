@@ -27,6 +27,7 @@ import { toast } from "sonner";
 import { AvailabilityModal } from "@/components/calendar/AvailabilityModal";
 import { OverrideModal } from "@/components/calendar/OverrideModal";
 import { AppointmentDetailSheet } from "@/components/appointments/AppointmentDetailSheet";
+import { useLanguage } from "@/contexts/LanguageContext";
 import api from "@/services/api";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
@@ -75,21 +76,6 @@ const localizer = dateFnsLocalizer({
 
 console.debug("[doctor][calendar] module loaded");
 
-const calendarMessages = {
-  today: "Bugun",
-  previous: "Geri",
-  next: "Ileri",
-  month: "Ay",
-  week: "Hafta",
-  day: "Gun",
-  agenda: "Ajanda",
-  date: "Tarih",
-  time: "Saat",
-  event: "Etkinlik",
-  noEventsInRange: "Bu aralikta etkinlik yok",
-  showMore: (total: number) => `+${total} daha`,
-};
-
 interface DoctorCalendarProps {
   doctorId: string;
 }
@@ -112,6 +98,12 @@ interface CalendarAppointmentResponse {
 
 interface CustomToolbarProps extends ToolbarProps<CalendarEvent, object> {
   onManageAvailability: () => void;
+  labels?: {
+    manageAvailability: string;
+    previous: string;
+    next: string;
+    views: Record<(typeof toolbarViews)[number], string>;
+  };
 }
 
 interface CalendarHeaderProps {
@@ -154,12 +146,25 @@ function getOverrideBadge(type: AvailabilityOverride["type"]) {
     : { label: "Özel Saat", className: "border-yellow-200 bg-yellow-50 text-yellow-700" };
 }
 
+const defaultToolbarLabels: CustomToolbarProps["labels"] = {
+  manageAvailability: "Manage Availability",
+  previous: "Previous",
+  next: "Next",
+  views: {
+    [Views.MONTH]: "Month",
+    [Views.WEEK]: "Week",
+    [Views.DAY]: "Day",
+    [Views.AGENDA]: "Agenda",
+  },
+};
+
 const CustomToolbar = ({
   label,
   onNavigate,
   onView,
   view,
   onManageAvailability,
+  labels = defaultToolbarLabels,
 }: CustomToolbarProps) => (
   <div className="mb-2 flex flex-wrap items-center justify-between gap-3 px-4 py-3">
     <Button
@@ -169,7 +174,7 @@ const CustomToolbar = ({
       onClick={onManageAvailability}
     >
       <Settings2 className="h-4 w-4" />
-      Musaitligi Yonet
+      {labels?.manageAvailability || defaultToolbarLabels.manageAvailability}
     </Button>
 
     <div className="flex items-center gap-2">
@@ -177,6 +182,8 @@ const CustomToolbar = ({
         onClick={() => onNavigate("PREV")}
         className="rounded-md p-1.5 text-gray-600 hover:bg-gray-100"
         type="button"
+        aria-label={labels?.previous || defaultToolbarLabels.previous}
+        title={labels?.previous || defaultToolbarLabels.previous}
       >
         {"<"}
       </button>
@@ -187,6 +194,8 @@ const CustomToolbar = ({
         onClick={() => onNavigate("NEXT")}
         className="rounded-md p-1.5 text-gray-600 hover:bg-gray-100"
         type="button"
+        aria-label={labels?.next || defaultToolbarLabels.next}
+        title={labels?.next || defaultToolbarLabels.next}
       >
         {">"}
       </button>
@@ -209,7 +218,7 @@ const CustomToolbar = ({
           }`}
           type="button"
         >
-          {toolbarViewLabels[toolbarView]}
+          {labels?.views?.[toolbarView] || defaultToolbarLabels.views[toolbarView]}
         </button>
       ))}
     </div>
@@ -261,6 +270,7 @@ function getDateRange(date: Date, view: View) {
 }
 
 export function DoctorCalendar({ doctorId }: DoctorCalendarProps) {
+  const { t } = useLanguage();
   const queryClient = useQueryClient();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [view, setView] = useState<View>(Views.WEEK);
@@ -302,6 +312,35 @@ export function DoctorCalendar({ doctorId }: DoctorCalendarProps) {
   );
   const overrideRangeStart = useMemo(() => format(subDays(new Date(), 30), "yyyy-MM-dd"), []);
   const overrideRangeEnd = useMemo(() => format(addDays(new Date(), 365), "yyyy-MM-dd"), []);
+  const calendarMessages = useMemo(
+    () => ({
+      today: t.today,
+      previous: t.goBack,
+      next: defaultToolbarLabels.next,
+      month: defaultToolbarLabels.views[Views.MONTH],
+      week: defaultToolbarLabels.views[Views.WEEK],
+      day: defaultToolbarLabels.views[Views.DAY],
+      agenda: defaultToolbarLabels.views[Views.AGENDA],
+      date: t.date,
+      time: t.time,
+      event: t.appointmentDetails,
+      noEventsInRange: t.noEventsInRange,
+      showMore: (total: number) =>
+        t.moreCount.includes("{{count}}")
+          ? t.moreCount.replace("{{count}}", String(total))
+          : `+${total}`,
+    }),
+    [t],
+  );
+  const toolbarLabels = useMemo(
+    () => ({
+      manageAvailability: t.manageAvailability || defaultToolbarLabels.manageAvailability,
+      previous: t.goBack || defaultToolbarLabels.previous,
+      next: defaultToolbarLabels.next,
+      views: defaultToolbarLabels.views,
+    }),
+    [t.goBack, t.manageAvailability],
+  );
 
   const {
     data: availabilitySlots = [],
@@ -559,6 +598,7 @@ export function DoctorCalendar({ doctorId }: DoctorCalendarProps) {
               <CustomToolbar
                 {...toolbarProps}
                 onManageAvailability={() => setIsAvailabilitySheetOpen(true)}
+                labels={toolbarLabels}
               />
             ),
           }}
@@ -683,7 +723,7 @@ export function DoctorCalendar({ doctorId }: DoctorCalendarProps) {
       <Sheet open={isAvailabilitySheetOpen} onOpenChange={setIsAvailabilitySheetOpen}>
         <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-lg">
           <SheetHeader>
-            <SheetTitle>Musaitligi Yonet</SheetTitle>
+            <SheetTitle>{t.manageAvailability}</SheetTitle>
             <SheetDescription>
               Haftalik musaitlik slotlarini burada duzenleyebilir, aktiflik durumunu degistirebilir veya yeni slot ekleyebilirsiniz.
             </SheetDescription>
@@ -708,7 +748,7 @@ export function DoctorCalendar({ doctorId }: DoctorCalendarProps) {
                     })
                   }
                 >
-                  ＋ Yeni Slot Ekle
+                  {t.addNewSlot}
                 </Button>
               </div>
 
@@ -765,7 +805,7 @@ export function DoctorCalendar({ doctorId }: DoctorCalendarProps) {
                           }
                         >
                           <Pencil className="h-4 w-4" />
-                          Duzenle
+                          {t.edit}
                         </Button>
                         <Button
                           type="button"
@@ -774,7 +814,7 @@ export function DoctorCalendar({ doctorId }: DoctorCalendarProps) {
                           onClick={() => setSlotToDelete(slot)}
                         >
                           <Trash2 className="h-4 w-4" />
-                          Sil
+                          {t.delete}
                         </Button>
                       </div>
                     </div>
@@ -808,7 +848,7 @@ export function DoctorCalendar({ doctorId }: DoctorCalendarProps) {
                     })
                   }
                 >
-                  ＋ İstisna Ekle
+                  {t.addException}
                 </Button>
               </div>
 
@@ -871,7 +911,7 @@ export function DoctorCalendar({ doctorId }: DoctorCalendarProps) {
                               onClick={() => setOverrideToDelete(override)}
                             >
                               <Trash2 className="h-4 w-4" />
-                              Sil
+                              {t.delete}
                             </Button>
                           </div>
                         </div>
@@ -897,7 +937,7 @@ export function DoctorCalendar({ doctorId }: DoctorCalendarProps) {
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel onClick={() => setSlotToDelete(null)}>Iptal</AlertDialogCancel>
+                  <AlertDialogCancel onClick={() => setSlotToDelete(null)}>{t.cancel}</AlertDialogCancel>
                   <Button
                     variant="destructive"
                     disabled={removeAvailability.isPending}
@@ -907,7 +947,7 @@ export function DoctorCalendar({ doctorId }: DoctorCalendarProps) {
                       }
                     }}
                   >
-                    {removeAvailability.isPending ? "Siliniyor..." : "Sil"}
+                    {removeAvailability.isPending ? t.deleting : t.delete}
                   </Button>
                 </AlertDialogFooter>
               </AlertDialogContent>
@@ -924,7 +964,7 @@ export function DoctorCalendar({ doctorId }: DoctorCalendarProps) {
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel onClick={() => setOverrideToDelete(null)}>İptal</AlertDialogCancel>
+                  <AlertDialogCancel onClick={() => setOverrideToDelete(null)}>{t.cancel}</AlertDialogCancel>
                   <Button
                     variant="destructive"
                     disabled={removeOverride.isPending}
@@ -934,7 +974,7 @@ export function DoctorCalendar({ doctorId }: DoctorCalendarProps) {
                       }
                     }}
                   >
-                    {removeOverride.isPending ? "Siliniyor..." : "Sil"}
+                    {removeOverride.isPending ? t.deleting : t.delete}
                   </Button>
                 </AlertDialogFooter>
               </AlertDialogContent>

@@ -1,9 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import api from "@/services/api";
-import type { SupportedLanguage } from "@/components/landing/content";
+import type { Language } from "@/i18n/config";
 import { shapeHomepagePreview } from "@/lib/homepage-preview";
 
-export function useHomepagePreviewData(lang: SupportedLanguage) {
+export function useHomepagePreviewData(lang: Language) {
   const query = useQuery({
     queryKey: ["homepage-preview"],
     queryFn: async () => api.homepagePreview.get(),

@@ -9,7 +9,7 @@ const appleEase = [0.25, 0.1, 0.25, 1] as const;
 
 export default function Specialties() {
   const navigate = useNavigate();
-  const { lang } = useLanguage();
+  const { lang, t } = useLanguage();
   const previewData = useHomepagePreviewData(lang);
 
   return (
@@ -30,18 +30,14 @@ export default function Specialties() {
             viewport={{ once: true, amount: 0.2 }}
             transition={{ duration: 0.6, ease: appleEase }}
           >
-            <p
-              className="text-[11px] font-medium uppercase tracking-[2px] text-homepage-muted"
-            >
-              UZMANLIK ALANLARI
+            <p className="text-[11px] font-medium uppercase tracking-[2px] text-homepage-muted">
+              {t.specialtiesEyebrow}
             </p>
             <h1 className="font-display mt-2 text-[34px] font-bold leading-tight text-homepage-ink md:text-[42px]">
-              Uzmanlık Alanlarımız
+              {t.specialtiesPageTitle}
             </h1>
-            <p
-              className="mt-3 max-w-[560px] text-[16px] leading-7 text-homepage-muted"
-            >
-              Kliniğimizin uzmanlık alanlarını ve bu alanlarda görev yapan hekimlerimizi inceleyin.
+            <p className="mt-3 max-w-[560px] text-[16px] leading-7 text-homepage-muted">
+              {t.specialtiesPageDesc}
             </p>
           </motion.div>
         </section>
@@ -77,18 +73,14 @@ export default function Specialties() {
           ) : null}
 
           {!previewData.isLoading && previewData.isError ? (
-            <div
-              className="rounded-[24px] border border-homepage-border bg-homepage-shell-cool px-6 py-10 text-center text-homepage-muted"
-            >
-              Uzmanlık verileri şu anda yüklenemiyor. Lütfen biraz sonra tekrar deneyin.
+            <div className="rounded-[24px] border border-homepage-border bg-homepage-shell-cool px-6 py-10 text-center text-homepage-muted">
+              {t.specialtiesLoadError}
             </div>
           ) : null}
 
           {!previewData.isLoading && !previewData.isError && previewData.hasLoadedEmptySpecialties ? (
-            <div
-              className="rounded-[24px] border border-homepage-border bg-homepage-shell-cool px-6 py-10 text-center text-homepage-muted"
-            >
-              Görüntülenecek aktif uzmanlık alanı bulunamadı.
+            <div className="rounded-[24px] border border-homepage-border bg-homepage-shell-cool px-6 py-10 text-center text-homepage-muted">
+              {t.noActiveSpecialties}
             </div>
           ) : null}
 
@@ -103,11 +95,7 @@ export default function Specialties() {
                   transition={{ duration: 0.45, delay: (index % 5) * 0.07, ease: appleEase }}
                   whileHover={{ scale: 1.02 }}
                   className="flex flex-col items-stretch"
-                  style={{
-                    borderRadius: "18px",
-                    overflow: "visible",
-                    background: "transparent",
-                  }}
+                  style={{ borderRadius: "18px", overflow: "visible", background: "transparent" }}
                 >
                   <div
                     style={{
@@ -144,20 +132,12 @@ export default function Specialties() {
 
                   <div style={{ height: "16px" }} />
 
-                  <div
-                    className="flex flex-col items-center px-2 pb-2 text-center"
-                    style={{ fontFamily: "Inter, sans-serif" }}
-                  >
-                    <h2
-                      className="mb-[6px] text-[22px] font-bold text-[#1a2e3b]"
-                      style={{ fontFamily: "Manrope, sans-serif" }}
-                    >
+                  <div className="flex flex-col items-center px-2 pb-2 text-center" style={{ fontFamily: "Inter, sans-serif" }}>
+                    <h2 className="mb-[6px] text-[22px] font-bold text-[#1a2e3b]" style={{ fontFamily: "Manrope, sans-serif" }}>
                       {spec.name}
                     </h2>
 
-                    <p
-                      className="mb-0 max-w-[220px] text-[14px] leading-[1.5] text-[#5a7a8a]"
-                    >
+                    <p className="mb-0 max-w-[220px] text-[14px] leading-[1.5] text-[#5a7a8a]">
                       {spec.description}
                     </p>
 
@@ -167,7 +147,7 @@ export default function Specialties() {
                         onClick={() => navigate("/request-appointment")}
                         className="homepage-focus-soft rounded-full border border-homepage-brand bg-homepage-brand px-[22px] py-[9px] text-[14px] font-semibold text-white transition-colors hover:bg-homepage-brand-deep"
                       >
-                        Randevu Al
+                        {t.bookAppointment}
                       </button>
 
                       <button
@@ -175,7 +155,7 @@ export default function Specialties() {
                         onClick={() => navigate(`/doctors?specialty=${spec.id}`)}
                         className="homepage-focus-soft rounded-full px-2 py-[9px] text-[14px] font-medium text-homepage-brand transition-colors hover:text-homepage-brand-deep"
                       >
-                        Doktorları Gör ›
+                        {t.viewDoctors} ›
                       </button>
                     </div>
                   </div>

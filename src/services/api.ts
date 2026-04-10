@@ -92,6 +92,7 @@ async function refreshAccessToken() {
 
   const response = await fetch(`${API_BASE}/auth/refresh`, {
     method: "POST",
+    credentials: "include",
     headers: {
       "Content-Type": "application/json",
     },
@@ -151,6 +152,7 @@ export async function request<T>(
 
   const response = await fetch(`${API_BASE}${endpoint}`, {
     ...options,
+    credentials: "include",
     headers,
   });
 
@@ -187,6 +189,7 @@ export async function request<T>(
 
     const retryResponse = await fetch(`${API_BASE}${endpoint}`, {
       ...options,
+      credentials: "include",
       headers: retryHeaders,
     });
 

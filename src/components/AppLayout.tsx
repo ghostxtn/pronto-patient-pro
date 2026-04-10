@@ -2,6 +2,20 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
+import {
+  Stethoscope,
+  LogOut,
+  LayoutDashboard,
+  Search,
+  CalendarDays,
+  User,
+  Clock,
+  ClipboardList,
+  Users,
+  Settings,
+  Menu,
+  X,
+} from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Button } from "@/components/ui/button";
@@ -9,11 +23,6 @@ import LanguageSwitcher from "@/components/LanguageSwitcher";
 import api from "@/services/api";
 import { getDefaultRouteByRole } from "@/lib/auth-routing";
 import { hasActiveDoctorProfile } from "@/lib/doctor-access";
-import {
-  Stethoscope, LogOut, LayoutDashboard, Search, CalendarDays, User, Clock, ClipboardList,
-  Users, Settings,
-  Menu, X,
-} from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -45,7 +54,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     { to: "/doctor/dashboard", label: t.dashboard, icon: LayoutDashboard },
     { to: "/doctor/schedule", label: t.myScheduleNav, icon: Clock },
     { to: "/doctor/appointments", label: t.appointmentsNav, icon: ClipboardList },
-    { to: "/doctor/patients", label: "Hastalarım", icon: Users },
+    { to: "/doctor/patients", label: t.myPatients, icon: Users },
     { to: "/profile", label: t.profile, icon: User },
   ];
 
@@ -60,15 +69,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     ];
 
     if ((isOwner || isAdmin) && hasActiveDoctorProfile(doctorProfile)) {
-      links.splice(1, 0, { to: "/doctor/schedule", label: "🩺 Doktor Panelim", icon: Stethoscope });
+      links.splice(1, 0, { to: "/doctor/schedule", label: t.myDoctorPanel, icon: Stethoscope });
     }
 
     return links;
-  }, [isOwner, isAdmin, doctorProfile, t]);
+  }, [doctorProfile, isAdmin, isOwner, t]);
 
   const staffLinks = [
     { to: "/staff/dashboard", label: t.dashboard, icon: LayoutDashboard },
-    { to: "/staff/doctors", label: "Doktorlar", icon: Stethoscope },
+    { to: "/staff/doctors", label: t.doctorsNav, icon: Stethoscope },
     { to: "/admin/patients", label: t.patientsNav, icon: Users },
     { to: "/admin/appointments", label: t.appointmentsNav, icon: CalendarDays },
   ];
@@ -80,9 +89,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     : patientLinks;
 
   const roleLabel =
-    isOwner ? "Owner"
+    isOwner ? t.owner
     : isAdmin ? t.admin
-    : isStaff ? "Staff"
+    : isStaff ? t.staff
     : isDoctor ? t.doctor
     : isPatient ? t.patient
     : t.patient;
@@ -102,13 +111,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <header className="glass-strong border-b sticky top-0 z-50">
         <div className="container flex h-16 items-center justify-between">
           <div className="flex items-center gap-3">
-            <Link to="/" className="flex items-center gap-2">
+            <Link to={homePath} className="flex items-center gap-2">
               <svg width="36" height="36" viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">
                 <rect x="0" y="13" width="44" height="18" rx="9" fill="#65a98f" />
                 <rect x="13" y="0" width="18" height="22" rx="9" fill="#4f8fe6" />
                 <rect x="13" y="22" width="18" height="22" rx="9" fill="#4f8fe6" />
               </svg>
-              <span className="font-display font-bold text-lg hidden sm:inline" style={{ color: "#1a2e3b" }}>MediBook</span>
+              <span className="font-display font-bold text-lg hidden sm:inline" style={{ color: "#1a2e3b" }}>
+                MediBook
+              </span>
             </Link>
             <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-accent text-accent-foreground">
               {roleLabel}
@@ -124,7 +135,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   "flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
                   isActiveLink(link.to)
                     ? "bg-accent text-accent-foreground"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted",
                 )}
               >
                 <link.icon className="h-4 w-4" />
@@ -139,16 +150,17 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <button
               className="md:hidden flex items-center justify-center w-10 h-10 rounded-xl border border-[#b5d1cc] text-[#5a7a8a] hover:bg-[#eaf5ff] transition-colors"
               onClick={() => setMenuOpen(!menuOpen)}
-              aria-label="Menü"
+              aria-label={t.menu}
             >
               {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </button>
-            <Button variant="ghost" size="icon" onClick={logout}>
+            <Button variant="ghost" size="icon" onClick={logout} aria-label={t.logoutLabel}>
               <LogOut className="h-4 w-4" />
             </Button>
           </div>
         </div>
       </header>
+
       <AnimatePresence>
         {menuOpen && (
           <motion.nav
@@ -169,18 +181,22 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     "flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors",
                     isActiveLink(link.to)
                       ? "bg-[#eaf5ff] text-[#4f8fe6]"
-                      : "text-[#5a7a8a] hover:bg-[#f4f8fd] hover:text-[#1a2e3b]"
+                      : "text-[#5a7a8a] hover:bg-[#f4f8fd] hover:text-[#1a2e3b]",
                   )}
                 >
                   <link.icon className="h-4 w-4" />
                   {link.label}
                 </Link>
               ))}
+
               <div className="mt-2 pt-2 border-t flex items-center justify-between px-2" style={{ borderColor: "#b5d1cc" }}>
                 <span className="text-xs text-[#5a7a8a]">{user?.email}</span>
-                <button onClick={logout} className="flex items-center gap-1 text-xs text-[#5a7a8a] hover:text-[#e05252] transition-colors">
+                <button
+                  onClick={logout}
+                  className="flex items-center gap-1 text-xs text-[#5a7a8a] hover:text-[#e05252] transition-colors"
+                >
                   <LogOut className="h-3.5 w-3.5" />
-                  Çıkış
+                  {t.logoutLabel}
                 </button>
               </div>
             </div>

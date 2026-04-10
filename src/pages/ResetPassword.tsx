@@ -5,11 +5,13 @@ import AuthScreen from "@/components/auth/AuthScreen";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useLanguage } from "@/contexts/LanguageContext";
 import api from "@/services/api";
 
 const MIN_PASSWORD_LENGTH = 8;
 
 export default function ResetPassword() {
+  const { t } = useLanguage();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const token = searchParams.get("token") ?? "";
@@ -25,21 +27,21 @@ export default function ResetPassword() {
     }
 
     if (password.length < MIN_PASSWORD_LENGTH) {
-      return `Sifre en az ${MIN_PASSWORD_LENGTH} karakter olmalidir.`;
+      return t.passwordTooShort.replace("{{min}}", String(MIN_PASSWORD_LENGTH));
     }
 
     if (password !== confirmPassword) {
-      return "Sifreler eslesmiyor.";
+      return t.passwordsDoNotMatch;
     }
 
     return null;
-  }, [confirmPassword, password]);
+  }, [confirmPassword, password, t]);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
 
     if (!token) {
-      setError("Bu sifre sifirlama baglantisi gecersiz.");
+      setError(t.resetPasswordInvalidShort);
       return;
     }
 
@@ -58,7 +60,7 @@ export default function ResetPassword() {
         navigate("/auth", { replace: true });
       }, 1500);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Sifre sifirlanamadi.");
+      setError(err instanceof Error ? err.message : t.resetPasswordFailed);
     } finally {
       setLoading(false);
     }
@@ -71,24 +73,24 @@ export default function ResetPassword() {
           className="text-2xl font-medium tracking-tight text-[#1a2e3b]"
           style={{ fontFamily: "Manrope, sans-serif" }}
         >
-          Yeni sifre belirleyin
+          {t.resetPasswordTitle}
         </h1>
         <p className="mt-1 text-sm font-light text-[#5a7a8a]">
-          Guvenli bir sifre secin ve hesabiniza yeniden giris yapin.
+          {t.resetPasswordDesc}
         </p>
       </div>
 
       {success ? (
         <div className="space-y-5">
           <div className="rounded-2xl border border-[#d7eadf] bg-[#f6fbf8] px-4 py-4 text-sm text-[#335b4a]">
-            Sifreniz basariyla guncellendi. Giris sayfasina yonlendiriliyorsunuz.
+            {t.passwordUpdatedRedirect}
           </div>
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="password" className="text-[11px] font-medium uppercase tracking-widest text-[#5a7a8a]">
-              Yeni sifre
+              {t.newPassword}
             </Label>
             <div className="relative">
               <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#7c96a4]" />
@@ -107,7 +109,7 @@ export default function ResetPassword() {
 
           <div className="space-y-2">
             <Label htmlFor="confirmPassword" className="text-[11px] font-medium uppercase tracking-widest text-[#5a7a8a]">
-              Yeni sifre tekrar
+              {t.confirmNewPassword}
             </Label>
             <div className="relative">
               <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#7c96a4]" />
@@ -126,7 +128,7 @@ export default function ResetPassword() {
 
           {!token ? (
             <p className="rounded-xl border border-[#f3d0d0] bg-[#fff6f6] px-4 py-3 text-sm text-[#a24b4b]">
-              Bu sifre sifirlama baglantisi eksik veya gecersiz.
+              {t.resetPasswordInvalid}
             </p>
           ) : null}
 
@@ -148,14 +150,14 @@ export default function ResetPassword() {
             disabled={loading || !token}
           >
             {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            Sifreyi guncelle
+            {t.updatePassword}
           </Button>
         </form>
       )}
 
       <p className="mt-6 text-center text-sm text-[#5a7a8a]">
         <Link to="/auth" className="font-medium text-[#005cae] hover:underline">
-          Giris sayfasina don
+          {t.backToLogin}
         </Link>
       </p>
     </AuthScreen>

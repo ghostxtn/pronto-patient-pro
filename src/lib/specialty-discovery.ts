@@ -1,6 +1,6 @@
 import { specialtyPresentation, getFallbackSpecialtyImage } from "@/data/specialtyPresentation";
 import type { DoctorDiscoveryItem } from "@/lib/doctor-discovery";
-import { toHomepageSlug } from "@/lib/homepage-preview";
+import { toHomepageSlug } from "@/lib/specialty-localization";
 
 export type PublicSpecialtyRecord = {
   id: string;
@@ -33,7 +33,7 @@ export function shapeSpecialtyDiscovery(
       const slug = toHomepageSlug(specialty.name);
       const presentation = specialtyPresentation.find((entry) => entry.slug === slug);
       const relatedDoctors = doctors
-        .filter((doctor) => doctor.specialtyId === specialty.id || doctor.specialtyName === specialty.name)
+        .filter((doctor) => doctor.specialtyId === specialty.id)
         .map((doctor) => ({
           id: doctor.id,
           slug: doctor.slug,

@@ -5,15 +5,11 @@ import HeroSection from "@/components/landing/HeroSection";
 import SpecialtiesSection from "@/components/landing/SpecializationsSection";
 import DoctorsSection from "@/components/landing/DoctorsSection";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { getLandingContent } from "@/components/landing/content";
 import { useHomepagePreviewData } from "@/hooks/useHomepagePreviewData";
 
 export default function Landing() {
   const { lang } = useLanguage();
-  const content = getLandingContent(lang);
   const previewData = useHomepagePreviewData(lang);
-
-  void content;
 
   return (
     <motion.div
@@ -39,6 +35,7 @@ export default function Landing() {
           specialties={previewData.specialties.map((specialty) => ({
             id: specialty.id,
             name: specialty.name,
+            description: specialty.description,
             slug: specialty.slug,
             imageSrc: specialty.imageSrc,
           }))}

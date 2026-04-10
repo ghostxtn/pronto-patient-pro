@@ -24,10 +24,9 @@ function getDoctorInitials(fullName: string) {
 export default function FindDoctors() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { lang } = useLanguage();
+  const { t } = useLanguage();
   const location = useLocation();
-  const isPatientDoctorsRoute =
-    user?.role === "patient" && location.pathname.startsWith("/patient/doctors");
+  const isPatientDoctorsRoute = user?.role === "patient" && location.pathname.startsWith("/patient/doctors");
   const { doctors, specialties, isLoading, isError, hasLoadedEmptyDoctors } = usePublicDoctors();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -39,9 +38,7 @@ export default function FindDoctors() {
   const selectedSpecialtySlug = searchParams.get("specialty");
 
   const activeSpecialty = useMemo(() => {
-    if (!selectedSpecialtySlug) {
-      return "all";
-    }
+    if (!selectedSpecialtySlug) return "all";
 
     const matchedSpecialty = specialties.find(
       (specialty) => specialty.slug === selectedSpecialtySlug || specialty.key === selectedSpecialtySlug,
@@ -51,10 +48,7 @@ export default function FindDoctors() {
   }, [selectedSpecialtySlug, specialties]);
 
   const filteredDoctors = useMemo(() => {
-    if (activeSpecialty === "all") {
-      return doctors;
-    }
-
+    if (activeSpecialty === "all") return doctors;
     return doctors.filter((doctor) => doctor.specialtyId === activeSpecialty);
   }, [activeSpecialty, doctors]);
 
@@ -77,9 +71,7 @@ export default function FindDoctors() {
       }
     }
 
-    if (!selectedSlug || isLoading) {
-      return;
-    }
+    if (!selectedSlug || isLoading) return;
 
     const existsInAllDoctors = doctors.some((doctor) => doctor.slug === selectedSlug);
     if (!existsInAllDoctors) {
@@ -170,23 +162,14 @@ export default function FindDoctors() {
             viewport={{ once: true, amount: 0.2 }}
             transition={{ duration: 0.6, ease: appleEase }}
           >
-            <p
-              className="text-[11px] font-medium uppercase tracking-[2px] text-[rgb(var(--homepage-muted))]"
-              style={{ fontFamily: "Inter, sans-serif" }}
-            >
-              DOKTORLARIMIZ
+            <p className="text-[11px] font-medium uppercase tracking-[2px] text-[rgb(var(--homepage-muted))]" style={{ fontFamily: "Inter, sans-serif" }}>
+              {t.ourDoctorsUpper}
             </p>
-            <h1
-              className="mt-2 text-[34px] font-bold leading-tight text-[rgb(var(--homepage-ink))] md:text-[42px]"
-              style={{ fontFamily: "Manrope, sans-serif" }}
-            >
-              Doktorlarımız
+            <h1 className="mt-2 text-[34px] font-bold leading-tight text-[rgb(var(--homepage-ink))] md:text-[42px]" style={{ fontFamily: "Manrope, sans-serif" }}>
+              {t.doctorsPageTitle}
             </h1>
-            <p
-              className="mt-3 max-w-[520px] text-[16px] leading-7 text-[rgb(var(--homepage-muted))]"
-              style={{ fontFamily: "Inter, sans-serif" }}
-            >
-              Kliniğimizin uzman hekim kadrosunu inceleyin ve randevu alın.
+            <p className="mt-3 max-w-[520px] text-[16px] leading-7 text-[rgb(var(--homepage-muted))]" style={{ fontFamily: "Inter, sans-serif" }}>
+              {t.doctorsPageDesc}
             </p>
           </motion.div>
         </section>
@@ -208,7 +191,7 @@ export default function FindDoctors() {
                 cursor: "pointer",
               }}
             >
-              Tümü
+              {t.all}
             </button>
 
             {specialties.map((specialty) => {
@@ -242,19 +225,14 @@ export default function FindDoctors() {
           {isLoading ? (
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
               {Array.from({ length: 6 }).map((_, index) => (
-                <div
-                  key={`doctor-skeleton-${index}`}
-                  className="flex flex-col"
-                  style={{ borderRadius: "18px", overflow: "visible", background: "transparent" }}
-                >
+                <div key={`doctor-skeleton-${index}`} className="flex flex-col" style={{ borderRadius: "18px", overflow: "visible", background: "transparent" }}>
                   <div
                     className="animate-pulse"
                     style={{
                       height: "280px",
                       width: "100%",
                       borderRadius: "18px",
-                      background:
-                        "linear-gradient(160deg, rgb(var(--homepage-shell-cool)) 0%, rgb(var(--homepage-footer-bg-from)) 55%, rgb(var(--homepage-border)) 100%)",
+                      background: "linear-gradient(160deg, rgb(var(--homepage-shell-cool)) 0%, rgb(var(--homepage-footer-bg-from)) 55%, rgb(var(--homepage-border)) 100%)",
                       flexShrink: 0,
                     }}
                   />
@@ -270,22 +248,14 @@ export default function FindDoctors() {
           ) : null}
 
           {!isLoading && isError ? (
-            <div
-              className="rounded-[24px] border border-[rgb(var(--homepage-info-border))] bg-[rgb(var(--homepage-shell-cool))] px-6 py-10 text-center text-[rgb(var(--homepage-muted))]"
-              style={{ fontFamily: "Inter, sans-serif" }}
-            >
-              Doktor verileri şu anda yüklenemiyor. Lütfen biraz sonra tekrar deneyin.
+            <div className="rounded-[24px] border border-[rgb(var(--homepage-info-border))] bg-[rgb(var(--homepage-shell-cool))] px-6 py-10 text-center text-[rgb(var(--homepage-muted))]" style={{ fontFamily: "Inter, sans-serif" }}>
+              {t.doctorsLoadError}
             </div>
           ) : null}
 
           {!isLoading && !isError && filteredDoctors.length === 0 ? (
-            <div
-              className="rounded-[24px] border border-[rgb(var(--homepage-info-border))] bg-[rgb(var(--homepage-shell-cool))] px-6 py-10 text-center text-[rgb(var(--homepage-muted))]"
-              style={{ fontFamily: "Inter, sans-serif" }}
-            >
-              {hasLoadedEmptyDoctors
-                ? "Görüntülenecek aktif doktor bulunamadı."
-                : "Seçili uzmanlıkta aktif doktor bulunamadı."}
+            <div className="rounded-[24px] border border-[rgb(var(--homepage-info-border))] bg-[rgb(var(--homepage-shell-cool))] px-6 py-10 text-center text-[rgb(var(--homepage-muted))]" style={{ fontFamily: "Inter, sans-serif" }}>
+              {hasLoadedEmptyDoctors ? t.noActiveDoctors : t.noSpecDoctors}
             </div>
           ) : null}
 
@@ -300,14 +270,7 @@ export default function FindDoctors() {
                   transition={{ duration: 0.45, delay: (index % 5) * 0.07, ease: appleEase }}
                   whileHover={{ scale: 1.02 }}
                   className="flex flex-col items-stretch"
-                  style={{
-                    borderRadius: "18px",
-                    overflow: "visible",
-                    background: "transparent",
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "stretch",
-                  }}
+                  style={{ borderRadius: "18px", overflow: "visible", background: "transparent", display: "flex", flexDirection: "column", alignItems: "stretch" }}
                 >
                   <div
                     style={{
@@ -316,9 +279,7 @@ export default function FindDoctors() {
                       borderRadius: "18px",
                       overflow: "hidden",
                       flexShrink: 0,
-                      background: doctor.imageSrc
-                        ? undefined
-                        : "linear-gradient(160deg, rgb(var(--homepage-shell-cool)) 0%, rgb(var(--homepage-footer-bg-from)) 55%, rgb(var(--homepage-border)) 100%)",
+                      background: doctor.imageSrc ? undefined : "linear-gradient(160deg, rgb(var(--homepage-shell-cool)) 0%, rgb(var(--homepage-footer-bg-from)) 55%, rgb(var(--homepage-border)) 100%)",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
@@ -328,13 +289,7 @@ export default function FindDoctors() {
                       <img
                         src={doctor.imageSrc}
                         alt={doctor.fullName}
-                        style={{
-                          width: "100%",
-                          height: "100%",
-                          objectFit: "cover",
-                          objectPosition: "center top",
-                          display: "block",
-                        }}
+                        style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center top", display: "block" }}
                       />
                     ) : (
                       <div
@@ -359,52 +314,19 @@ export default function FindDoctors() {
 
                   <div style={{ height: "16px" }} />
 
-                  <div
-                    style={{
-                      padding: "0 8px 8px",
-                      textAlign: "center",
-                      alignItems: "center",
-                      display: "flex",
-                      flexDirection: "column",
-                    }}
-                  >
-                    <h2
-                      style={{
-                        fontFamily: "Manrope, sans-serif",
-                        fontWeight: 700,
-                        fontSize: "20px",
-                        color: "rgb(var(--homepage-ink))",
-                        marginBottom: "4px",
-                        lineHeight: 1.3,
-                      }}
-                    >
+                  <div style={{ padding: "0 8px 8px", textAlign: "center", alignItems: "center", display: "flex", flexDirection: "column" }}>
+                    <h2 style={{ fontFamily: "Manrope, sans-serif", fontWeight: 700, fontSize: "20px", color: "rgb(var(--homepage-ink))", marginBottom: "4px", lineHeight: 1.3 }}>
                       {[doctor.title, doctor.fullName].filter(Boolean).join(" ")}
                     </h2>
 
-                    <p
-                      style={{
-                        fontFamily: "Inter, sans-serif",
-                        fontWeight: 400,
-                        fontSize: "14px",
-                        color: "rgb(var(--homepage-muted))",
-                        marginBottom: 0,
-                      }}
-                    >
+                    <p style={{ fontFamily: "Inter, sans-serif", fontWeight: 400, fontSize: "14px", color: "rgb(var(--homepage-muted))", marginBottom: 0 }}>
                       {doctor.specialtyName}
                     </p>
 
-                    <div
-                      style={{
-                        marginTop: "20px",
-                        display: "flex",
-                        flexDirection: "row",
-                        justifyContent: "center",
-                        gap: "16px",
-                      }}
-                    >
+                    <div style={{ marginTop: "20px", display: "flex", flexDirection: "row", justifyContent: "center", gap: "16px" }}>
                       <button
                         type="button"
-                        onClick={() => navigate(`/patient/doctors/${doctor.id}`)}
+                        onClick={() => handleProfileClick(doctor)}
                         style={{
                           borderRadius: "980px",
                           background: "rgb(var(--homepage-brand))",
@@ -418,7 +340,7 @@ export default function FindDoctors() {
                           whiteSpace: "nowrap",
                         }}
                       >
-                        Randevu Al
+                        {t.bookAppointment}
                       </button>
                     </div>
                   </div>
@@ -442,9 +364,7 @@ export default function FindDoctors() {
                     borderRadius: "18px",
                     overflow: "hidden",
                     flexShrink: 0,
-                    background: selectedDoctor.imageSrc
-                      ? undefined
-                      : "linear-gradient(160deg, rgb(var(--homepage-shell-cool)) 0%, rgb(var(--homepage-footer-bg-from)) 55%, rgb(var(--homepage-border)) 100%)",
+                    background: selectedDoctor.imageSrc ? undefined : "linear-gradient(160deg, rgb(var(--homepage-shell-cool)) 0%, rgb(var(--homepage-footer-bg-from)) 55%, rgb(var(--homepage-border)) 100%)",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
@@ -454,13 +374,7 @@ export default function FindDoctors() {
                     <img
                       src={selectedDoctor.imageSrc}
                       alt={selectedDoctor.fullName}
-                      style={{
-                        width: "100%",
-                        height: "100%",
-                        objectFit: "cover",
-                        objectPosition: "center top",
-                        display: "block",
-                      }}
+                      style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center top", display: "block" }}
                     />
                   ) : (
                     <div
@@ -484,28 +398,14 @@ export default function FindDoctors() {
                 </div>
 
                 <div>
-                  <h3
-                    style={{
-                      fontFamily: "Manrope, sans-serif",
-                      fontWeight: 700,
-                      fontSize: "32px",
-                      lineHeight: 1.2,
-                      color: "rgb(var(--homepage-ink))",
-                    }}
-                  >
+                  <h3 style={{ fontFamily: "Manrope, sans-serif", fontWeight: 700, fontSize: "32px", lineHeight: 1.2, color: "rgb(var(--homepage-ink))" }}>
                     {[selectedDoctor.title, selectedDoctor.fullName].filter(Boolean).join(" ")}
                   </h3>
-                  <p
-                    className="mt-3"
-                    style={{ fontFamily: "Inter, sans-serif", fontSize: "15px", color: "rgb(var(--homepage-muted))" }}
-                  >
+                  <p className="mt-3" style={{ fontFamily: "Inter, sans-serif", fontSize: "15px", color: "rgb(var(--homepage-muted))" }}>
                     {selectedDoctor.specialtyName}
                   </p>
 
-                  <p
-                    className="mt-6"
-                    style={{ fontFamily: "Inter, sans-serif", fontSize: "15px", lineHeight: 1.8, color: "rgb(var(--homepage-muted))" }}
-                  >
+                  <p className="mt-6" style={{ fontFamily: "Inter, sans-serif", fontSize: "15px", lineHeight: 1.8, color: "rgb(var(--homepage-muted))" }}>
                     {selectedDoctor.biography || selectedDoctor.previewText}
                   </p>
 
@@ -545,7 +445,7 @@ export default function FindDoctors() {
                         whiteSpace: "nowrap",
                       }}
                     >
-                      Randevu Al
+                      {t.bookAppointment}
                     </button>
 
                     <button
@@ -563,7 +463,7 @@ export default function FindDoctors() {
                         cursor: "pointer",
                       }}
                     >
-                      Detayı Kapat
+                      {t.closeDetails}
                     </button>
                   </div>
                 </div>

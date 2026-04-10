@@ -1,11 +1,13 @@
 import { motion, useInView } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useLanguage } from "@/contexts/LanguageContext";
 import SmartLink from "./SmartLink";
 
 type SpecialtyItem = {
   id: string;
   name: string;
+  description?: string;
   slug?: string;
   imageSrc?: string | null;
 };
@@ -31,12 +33,13 @@ export default function SpecialtiesSection({
   hasLoadedEmpty,
 }: SpecialtiesSectionProps) {
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const sectionRef = useRef<HTMLElement | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const isDragging = useRef(false);
   const startX = useRef(0);
   const scrollLeft = useRef(0);
-  const isInView = useInView(sectionRef, { once: true, amount: 0.2 });
+  useInView(sectionRef, { once: true, amount: 0.2 });
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
   const useGridMode = specialties.length <= 4;
@@ -72,7 +75,7 @@ export default function SpecialtiesSection({
             className="text-[2rem] font-bold text-[#1a2e3b]"
             style={{ fontFamily: "Manrope, sans-serif" }}
           >
-            Uzmanlık Alanlarımız
+            {t.specialtiesPageTitle}
           </motion.h2>
 
           <motion.div
@@ -86,7 +89,7 @@ export default function SpecialtiesSection({
               className="shrink-0 text-sm font-medium text-[#4f8fe6] transition-colors duration-200 hover:text-[#2f75ca]"
               style={{ fontFamily: "Inter, sans-serif" }}
             >
-              Tümünü Gör →
+              {t.viewAll} →
             </SmartLink>
           </motion.div>
         </div>
@@ -104,14 +107,13 @@ export default function SpecialtiesSection({
                   <div className="mb-5 h-4 w-4/5 rounded-full bg-[#f3f7fb]" />
                   <div className="mt-5 flex items-center justify-center gap-4">
                     <div className="h-10 w-28 rounded-full bg-[#eef4fb]" />
-                    <div className="h-10 w-32 rounded-full bg-[#f3f7fb]" />
                   </div>
                 </div>
               </div>
             ))}
           </div>
         ) : hasLoadedEmpty ? (
-          <div style={{ textAlign: "center", color: "#5a7a8a", padding: 40 }}>Yakında eklenecek</div>
+          <div style={{ textAlign: "center", color: "#5a7a8a", padding: 40 }}>{t.noActiveSpecialties}</div>
         ) : (
           <div className={useGridMode ? "" : "relative px-0 md:px-6"}>
             {!useGridMode ? (
@@ -119,10 +121,7 @@ export default function SpecialtiesSection({
                 type="button"
                 onClick={() => scrollRef.current?.scrollBy({ left: -340, behavior: "smooth" })}
                 className="hidden md:flex absolute left-[-20px] top-1/2 z-10 h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border-[1.5px] border-[#b5d1cc] bg-white shadow-[0_2px_12px_rgba(79,143,230,0.15)]"
-                style={{
-                  opacity: canScrollLeft ? 1 : 0.3,
-                  pointerEvents: canScrollLeft ? "auto" : "none",
-                }}
+                style={{ opacity: canScrollLeft ? 1 : 0.3, pointerEvents: canScrollLeft ? "auto" : "none" }}
               >
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
                   <path d="M10 3 5 8l5 5" stroke="#4f8fe6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -135,10 +134,7 @@ export default function SpecialtiesSection({
                 type="button"
                 onClick={() => scrollRef.current?.scrollBy({ left: 340, behavior: "smooth" })}
                 className="hidden md:flex absolute right-[-20px] top-1/2 z-10 h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border-[1.5px] border-[#b5d1cc] bg-white shadow-[0_2px_12px_rgba(79,143,230,0.15)]"
-                style={{
-                  opacity: canScrollRight ? 1 : 0.3,
-                  pointerEvents: canScrollRight ? "auto" : "none",
-                }}
+                style={{ opacity: canScrollRight ? 1 : 0.3, pointerEvents: canScrollRight ? "auto" : "none" }}
               >
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
                   <path d="m6 3 5 5-5 5" stroke="#4f8fe6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -203,13 +199,7 @@ export default function SpecialtiesSection({
               style={
                 useGridMode
                   ? undefined
-                  : {
-                      scrollbarWidth: "none",
-                      msOverflowStyle: "none",
-                      cursor: "grab",
-                      scrollBehavior: "smooth",
-                      paddingRight: "24px",
-                    }
+                  : { scrollbarWidth: "none", msOverflowStyle: "none", cursor: "grab", scrollBehavior: "smooth", paddingRight: "24px" }
               }
             >
               {specialties.map((specialty, index) => (
@@ -219,131 +209,42 @@ export default function SpecialtiesSection({
                   whileInView={{ opacity: 1, y: 0, x: 0 }}
                   viewport={{ once: true, amount: 0.1 }}
                   transition={{ duration: 0.5, delay: (index % 5) * 0.08, ease: appleEase }}
-                  whileHover={{
-                    scale: 1.02,
-                    boxShadow: "0 8px 32px rgba(79,143,230,0.18)",
-                  }}
-                  className={[
-                    "min-h-[420px]",
-                    useGridMode ? "w-full" : "w-[280px] shrink-0 snap-start",
-                  ].join(" ")}
-                  style={{
-                    borderRadius: "18px",
-                    overflow: "visible",
-                    background: "transparent",
-                    flexShrink: 0,
-                    width: useGridMode ? undefined : "300px",
-                    cursor: "grab",
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "stretch",
-                  }}
+                  whileHover={{ scale: 1.02, boxShadow: "0 8px 32px rgba(79,143,230,0.18)" }}
+                  className={["min-h-[420px]", useGridMode ? "w-full" : "w-[280px] shrink-0 snap-start"].join(" ")}
+                  style={{ borderRadius: "18px", overflow: "visible", background: "transparent", flexShrink: 0, width: useGridMode ? undefined : "300px", cursor: "grab", display: "flex", flexDirection: "column", alignItems: "stretch" }}
                 >
-                  <div
-                    style={{
-                      height: "260px",
-                      width: "100%",
-                      borderRadius: "18px",
-                      flexShrink: 0,
-                      overflow: "hidden",
-                    }}
-                  >
+                  <div style={{ height: "260px", width: "100%", borderRadius: "18px", flexShrink: 0, overflow: "hidden" }}>
                     {specialty.imageSrc ? (
-                      <img
-                        src={specialty.imageSrc}
-                        alt={specialty.name}
-                        style={{
-                          width: "100%",
-                          height: "100%",
-                          objectFit: "cover",
-                        }}
-                      />
+                      <img src={specialty.imageSrc} alt={specialty.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                     ) : (
-                      <div
-                        style={{
-                          width: "100%",
-                          height: "100%",
-                          background: "linear-gradient(160deg, #eaf5ff 0%, #c8e6f5 55%, #b5d1cc 100%)",
-                        }}
-                      />
+                      <div style={{ width: "100%", height: "100%", background: "linear-gradient(160deg, #eaf5ff 0%, #c8e6f5 55%, #b5d1cc 100%)" }} />
                     )}
                   </div>
 
                   <div style={{ height: "16px" }} />
 
-                  <div
-                    className="min-h-[150px]"
-                    style={{
-                      padding: "0 8px 8px",
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "center",
-                      textAlign: "center",
-                      gap: "0",
-                    }}
-                  >
-                    <h3
-                      style={{
-                        fontSize: "24px",
-                        fontWeight: "700",
-                        fontFamily: "Manrope, sans-serif",
-                        color: "#1a2e3b",
-                        marginBottom: "8px",
-                        letterSpacing: "-0.3px",
-                        lineHeight: "1.2",
-                      }}
-                    >
+                  <div className="min-h-[150px]" style={{ padding: "0 8px 8px", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: "0" }}>
+                    <h3 style={{ fontSize: "24px", fontWeight: "700", fontFamily: "Manrope, sans-serif", color: "#1a2e3b", marginBottom: "8px", letterSpacing: "-0.3px", lineHeight: "1.2" }}>
                       {specialty.name}
                     </h3>
 
-                    <p
-                      style={{
-                        fontSize: "15px",
-                        fontWeight: "400",
-                        fontFamily: "Inter, sans-serif",
-                        color: "#5a7a8a",
-                        marginBottom: "0",
-                        lineHeight: "1.5",
-                        maxWidth: "220px",
-                      }}
-                    >
-                      Uzman kadromuzla hizmetinizdeyiz
+                    <p style={{ fontSize: "15px", fontWeight: "400", fontFamily: "Inter, sans-serif", color: "#5a7a8a", marginBottom: "0", lineHeight: "1.5", maxWidth: "220px" }}>
+                      {specialty.description}
                     </p>
 
-                    <div
-                      style={{
-                        display: "flex",
-                        flexDirection: "row",
-                        alignItems: "center",
-                        gap: "16px",
-                        justifyContent: "center",
-                        marginTop: "20px",
-                      }}
-                    >
+                    <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: "16px", justifyContent: "center", marginTop: "20px" }}>
                       <button
                         type="button"
                         onClick={() => navigate(`/patient/doctors?specialty=${encodeURIComponent(specialty.slug ?? specialty.name.toLowerCase())}`)}
                         className="transition-colors duration-200 hover:bg-[#2f75ca]"
-                        style={{
-                          borderRadius: "980px",
-                          padding: "9px 22px",
-                          background: "#4f8fe6",
-                          color: "white",
-                          border: "none",
-                          fontWeight: 600,
-                          fontSize: "14px",
-                          cursor: "pointer",
-                          whiteSpace: "nowrap",
-                          fontFamily: "Inter, sans-serif",
-                        }}
+                        style={{ borderRadius: "980px", padding: "9px 22px", background: "#4f8fe6", color: "white", border: "none", fontWeight: 600, fontSize: "14px", cursor: "pointer", whiteSpace: "nowrap", fontFamily: "Inter, sans-serif" }}
                       >
-                        Randevu Al
+                        {t.bookAppointment}
                       </button>
                     </div>
                   </div>
                 </motion.div>
               ))}
-              {/* spacer to prevent last card from being clipped */}
               <div style={{ minWidth: "32px", flexShrink: 0 }} />
             </div>
           </div>
