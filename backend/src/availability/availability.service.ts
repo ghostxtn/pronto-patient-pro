@@ -4,15 +4,31 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { and, eq, ne } from 'drizzle-orm';
+import { and, eq, inArray, ne } from 'drizzle-orm';
 import {
   appointments,
   doctorAvailability,
   doctorAvailabilityOverrides,
+  doctors,
 } from '../database/schema';
 import type { DoctorAvailability } from '../database/schema/doctor-availability.schema';
+import {
+  createUnionRange,
+  isExpiredStartTime,
+  mergeRanges,
+  minutesToTime,
+  rangesOverlap,
+  timeToMinutes,
+  type MinuteRange,
+  type SlotEntry,
+} from './calendar-time.utils';
 import { CreateAvailabilityDto } from './dto/create-availability.dto';
 import { UpdateAvailabilityDto } from './dto/update-availability.dto';
+
+type AvailabilityContext = {
+  availabilityRanges: MinuteRange[];
+  slotEntries: SlotEntry[];
+};
 
 @Injectable()
 export class AvailabilityService {
@@ -23,151 +39,49 @@ export class AvailabilityService {
     doctorId: string,
     date: string,
   ): Promise<string[]> {
-    const dayOfWeek = new Date(`${date}T00:00:00`).getDay();
-    const availabilityBlocks = await this.db
-      .select()
-      .from(doctorAvailability)
-      .where(
-        and(
-          eq(doctorAvailability.doctor_id, doctorId),
-          eq(doctorAvailability.clinic_id, clinicId),
-          eq(doctorAvailability.day_of_week, dayOfWeek),
-          eq(doctorAvailability.is_active, true),
-        ),
-      );
-
-    if (availabilityBlocks.length === 0) {
-      return [];
-    }
-
-    const [override] = await this.db
-      .select()
-      .from(doctorAvailabilityOverrides)
-      .where(
-        and(
-          eq(doctorAvailabilityOverrides.doctor_id, doctorId),
-          eq(doctorAvailabilityOverrides.clinic_id, clinicId),
-          eq(doctorAvailabilityOverrides.date, date),
-        ),
-      )
-      .limit(1);
-
-    if (override?.type === 'blackout') {
-      return [];
-    }
-
-    const slotDuration = availabilityBlocks[0].slot_duration ?? 30;
-    const rawSlots =
-      override?.type === 'custom_hours'
-        ? availabilityBlocks.flatMap((block: DoctorAvailability) => {
-            const slots: string[] = [];
-
-            if (
-              override.start_time &&
-              this.timeToMinutes(override.start_time) >
-                this.timeToMinutes(block.start_time)
-            ) {
-              slots.push(
-                ...this.generateSlots(
-                  block.start_time,
-                  override.start_time,
-                  block.slot_duration ?? 30,
-                ),
-              );
-            }
-
-            if (
-              override.end_time &&
-              this.timeToMinutes(override.end_time) <
-                this.timeToMinutes(block.end_time)
-            ) {
-              slots.push(
-                ...this.generateSlots(
-                  override.end_time,
-                  block.end_time,
-                  block.slot_duration ?? 30,
-                ),
-              );
-            }
-
-            return slots;
-          })
-        : availabilityBlocks.flatMap((block: DoctorAvailability) =>
-            this.generateSlots(
-              block.start_time,
-              block.end_time,
-              block.slot_duration ?? 30,
-            ),
-          );
-
-    if (rawSlots.length === 0) {
-      return [];
-    }
-
-    const existingAppointments = await this.db
-      .select({
-        start_time: appointments.start_time,
-      })
-      .from(appointments)
-      .where(
-        and(
-          eq(appointments.doctor_id, doctorId),
-          eq(appointments.clinic_id, clinicId),
-          eq(appointments.appointment_date, date),
-          ne(appointments.status, 'cancelled'),
-        ),
-      );
-
-    const bookedStarts = new Set(
-      existingAppointments.map((appointment: { start_time: string }) =>
-        appointment.start_time.slice(0, 5),
-      ),
-    );
-
-    return rawSlots.filter((slot: string) => !bookedStarts.has(slot));
+    const slotEntries = await this.getBookableSlotEntries(clinicId, doctorId, date);
+    return slotEntries.map((slotEntry) => slotEntry.startTime);
   }
 
   async create(dto: CreateAvailabilityDto, clinicId: string) {
-    const existing = await this.db
-      .select()
-      .from(doctorAvailability)
-      .where(
-        and(
-          eq(doctorAvailability.doctor_id, dto.doctorId),
-          eq(doctorAvailability.clinic_id, clinicId),
-          eq(doctorAvailability.day_of_week, dto.dayOfWeek),
-          eq(doctorAvailability.is_active, true),
-        ),
-      );
+    await this.ensureDoctorInClinic(dto.doctorId, clinicId);
+    this.validateAvailabilityRange(dto.startTime, dto.endTime);
 
-    const newStart = dto.startTime;
-    const newEnd = dto.endTime;
-
-    const hasOverlap = existing.some((slot: DoctorAvailability) => {
-      const existStart = slot.start_time.slice(0, 5);
-      const existEnd = slot.end_time.slice(0, 5);
-      return newStart < existEnd && newEnd > existStart;
+    const candidateRange = this.toRange(dto.startTime, dto.endTime);
+    const overlappingSlots = await this.findOverlappingActiveSlots({
+      clinicId,
+      doctorId: dto.doctorId,
+      dayOfWeek: dto.dayOfWeek,
+      range: candidateRange,
     });
+    const slotDuration = this.resolveNormalizedSlotDuration(
+      dto.slotDuration ?? 30,
+      overlappingSlots,
+    );
 
-    if (hasOverlap) {
-      throw new ConflictException(
-        'Bu gün ve saat aralığında zaten aktif bir müsaitlik slotu mevcut.',
-      );
+    if (overlappingSlots.length === 0) {
+      const [availability] = await this.db
+        .insert(doctorAvailability)
+        .values({
+          doctor_id: dto.doctorId,
+          clinic_id: clinicId,
+          day_of_week: dto.dayOfWeek,
+          start_time: dto.startTime,
+          end_time: dto.endTime,
+          slot_duration: slotDuration,
+        })
+        .returning();
+
+      return availability;
     }
 
-    const [availability] = await this.db
-      .insert(doctorAvailability)
-      .values({
-        doctor_id: dto.doctorId,
-        clinic_id: clinicId,
-        day_of_week: dto.dayOfWeek,
-        start_time: dto.startTime,
-        end_time: dto.endTime,
-        slot_duration: dto.slotDuration ?? 30,
-      })
-      .returning();
-
-    return availability;
+    return this.normalizeAvailabilityOverlap({
+      keeperId: overlappingSlots[0].id,
+      dayOfWeek: dto.dayOfWeek,
+      slotDuration,
+      candidateRange,
+      overlappingSlots,
+    });
   }
 
   async findByDoctor(doctorId: string, clinicId: string) {
@@ -203,40 +117,349 @@ export class AvailabilityService {
 
   async update(id: string, dto: UpdateAvailabilityDto, clinicId: string) {
     const currentAvailability = await this.findById(id, clinicId);
+    await this.ensureDoctorInClinic(currentAvailability.doctor_id, clinicId);
 
     const nextDayOfWeek = dto.dayOfWeek ?? currentAvailability.day_of_week;
-    const nextStartTime = dto.startTime ?? currentAvailability.start_time.slice(0, 5);
+    const nextStartTime =
+      dto.startTime ?? currentAvailability.start_time.slice(0, 5);
     const nextEndTime = dto.endTime ?? currentAvailability.end_time.slice(0, 5);
     const nextIsActive = dto.isActive ?? currentAvailability.is_active;
+    const nextSlotDuration =
+      dto.slotDuration ?? currentAvailability.slot_duration ?? 30;
 
-    if (nextIsActive) {
-      const existing = await this.db
-        .select()
-        .from(doctorAvailability)
-        .where(
-          and(
-            eq(doctorAvailability.doctor_id, currentAvailability.doctor_id),
-            eq(doctorAvailability.clinic_id, clinicId),
-            eq(doctorAvailability.day_of_week, nextDayOfWeek),
-            eq(doctorAvailability.is_active, true),
-          ),
+    this.validateAvailabilityRange(nextStartTime, nextEndTime);
+
+    if (!nextIsActive) {
+      return this.updateAvailabilityRecord(id, dto);
+    }
+
+    const candidateRange = this.toRange(nextStartTime, nextEndTime);
+    const overlappingSlots = await this.findOverlappingActiveSlots({
+      clinicId,
+      doctorId: currentAvailability.doctor_id,
+      dayOfWeek: nextDayOfWeek,
+      range: candidateRange,
+      excludeId: id,
+    });
+    const slotDuration = this.resolveNormalizedSlotDuration(
+      nextSlotDuration,
+      overlappingSlots,
+    );
+
+    if (overlappingSlots.length === 0) {
+      return this.updateAvailabilityRecord(id, dto);
+    }
+
+    return this.normalizeAvailabilityOverlap({
+      keeperId: id,
+      dayOfWeek: nextDayOfWeek,
+      slotDuration,
+      candidateRange,
+      overlappingSlots,
+    });
+  }
+
+  async remove(id: string, clinicId: string) {
+    await this.findById(id, clinicId);
+
+    await this.db
+      .delete(doctorAvailability)
+      .where(
+        and(
+          eq(doctorAvailability.id, id),
+          eq(doctorAvailability.clinic_id, clinicId),
+        ),
+      );
+
+    return { success: true };
+  }
+
+  private generateSlots(
+    startMinutes: number,
+    endMinutes: number,
+    slotDuration: number,
+  ): string[] {
+    const slots: string[] = [];
+    let currentMinutes = startMinutes;
+
+    while (currentMinutes < endMinutes) {
+      slots.push(minutesToTime(currentMinutes));
+      currentMinutes += slotDuration;
+    }
+
+    return slots;
+  }
+
+  private timeToMinutes(time: string): number {
+    const [hours, minutes] = time.slice(0, 5).split(':').map(Number);
+    return hours * 60 + minutes;
+  }
+
+  private minutesToTime(totalMinutes: number): string {
+    const hours = String(Math.floor(totalMinutes / 60)).padStart(2, '0');
+    const minutes = String(totalMinutes % 60).padStart(2, '0');
+    return `${hours}:${minutes}`;
+  }
+
+  async getAvailabilityContext(
+    clinicId: string,
+    doctorId: string,
+    date: string,
+    options: {
+      excludeExpired?: boolean;
+    } = {},
+  ): Promise<AvailabilityContext> {
+    await this.ensureDoctorInClinic(doctorId, clinicId);
+
+    const dayOfWeek = new Date(`${date}T00:00:00`).getDay();
+    const availabilityBlocks = await this.db
+      .select()
+      .from(doctorAvailability)
+      .where(
+        and(
+          eq(doctorAvailability.doctor_id, doctorId),
+          eq(doctorAvailability.clinic_id, clinicId),
+          eq(doctorAvailability.day_of_week, dayOfWeek),
+          eq(doctorAvailability.is_active, true),
+        ),
+      );
+
+    if (availabilityBlocks.length === 0) {
+      return {
+        availabilityRanges: [],
+        slotEntries: [],
+      };
+    }
+
+    const overrides = await this.db
+      .select()
+      .from(doctorAvailabilityOverrides)
+      .where(
+        and(
+          eq(doctorAvailabilityOverrides.doctor_id, doctorId),
+          eq(doctorAvailabilityOverrides.clinic_id, clinicId),
+          eq(doctorAvailabilityOverrides.date, date),
+        ),
+      );
+
+    if (overrides.some((override: { type: string }) => override.type === 'blackout')) {
+      return {
+        availabilityRanges: [],
+        slotEntries: [],
+      };
+    }
+
+    const blockedRanges = overrides
+      .filter(
+        (override: {
+          type: string;
+          start_time: string | null;
+          end_time: string | null;
+        }) =>
+          override.type === 'custom_hours' &&
+          override.start_time &&
+          override.end_time,
+      )
+      .map((override: { start_time: string; end_time: string }) =>
+        this.toRange(override.start_time, override.end_time),
+      );
+
+    const rawAvailabilityRanges: MinuteRange[] = [];
+    const rawSlotEntries: SlotEntry[] = [];
+
+    for (const block of availabilityBlocks as DoctorAvailability[]) {
+      let segments = [this.toRange(block.start_time, block.end_time)];
+
+      for (const blockedRange of blockedRanges) {
+        segments = this.subtractBlockedRange(
+          segments,
+          blockedRange.start,
+          blockedRange.end,
         );
+      }
 
-      const hasOverlap = existing
-        .filter((slot: DoctorAvailability) => slot.id !== id)
-        .some((slot: DoctorAvailability) => {
-          const existStart = slot.start_time.slice(0, 5);
-          const existEnd = slot.end_time.slice(0, 5);
-          return nextStartTime < existEnd && nextEndTime > existStart;
-        });
+      for (const segment of segments) {
+        if (segment.end <= segment.start) {
+          continue;
+        }
 
-      if (hasOverlap) {
-        throw new ConflictException(
-          'Bu gün ve saat aralığında zaten aktif bir müsaitlik slotu mevcut.',
+        rawAvailabilityRanges.push(segment);
+        rawSlotEntries.push(
+          ...this.generateSlotEntries(segment.start, segment.end, block.slot_duration ?? 30),
         );
       }
     }
 
+    return {
+      availabilityRanges: mergeRanges(rawAvailabilityRanges, {
+        mergeTouching: true,
+      }),
+      slotEntries: this.dedupeSlotEntries(
+        rawSlotEntries.filter(
+          (slotEntry) =>
+            options.excludeExpired !== true ||
+            !isExpiredStartTime(date, slotEntry.startTime),
+        ),
+      ),
+    };
+  }
+
+  private async getBookableSlotEntries(
+    clinicId: string,
+    doctorId: string,
+    date: string,
+  ): Promise<SlotEntry[]> {
+    const availabilityContext = await this.getAvailabilityContext(
+      clinicId,
+      doctorId,
+      date,
+      {
+        excludeExpired: true,
+      },
+    );
+
+    if (availabilityContext.slotEntries.length === 0) {
+      return [];
+    }
+
+    const existingAppointments = await this.db
+      .select({
+        start_time: appointments.start_time,
+        end_time: appointments.end_time,
+      })
+      .from(appointments)
+      .where(
+        and(
+          eq(appointments.doctor_id, doctorId),
+          eq(appointments.clinic_id, clinicId),
+          eq(appointments.appointment_date, date),
+          ne(appointments.status, 'cancelled'),
+        ),
+      );
+
+    return this.dedupeSlotEntries(
+      availabilityContext.slotEntries.filter((slotEntry) => {
+        const slotRange = {
+          start: slotEntry.startMinutes,
+          end: slotEntry.endMinutes,
+        };
+
+        return !existingAppointments.some(
+          (appointment: { start_time: string; end_time: string }) =>
+            rangesOverlap(slotRange, this.toRange(appointment.start_time, appointment.end_time)),
+        );
+      }),
+    );
+  }
+
+  private async ensureDoctorInClinic(doctorId: string, clinicId: string) {
+    const [doctor] = await this.db
+      .select({ id: doctors.id })
+      .from(doctors)
+      .where(and(eq(doctors.id, doctorId), eq(doctors.clinic_id, clinicId)))
+      .limit(1);
+
+    if (!doctor) {
+      throw new NotFoundException('Doctor not found in this clinic');
+    }
+  }
+
+  private validateAvailabilityRange(startTime: string, endTime: string) {
+    if (startTime >= endTime) {
+      throw new ConflictException(
+        'Availability end time must be after start time.',
+      );
+    }
+  }
+
+  private async findOverlappingActiveSlots(params: {
+    clinicId: string;
+    doctorId: string;
+    dayOfWeek: number;
+    range: MinuteRange;
+    excludeId?: string;
+  }) {
+    const conditions = [
+      eq(doctorAvailability.doctor_id, params.doctorId),
+      eq(doctorAvailability.clinic_id, params.clinicId),
+      eq(doctorAvailability.day_of_week, params.dayOfWeek),
+      eq(doctorAvailability.is_active, true),
+    ];
+
+    if (params.excludeId) {
+      conditions.push(ne(doctorAvailability.id, params.excludeId));
+    }
+
+    const existingSlots = await this.db
+      .select()
+      .from(doctorAvailability)
+      .where(and(...conditions));
+
+    return (existingSlots as DoctorAvailability[]).filter((slot) =>
+      rangesOverlap(params.range, this.toRange(slot.start_time, slot.end_time)),
+    );
+  }
+
+  private resolveNormalizedSlotDuration(
+    candidateSlotDuration: number,
+    overlappingSlots: DoctorAvailability[],
+  ) {
+    const durationSet = new Set([
+      candidateSlotDuration,
+      ...overlappingSlots.map((slot) => slot.slot_duration ?? 30),
+    ]);
+
+    if (durationSet.size > 1) {
+      throw new ConflictException(
+        'Overlapping availability slots with different slot durations cannot be normalized automatically.',
+      );
+    }
+
+    return candidateSlotDuration;
+  }
+
+  private async normalizeAvailabilityOverlap(params: {
+    keeperId: string;
+    dayOfWeek: number;
+    slotDuration: number;
+    candidateRange: MinuteRange;
+    overlappingSlots: DoctorAvailability[];
+  }) {
+    const mergedRange = createUnionRange([
+      params.candidateRange,
+      ...params.overlappingSlots.map((slot) =>
+        this.toRange(slot.start_time, slot.end_time),
+      ),
+    ]);
+    const redundantIds = params.overlappingSlots
+      .map((slot) => slot.id)
+      .filter((slotId) => slotId !== params.keeperId);
+
+    return this.db.transaction(async (tx: any) => {
+      const [availability] = await tx
+        .update(doctorAvailability)
+        .set({
+          day_of_week: params.dayOfWeek,
+          start_time: minutesToTime(mergedRange.start),
+          end_time: minutesToTime(mergedRange.end),
+          slot_duration: params.slotDuration,
+          is_active: true,
+          updated_at: new Date(),
+        })
+        .where(eq(doctorAvailability.id, params.keeperId))
+        .returning();
+
+      if (redundantIds.length > 0) {
+        await tx
+          .delete(doctorAvailability)
+          .where(inArray(doctorAvailability.id, redundantIds));
+      }
+
+      return availability;
+    });
+  }
+
+  private updateAvailabilityRecord(id: string, dto: UpdateAvailabilityDto) {
     const updateData: Record<string, unknown> = {
       updated_at: new Date(),
     };
@@ -261,55 +484,83 @@ export class AvailabilityService {
       updateData.is_active = dto.isActive;
     }
 
-    const [availability] = await this.db
+    return this.db
       .update(doctorAvailability)
       .set(updateData)
       .where(eq(doctorAvailability.id, id))
-      .returning();
-
-    return availability;
+      .returning()
+      .then((rows: DoctorAvailability[]) => rows[0]);
   }
 
-  async remove(id: string, clinicId: string) {
-    await this.findById(id, clinicId);
-
-    await this.db
-      .delete(doctorAvailability)
-      .where(
-        and(
-          eq(doctorAvailability.id, id),
-          eq(doctorAvailability.clinic_id, clinicId),
-        ),
-      );
-
-    return { success: true };
-  }
-
-  private generateSlots(
-    startTime: string,
-    endTime: string,
+  private generateSlotEntries(
+    startMinutes: number,
+    endMinutes: number,
     slotDuration: number,
-  ): string[] {
-    const slots: string[] = [];
-    let currentMinutes = this.timeToMinutes(startTime);
-    const endMinutes = this.timeToMinutes(endTime);
+  ): SlotEntry[] {
+    return this.generateSlots(startMinutes, endMinutes, slotDuration).map(
+      (slot) => {
+        const slotStartMinutes = timeToMinutes(slot);
+        return {
+          startTime: slot,
+          endTime: minutesToTime(slotStartMinutes + slotDuration),
+          duration: slotDuration,
+          startMinutes: slotStartMinutes,
+          endMinutes: slotStartMinutes + slotDuration,
+        };
+      },
+    );
+  }
 
-    while (currentMinutes < endMinutes) {
-      slots.push(this.minutesToTime(currentMinutes));
-      currentMinutes += slotDuration;
+  private subtractBlockedRange(
+    segments: Array<{ start: number; end: number }>,
+    blockedStart: number,
+    blockedEnd: number,
+  ) {
+    return segments.flatMap((segment) => {
+      if (blockedEnd <= segment.start || blockedStart >= segment.end) {
+        return [segment];
+      }
+
+      const nextSegments: Array<{ start: number; end: number }> = [];
+
+      if (blockedStart > segment.start) {
+        nextSegments.push({
+          start: segment.start,
+          end: blockedStart,
+        });
+      }
+
+      if (blockedEnd < segment.end) {
+        nextSegments.push({
+          start: blockedEnd,
+          end: segment.end,
+        });
+      }
+
+      return nextSegments;
+    });
+  }
+
+  private dedupeSlotEntries(slotEntries: SlotEntry[]) {
+    const entriesByStartTime = new Map<string, SlotEntry>();
+
+    for (const slotEntry of slotEntries) {
+      const currentEntry = entriesByStartTime.get(slotEntry.startTime);
+
+      if (!currentEntry || slotEntry.endMinutes > currentEntry.endMinutes) {
+        entriesByStartTime.set(slotEntry.startTime, slotEntry);
+      }
     }
 
-    return slots;
+    return [...entriesByStartTime.values()].sort(
+      (left, right) => left.startMinutes - right.startMinutes,
+    );
   }
 
-  private timeToMinutes(time: string): number {
-    const [hours, minutes] = time.slice(0, 5).split(':').map(Number);
-    return hours * 60 + minutes;
-  }
-
-  private minutesToTime(totalMinutes: number): string {
-    const hours = String(Math.floor(totalMinutes / 60)).padStart(2, '0');
-    const minutes = String(totalMinutes % 60).padStart(2, '0');
-    return `${hours}:${minutes}`;
+  private toRange(startTime: string, endTime: string): MinuteRange {
+    return {
+      start: timeToMinutes(startTime),
+      end: timeToMinutes(endTime),
+    };
   }
 }
