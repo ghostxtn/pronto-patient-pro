@@ -186,7 +186,13 @@ export class AuthController {
       hasUser: Boolean(req.user),
     });
 
-    const frontendUrl = 'http://localhost:5173';
+    const clinicDomain = req.tenant?.clinic?.domain;
+    const isDev = this.configService.get<string>('NODE_ENV') !== 'production';
+    const frontendUrl = clinicDomain
+      ? isDev
+        ? `http://${clinicDomain}:5173`
+        : `https://${clinicDomain}`
+      : (this.configService.get<string>('FRONTEND_URL') ?? 'http://localhost:5173');
 
     const { accessToken, refreshToken, user, flowToken, email, trustedDeviceToken } = req.user as {
       accessToken?: string;
