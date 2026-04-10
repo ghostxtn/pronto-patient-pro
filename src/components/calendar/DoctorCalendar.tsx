@@ -78,6 +78,13 @@ console.debug("[doctor][calendar] module loaded");
 
 interface DoctorCalendarProps {
   doctorId: string;
+  mode?: "staff" | "doctor";
+  doctorName?: string;
+  specializationName?: string;
+  calendarDate?: Date;
+  onCalendarDateChange?: (date: Date) => void;
+  calendarView?: View;
+  onCalendarViewChange?: (view: View) => void;
 }
 
 interface CalendarAppointmentResponse {
@@ -110,6 +117,117 @@ interface CalendarHeaderProps {
   date: Date;
   label: string;
   onContextMenu: (event: React.MouseEvent<HTMLElement>, date: Date) => void;
+}
+
+interface AvailabilityDraftPreview {
+  dayOfWeek: number;
+  startTime: string;
+  endTime: string;
+  slotDuration: number;
+}
+
+interface AvailabilitySelectionTarget {
+  relatedSlots: AvailabilitySlot[];
+  primarySlot: AvailabilitySlot | null;
+  prefillStart: Date;
+  prefillEnd: Date;
+  slotDuration: number;
+  shouldPrefillExpand: boolean;
+}
+
+interface QuickActionState {
+  open: boolean;
+  kind: "available" | "unavailable" | "blocked";
+  start: Date;
+  end: Date;
+  dayOfWeek: number;
+  dateLabel: string;
+  timeLabel: string;
+  anchor: {
+    left: number;
+    right: number;
+    top: number;
+    bottom: number;
+  };
+  override: AvailabilityOverride | null;
+  availabilityTarget: AvailabilitySelectionTarget | null;
+}
+
+interface BlockActionState {
+  open: boolean;
+  start: Date;
+  end: Date;
+  dateLabel: string;
+  timeLabel: string;
+}
+
+interface AppointmentComposerState {
+  open: boolean;
+  start: Date;
+  end: Date;
+  dateLabel: string;
+  timeLabel: string;
+}
+
+interface PatientLookupRecord {
+  id: string;
+  first_name?: string;
+  last_name?: string;
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  phone?: string;
+}
+
+interface SchedulerDraftEvent {
+  id: string;
+  title: string;
+  start: Date;
+  end: Date;
+  type: "draft";
+  resource: {
+    durationMinutes: number;
+    source: "availability" | "selection";
+  };
+}
+
+interface AvailabilitySurfaceEvent {
+  id: string;
+  title: string;
+  start: Date;
+  end: Date;
+  type: "availability-surface";
+  resource: {
+    slotIds: string[];
+  };
+}
+
+interface BlackoutSurfaceEvent {
+  id: string;
+  title: string;
+  start: Date;
+  end: Date;
+  type: "blackout-surface";
+  resource: {
+    overrideId: string;
+  };
+}
+
+interface AvailabilityWindow {
+  start: Date;
+  end: Date;
+  slots: AvailabilitySlot[];
+  slotIds: string[];
+}
+
+type SchedulerEvent =
+  | CalendarEvent
+  | SchedulerDraftEvent
+  | AvailabilitySurfaceEvent
+  | BlackoutSurfaceEvent;
+
+interface RollingWeekViewProps {
+  date: Date;
 }
 
 const toolbarViewLabels = {
@@ -239,6 +357,38 @@ function toApiDate(date: Date) {
   return format(date, "yyyy-MM-dd");
 }
 
+function timeToMinutes(time: string) {
+  const [hours, minutes] = time.slice(0, 5).split(":").map(Number);
+  return hours * 60 + minutes;
+}
+
+function normalizeMinuteRange(start: number, end: number) {
+  return {
+    start: Math.min(start, end),
+    end: Math.max(start, end),
+  };
+}
+
+function splitFullName(fullName: string) {
+  const normalized = fullName
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+
+  if (normalized.length === 0) {
+    return { firstName: "", lastName: "" };
+  }
+
+  if (normalized.length === 1) {
+    return { firstName: normalized[0], lastName: normalized[0] };
+  }
+
+  return {
+    firstName: normalized.slice(0, -1).join(" "),
+    lastName: normalized.slice(-1).join(" "),
+  };
+}
+
 function getDateRange(date: Date, view: View) {
   switch (view) {
     case Views.MONTH:
@@ -269,10 +419,19 @@ function getDateRange(date: Date, view: View) {
   }
 }
 
-export function DoctorCalendar({ doctorId }: DoctorCalendarProps) {
+export function DoctorCalendar({
+  doctorId,
+  mode = "doctor",
+  doctorName = "Doktor",
+  specializationName,
+  calendarDate,
+  onCalendarDateChange,
+  calendarView,
+  onCalendarViewChange,
+}: DoctorCalendarProps) {
   const { t } = useLanguage();
   const queryClient = useQueryClient();
-  const [currentDate, setCurrentDate] = useState(new Date());
+  const [internalCurrentDate, setInternalCurrentDate] = useState(new Date());
   const [view, setView] = useState<View>(Views.WEEK);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [availabilityModal, setAvailabilityModal] = useState<{
@@ -293,22 +452,52 @@ export function DoctorCalendar({ doctorId }: DoctorCalendarProps) {
   const [isAvailabilitySheetOpen, setIsAvailabilitySheetOpen] = useState(false);
   const [slotToDelete, setSlotToDelete] = useState<AvailabilitySlot | null>(null);
   const [overrideToDelete, setOverrideToDelete] = useState<AvailabilityOverride | null>(null);
+  const [appointmentComposer, setAppointmentComposer] =
+    useState<AppointmentComposerState | null>(null);
+  const [appointmentMode, setAppointmentMode] =
+    useState<"registered" | "manual">("registered");
+  const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
   const [contextMenuState, setContextMenuState] = useState<{
     open: boolean;
     x: number;
     y: number;
     date?: Date;
   }>({ open: false, x: 0, y: 0 });
+  const [patientSearch, setPatientSearch] = useState("");
+  const [manualPatientName, setManualPatientName] = useState("");
+  const [manualPatientPhone, setManualPatientPhone] = useState("");
+  const [manualPatientNote, setManualPatientNote] = useState("");
+  const [appointmentNotes, setAppointmentNotes] = useState("");
+
+  const resolvedCurrentDate = calendarDate ?? internalCurrentDate;
+  const resolvedView = calendarView ?? view;
+
+  const setCalendarDate = (nextDate: Date) => {
+    onCalendarDateChange?.(nextDate);
+    if (calendarDate === undefined) {
+      setInternalCurrentDate(nextDate);
+    }
+  };
+
+  const setCalendarView = (nextView: View) => {
+    onCalendarViewChange?.(nextView);
+    if (calendarView === undefined) {
+      setView(nextView);
+    }
+  };
 
   console.debug("[doctor][calendar] render", {
     doctorId,
-    currentDate: currentDate.toISOString(),
-    view,
+    currentDate: resolvedCurrentDate.toISOString(),
+    view: resolvedView,
+    mode,
+    doctorName,
+    specializationName,
   });
 
   const { rangeStart, rangeEnd } = useMemo(
-    () => getDateRange(currentDate, view),
-    [currentDate, view],
+    () => getDateRange(resolvedCurrentDate, resolvedView),
+    [resolvedCurrentDate, resolvedView],
   );
   const overrideRangeStart = useMemo(() => format(subDays(new Date(), 30), "yyyy-MM-dd"), []);
   const overrideRangeEnd = useMemo(() => format(addDays(new Date(), 365), "yyyy-MM-dd"), []);
@@ -412,6 +601,19 @@ export function DoctorCalendar({ doctorId }: DoctorCalendarProps) {
     enabled: Boolean(doctorId),
   });
 
+  const {
+    data: patientsResult,
+  } = useQuery({
+    queryKey: ["staff-calendar-patients"],
+    queryFn: async () => api.patients.list({ page: 1, limit: 200 }),
+    enabled: Boolean(appointmentComposer?.open),
+  });
+
+  const patients = useMemo<PatientLookupRecord[]>(
+    () => (Array.isArray(patientsResult) ? patientsResult : patientsResult?.data ?? []),
+    [patientsResult],
+  );
+
   const removeAvailability = useMutation({
     mutationFn: async (slotId: string) => api.availability.remove(slotId),
     onSuccess: async () => {
@@ -436,6 +638,138 @@ export function DoctorCalendar({ doctorId }: DoctorCalendarProps) {
     },
     onError: (error: unknown) => {
       toast.error(error instanceof Error ? error.message : "İstisna silinemedi");
+    },
+  });
+
+  const createQuickBlock = useMutation({
+    mutationFn: async (payload: { start: Date; end: Date }) => {
+      const date = toApiDate(payload.start);
+      const sameDayOverrides = (data?.overrides ?? []).filter(
+        (override) => override.date === date,
+      );
+
+      const blackoutOverride = sameDayOverrides.find(
+        (override) => override.type === "blackout",
+      );
+
+      const nextStart = format(payload.start, "HH:mm");
+      const nextEnd = format(payload.end, "HH:mm");
+      const nextRange = normalizeMinuteRange(
+        timeToMinutes(nextStart),
+        timeToMinutes(nextEnd),
+      );
+
+      const appointmentConflictExists = (candidateRange: {
+        start: number;
+        end: number;
+      }) =>
+        (data?.appointments ?? []).some((appointment) => {
+          if (
+            appointment.status === "cancelled" ||
+            appointment.appointment_date !== date
+          ) {
+            return false;
+          }
+
+          const appointmentRange = normalizeMinuteRange(
+            timeToMinutes(appointment.start_time),
+            timeToMinutes(appointment.end_time),
+          );
+
+          return (
+            appointmentRange.start < candidateRange.end &&
+            appointmentRange.end > candidateRange.start
+          );
+        });
+
+      if (blackoutOverride) {
+        throw new Error("Bu gun zaten kapali olarak isaretlenmis.");
+      }
+
+      if (appointmentConflictExists(nextRange)) {
+        throw new Error(
+          "Secilen zaman araliginda randevu oldugu icin blok eklenemiyor.",
+        );
+      }
+
+      return api.availabilityOverrides.create({
+        doctor_id: doctorId,
+        date,
+        type: "custom_hours",
+        start_time: nextStart,
+        end_time: nextEnd,
+      });
+    },
+    onSuccess: async () => {
+      toast.success("Zaman bloklamasi eklendi");
+      await queryClient.invalidateQueries({
+        queryKey: ["availability-overrides", doctorId],
+      });
+      await queryClient.invalidateQueries({
+        queryKey: ["doctor-calendar", doctorId],
+      });
+    },
+    onError: (error: unknown) => {
+      toast.error(error instanceof Error ? error.message : "Zaman blogu eklenemedi");
+    },
+  });
+
+  const createAppointmentFromCalendar = useMutation({
+    mutationFn: async () => {
+      if (!appointmentComposer) {
+        throw new Error("Randevu baglami bulunamadi");
+      }
+
+      let patientId = selectedPatientId;
+
+      if (appointmentMode === "manual") {
+        const { firstName, lastName } = splitFullName(manualPatientName);
+        if (!firstName || !lastName || !manualPatientPhone.trim()) {
+          throw new Error("Ad soyad ve telefon zorunludur");
+        }
+
+        const createdPatient = await api.patients.create({
+          firstName,
+          lastName,
+          phone: manualPatientPhone.trim(),
+          notes: manualPatientNote.trim() || undefined,
+        });
+
+        patientId = createdPatient?.id;
+      }
+
+      if (!patientId) {
+        throw new Error("Hasta secilmedi");
+      }
+
+      return api.appointments.create({
+        doctorId,
+        patientId,
+        appointmentDate: toApiDate(appointmentComposer.start),
+        startTime: format(appointmentComposer.start, "HH:mm"),
+        endTime: format(appointmentComposer.end, "HH:mm"),
+        notes: appointmentNotes.trim() || undefined,
+      });
+    },
+    onSuccess: async () => {
+      toast.success("Randevu olusturuldu");
+      setAppointmentComposer(null);
+      setAppointmentMode("registered");
+      setPatientSearch("");
+      setSelectedPatientId(null);
+      setManualPatientName("");
+      setManualPatientPhone("");
+      setManualPatientNote("");
+      setAppointmentNotes("");
+      await queryClient.invalidateQueries({
+        queryKey: ["doctor-calendar", doctorId],
+      });
+      await queryClient.invalidateQueries({
+        queryKey: ["staff-calendar-patients"],
+      });
+    },
+    onError: (error: unknown) => {
+      toast.error(error instanceof Error ? error.message : "Randevu olusturulamadi");
     },
   });
 
@@ -605,8 +939,8 @@ export function DoctorCalendar({ doctorId }: DoctorCalendarProps) {
           localizer={localizer}
           events={foregroundEvents}
           defaultView={Views.WEEK}
-          view={view}
-          date={currentDate}
+          view={resolvedView}
+          date={resolvedCurrentDate}
           startAccessor="start"
           endAccessor="end"
           style={{ height: 720 }}
@@ -632,12 +966,12 @@ export function DoctorCalendar({ doctorId }: DoctorCalendarProps) {
             );
             return inSlot ? { style: { backgroundColor: "#dcfce7", cursor: "pointer" } } : {};
           }}
-          onNavigate={setCurrentDate}
-          onView={setView}
+          onNavigate={setCalendarDate}
+          onView={setCalendarView}
           onDrillDown={(date, nextView) => {
             void nextView;
-            setCurrentDate(date);
-            setView(Views.DAY);
+            setCalendarDate(date);
+            setCalendarView(Views.DAY);
           }}
           getDrilldownView={() => Views.DAY}
           onSelectSlot={(slotInfo) => {

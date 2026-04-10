@@ -61,7 +61,7 @@ export default function DoctorSchedule() {
         </motion.div>
 
         {doctorRecord ? (
-          <DoctorCalendar doctorId={doctorRecord.id} />
+          <DoctorCalendar doctorId={doctorRecord.id} mode="doctor" />
         ) : isError ? (
           <Alert className="rounded-2xl">
             <AlertTitle>Doctor schedule could not be loaded</AlertTitle>
