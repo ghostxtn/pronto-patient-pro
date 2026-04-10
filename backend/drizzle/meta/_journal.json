@@ -92,6 +92,13 @@
       "when": 1775702400000,
       "tag": "0012_trusted_devices",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1775865600000,
+      "tag": "0013_salak_Hakan",
+      "breakpoints": true
     }
   ]
 }
