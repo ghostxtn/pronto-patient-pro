@@ -31,3 +31,6 @@ redis_data/
 uploads_data/
 bun.lock
 bun.lockb
+*.md
+*.txt
+backend/drizzle/meta/0012_snapshot.json
