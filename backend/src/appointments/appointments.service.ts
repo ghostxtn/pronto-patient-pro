@@ -47,6 +47,7 @@ export class AppointmentsService {
       dto.appointmentDate,
       dto.startTime,
       dto.endTime,
+      userRole,
     );
     await this.assertNoAppointmentOverlap(
       clinicId,
@@ -215,6 +216,7 @@ export class AppointmentsService {
         nextAppointmentDate,
         nextStartTime,
         nextEndTime,
+        'staff',
       );
       await this.assertNoAppointmentOverlap(
         clinicId,
@@ -480,17 +482,27 @@ export class AppointmentsService {
     appointmentDate: string,
     startTime: string,
     endTime: string,
+    userRole: string,
   ) {
     const availabilityContext = await this.availabilityService.getAvailabilityContext(
       clinicId,
       doctorId,
       appointmentDate,
     );
+    const bookableSlotEntries =
+      userRole === 'patient'
+        ? await this.availabilityService.getBookableSlotEntriesForDuration(
+            clinicId,
+            doctorId,
+            appointmentDate,
+            30,
+          )
+        : availabilityContext.slotEntries;
     const requestedRange = {
       start: timeToMinutes(startTime),
       end: timeToMinutes(endTime),
     };
-    const hasBookableStart = availabilityContext.slotEntries.some(
+    const hasBookableStart = bookableSlotEntries.some(
       (slotEntry) => slotEntry.startTime === startTime,
     );
     const hasFullCoverage = availabilityContext.availabilityRanges.some((range) =>

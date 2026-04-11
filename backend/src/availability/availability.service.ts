@@ -14,6 +14,7 @@ import {
 import type { DoctorAvailability } from '../database/schema/doctor-availability.schema';
 import {
   createUnionRange,
+  generateSlotEntriesForRange,
   isExpiredStartTime,
   mergeRanges,
   minutesToTime,
@@ -30,6 +31,8 @@ type AvailabilityContext = {
   slotEntries: SlotEntry[];
 };
 
+const PATIENT_BOOKING_SLOT_DURATION_MINUTES = 30;
+
 @Injectable()
 export class AvailabilityService {
   constructor(@Inject('DRIZZLE') private readonly db: any) {}
@@ -39,8 +42,24 @@ export class AvailabilityService {
     doctorId: string,
     date: string,
   ): Promise<string[]> {
-    const slotEntries = await this.getBookableSlotEntries(clinicId, doctorId, date);
+    const slotEntries = await this.getBookableSlotEntriesForDuration(
+      clinicId,
+      doctorId,
+      date,
+      PATIENT_BOOKING_SLOT_DURATION_MINUTES,
+    );
     return slotEntries.map((slotEntry) => slotEntry.startTime);
+  }
+
+  async getBookableSlotEntriesForDuration(
+    clinicId: string,
+    doctorId: string,
+    date: string,
+    slotDuration: number,
+  ): Promise<SlotEntry[]> {
+    return this.getBookableSlotEntries(clinicId, doctorId, date, {
+      slotDuration,
+    });
   }
 
   async create(dto: CreateAvailabilityDto, clinicId: string) {
@@ -174,22 +193,6 @@ export class AvailabilityService {
     return { success: true };
   }
 
-  private generateSlots(
-    startMinutes: number,
-    endMinutes: number,
-    slotDuration: number,
-  ): string[] {
-    const slots: string[] = [];
-    let currentMinutes = startMinutes;
-
-    while (currentMinutes < endMinutes) {
-      slots.push(minutesToTime(currentMinutes));
-      currentMinutes += slotDuration;
-    }
-
-    return slots;
-  }
-
   private timeToMinutes(time: string): number {
     const [hours, minutes] = time.slice(0, 5).split(':').map(Number);
     return hours * 60 + minutes;
@@ -285,7 +288,11 @@ export class AvailabilityService {
 
         rawAvailabilityRanges.push(segment);
         rawSlotEntries.push(
-          ...this.generateSlotEntries(segment.start, segment.end, block.slot_duration ?? 30),
+          ...generateSlotEntriesForRange(
+            segment.start,
+            segment.end,
+            block.slot_duration ?? 30,
+          ),
         );
       }
     }
@@ -308,6 +315,9 @@ export class AvailabilityService {
     clinicId: string,
     doctorId: string,
     date: string,
+    options: {
+      slotDuration?: number;
+    } = {},
   ): Promise<SlotEntry[]> {
     const availabilityContext = await this.getAvailabilityContext(
       clinicId,
@@ -318,7 +328,18 @@ export class AvailabilityService {
       },
     );
 
-    if (availabilityContext.slotEntries.length === 0) {
+    const candidateSlotEntries =
+      options.slotDuration !== undefined
+        ? this.dedupeSlotEntries(
+            availabilityContext.availabilityRanges.flatMap((range) =>
+              generateSlotEntriesForRange(range.start, range.end, options.slotDuration!, {
+                alignToGrid: true,
+              }),
+            ),
+          ).filter((slotEntry) => !isExpiredStartTime(date, slotEntry.startTime))
+        : availabilityContext.slotEntries;
+
+    if (candidateSlotEntries.length === 0) {
       return [];
     }
 
@@ -338,7 +359,7 @@ export class AvailabilityService {
       );
 
     return this.dedupeSlotEntries(
-      availabilityContext.slotEntries.filter((slotEntry) => {
+      candidateSlotEntries.filter((slotEntry) => {
         const slotRange = {
           start: slotEntry.startMinutes,
           end: slotEntry.endMinutes,
@@ -346,7 +367,10 @@ export class AvailabilityService {
 
         return !existingAppointments.some(
           (appointment: { start_time: string; end_time: string }) =>
-            rangesOverlap(slotRange, this.toRange(appointment.start_time, appointment.end_time)),
+            this.slotConflictsWithBusyRange(
+              slotRange,
+              this.toRange(appointment.start_time, appointment.end_time),
+            ),
         );
       }),
     );
@@ -492,23 +516,14 @@ export class AvailabilityService {
       .then((rows: DoctorAvailability[]) => rows[0]);
   }
 
-  private generateSlotEntries(
-    startMinutes: number,
-    endMinutes: number,
-    slotDuration: number,
-  ): SlotEntry[] {
-    return this.generateSlots(startMinutes, endMinutes, slotDuration).map(
-      (slot) => {
-        const slotStartMinutes = timeToMinutes(slot);
-        return {
-          startTime: slot,
-          endTime: minutesToTime(slotStartMinutes + slotDuration),
-          duration: slotDuration,
-          startMinutes: slotStartMinutes,
-          endMinutes: slotStartMinutes + slotDuration,
-        };
-      },
-    );
+  // Bookable patient slots use half-open intervals: [start, end).
+  // That keeps 10:30-12:00 busy from blocking 12:00-12:30,
+  // while still blocking 11:30-12:00 and 07:00-07:30.
+  private slotConflictsWithBusyRange(
+    slotRange: MinuteRange,
+    busyRange: MinuteRange,
+  ): boolean {
+    return slotRange.start < busyRange.end && slotRange.end > busyRange.start;
   }
 
   private subtractBlockedRange(
