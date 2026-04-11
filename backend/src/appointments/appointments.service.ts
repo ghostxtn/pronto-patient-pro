@@ -1,6 +1,9 @@
 import { ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { and, eq, gte, lte, ne } from 'drizzle-orm';
-import { AvailabilityService } from '../availability/availability.service';
+import {
+  AvailabilityService,
+  type PublicSlotEntry,
+} from '../availability/availability.service';
 import {
   isExpiredStartTime,
   rangeContains,
@@ -489,7 +492,7 @@ export class AppointmentsService {
       doctorId,
       appointmentDate,
     );
-    const bookableSlotEntries =
+    const bookableSlotEntries: PublicSlotEntry[] =
       userRole === 'patient'
         ? await this.availabilityService.getBookableSlots(
             clinicId,
@@ -502,7 +505,7 @@ export class AppointmentsService {
       end: timeToMinutes(endTime),
     };
     const hasBookableStart = bookableSlotEntries.some(
-      (slotEntry: { startTime: string }) => slotEntry.startTime === startTime,
+      (slotEntry) => slotEntry.startTime === startTime,
     );
     const hasFullCoverage = availabilityContext.availabilityRanges.some((range) =>
       rangeContains(range, requestedRange),
