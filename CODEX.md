@@ -78,6 +78,8 @@ Codex quota is limited — keep prompts minimal and targeted.
 - `0000–0006`: Base schema, auth, multi-tenancy, staff phone, patient user_id
 - `0007`: `doctor_availability_overrides` table + domain/email unique constraints
 - `0008`: `patient_clinical_notes` table
+- `0012`: `trusted_devices` migration exists on mainline
+- `0013_salak_Hakan`: drops `doctor_availability_overrides_doctor_date_type_unique` to allow same-day multiple `custom_hours` / block records under the new calendar scheduler flow
 
 ### Migration Flow
 ```bash
@@ -101,11 +103,21 @@ npm run db:seed
 - Fresh DB: `docker compose up -d` -> `npm run db:migrate` -> `npm run db:seed`
 - Schema change: `npm run db:generate` -> commit migration -> `npm run db:migrate`
 - Avoid treating `db:push` as the default team flow; prefer committed migrations
+
+### Calendar Integration Note
+- `calendar-integration` branch pulled the calendar scheduler from `origin/Calender_v5_fully-functionable` selectively, not as a full branch merge
+- We intentionally did **not** take the branch's auth/i18n regressions
+- The current scheduler UI is very close to the branch version:
+  - `src/components/calendar/DoctorCalendar.tsx`
+  - `src/index.css`
+  - `src/pages/doctor/DoctorSchedule.tsx`
+- The branch did **not** contain a true Google Calendar-style hover preview/popover in `DoctorCalendar`; current interactions are click/select based (`quick action`, `Sheet`, `Drawer`, `AppointmentDetailSheet`)
+- If someone later asks "where did the hover modal go?", the answer is usually: it was not present in the committed branch/calendar code we integrated
+
 ### Staff Calendar 429 Note
 - 429 root cause was per-doctor availability fan-out in `src/pages/staff/StaffDoctors.tsx`
 - Final fix was removing the `Promise.all(...api.availability.listByDoctor...)` burst from the staff page
 - Throttle `300/min` is kept only as buffer, not the primary solution
-
 
 ### Existing DB Repair Flow
 Use this only if the local database already has clinic tables and `npm run db:migrate` fails with errors like `relation "users" already exists`.
@@ -242,6 +254,19 @@ POST/GET /api/storage/appointments/:id/files
 - `is_active`: toggleable
 - Overlap validation: same doctor + same day + active slots cannot overlap
 - DELETE is hard delete
+
+### doctor_availability_overrides (date-specific)
+- Old model assumed one override per `doctor_id + date + type`
+- New scheduler model supports multiple same-day `custom_hours` / blocked ranges and merge logic in service layer
+- Runtime coordination now lives in:
+  - `backend/src/availability-overrides/availability-overrides.service.ts`
+  - `findOverridesForDate(...)`
+  - `ensureOverrideCompatibility(...)`
+  - `findOverlappingCustomHours(...)`
+  - `normalizeCustomHoursOverlap(...)`
+- DB/schema must stay aligned with this model:
+  - `backend/src/database/schema/doctor-availability-overrides.schema.ts` should **not** reintroduce the old unique constraint
+  - `backend/drizzle/0013_salak_Hakan.sql` must be applied locally if DB still has `doctor_availability_overrides_doctor_date_type_unique`
 
 ### doctor_availability_overrides (date-specific)
 - `type`: `blackout` | `custom_hours`

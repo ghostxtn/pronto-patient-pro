@@ -31,7 +31,7 @@ type AvailabilityContext = {
   slotEntries: SlotEntry[];
 };
 
-type PublicSlotEntry = Pick<SlotEntry, 'startTime' | 'endTime' | 'duration'>;
+export type PublicSlotEntry = Pick<SlotEntry, 'startTime' | 'endTime' | 'duration'>;
 
 @Injectable()
 export class AvailabilityService {

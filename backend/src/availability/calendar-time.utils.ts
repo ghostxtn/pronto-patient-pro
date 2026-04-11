@@ -22,6 +22,36 @@ export function minutesToTime(totalMinutes: number): string {
   return `${hours}:${minutes}`;
 }
 
+export function generateSlotEntriesForRange(
+  startMinutes: number,
+  endMinutes: number,
+  slotDuration: number,
+  options: {
+    alignToGrid?: boolean;
+  } = {},
+): SlotEntry[] {
+  const slotEntries: SlotEntry[] = [];
+  const initialStart = options.alignToGrid
+    ? Math.ceil(startMinutes / slotDuration) * slotDuration
+    : startMinutes;
+
+  for (
+    let slotStartMinutes = initialStart;
+    slotStartMinutes + slotDuration <= endMinutes;
+    slotStartMinutes += slotDuration
+  ) {
+    slotEntries.push({
+      startTime: minutesToTime(slotStartMinutes),
+      endTime: minutesToTime(slotStartMinutes + slotDuration),
+      duration: slotDuration,
+      startMinutes: slotStartMinutes,
+      endMinutes: slotStartMinutes + slotDuration,
+    });
+  }
+
+  return slotEntries;
+}
+
 export function rangesOverlap(left: MinuteRange, right: MinuteRange): boolean {
   return left.start < right.end && right.start < left.end;
 }
