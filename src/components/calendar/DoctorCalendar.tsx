@@ -266,6 +266,8 @@ type SchedulerEvent =
   | BlackoutSurfaceEvent;
 
 const supportedSlotDurations = [15, 20, 30, 45, 60, 90] as const;
+const calendarSelectionStepMinutes = 15;
+const calendarSelectionTimeslots = 4;
 
 const toolbarViewLabels = {
   [Views.MONTH]: "Ay",
@@ -2104,7 +2106,7 @@ export function DoctorCalendar({
     handleSlotSelection({
       action: "select",
       start: slotStart,
-      end: addMinutes(slotStart, 30),
+      end: addMinutes(slotStart, calendarSelectionStepMinutes),
       slots: [slotStart],
       bounds: anchorRect ?? undefined,
       box: anchorRect ?? undefined,
@@ -2232,8 +2234,8 @@ export function DoctorCalendar({
         selectable={!isMobile || resolvedView === Views.MONTH}
         popup
         culture="tr"
-        step={30}
-        timeslots={2}
+        step={calendarSelectionStepMinutes}
+        timeslots={calendarSelectionTimeslots}
         min={setMinutes(setHours(new Date(), 6), 0)}
         max={setMinutes(setHours(new Date(), 23), 0)}
         drilldownView={Views.DAY}

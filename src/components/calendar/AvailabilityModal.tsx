@@ -21,6 +21,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
+const slotDurationOptions = ["15", "20", "30", "45", "60", "90"] as const;
+
 export interface AvailabilityModalProps {
   open: boolean;
   onClose: () => void;
@@ -93,7 +95,6 @@ export function AvailabilityModal({
     { value: "6", label: t.saturday },
     { value: "0", label: t.sunday },
   ] as const;
-  const slotDurationOptions = ["15", "20", "30", "45", "60", "90"] as const;
   const [dayOfWeek, setDayOfWeek] = useState("1");
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
