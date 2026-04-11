@@ -31,3 +31,11 @@ redis_data/
 uploads_data/
 bun.lock
 bun.lockb
+# Graphify artifacts
+graphify-out/
+.graphify/
+.graphify_python
+.graphify_transcripts.json
+
+AGENTS.md
+.codex/hooks.json
