@@ -4,10 +4,7 @@ import { motion } from "framer-motion";
 import { Search, Users } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import AppLayout from "@/components/AppLayout";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import api from "@/services/api";
 
@@ -75,29 +72,34 @@ export default function DoctorPatients() {
 
   return (
     <AppLayout>
-      <motion.div initial="hidden" animate="visible" className="space-y-6">
+      <motion.div initial="hidden" animate="visible" className="space-y-6 rounded-[28px] bg-[#f4f8fd] p-1">
         <motion.div custom={0} variants={fadeUp}>
-          <h1 className="text-3xl font-display font-bold">Hastalarım</h1>
-          <p className="mt-1 text-muted-foreground">
+          <h1 className="text-3xl font-bold tracking-tight text-[#1a2e3b]" style={{ fontFamily: "Manrope, sans-serif" }}>
+            Hastalarım
+          </h1>
+          <p className="mt-2 text-sm text-[#5a7a8a]" style={{ fontFamily: "Inter, sans-serif" }}>
             Kayıtlı hastaları görüntüleyin ve hasta detaylarına geçin.
           </p>
         </motion.div>
 
-        <motion.div custom={1} variants={fadeUp} className="relative">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
+        <motion.div custom={1} variants={fadeUp}>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: "#5a7a8a" }} />
+            <input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder="Ad veya e-posta ile ara"
-            className="pl-10"
-          />
+              className="w-full h-10 pl-10 pr-4 rounded-xl border border-[#b5d1cc] bg-white text-sm text-[#1a2e3b] placeholder:text-[#5a7a8a] focus:outline-none focus:ring-2 focus:ring-[#4f8fe6]/30 shadow-[0_2px_8px_rgba(79,143,230,0.06)]"
+              style={{ fontFamily: "Inter, sans-serif" }}
+            />
+          </div>
         </motion.div>
 
         <motion.div custom={2} variants={fadeUp}>
           {isLoading ? (
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3" style={{ maxHeight: "560px", overflowY: "auto" }}>
               {Array.from({ length: 6 }).map((_, index) => (
-                <Card key={index} className="rounded-2xl">
+                <Card key={index} className="rounded-2xl border border-[#b5d1cc] bg-white shadow-[0_2px_12px_rgba(79,143,230,0.08)]">
                   <CardContent className="space-y-4 p-5">
                     <div className="flex items-center gap-3">
                       <Skeleton className="h-12 w-12 rounded-full" />
@@ -113,39 +115,42 @@ export default function DoctorPatients() {
               ))}
             </div>
           ) : filteredPatients.length > 0 ? (
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3" style={{ maxHeight: "560px", overflowY: "auto" }}>
               {filteredPatients.map((patient, index) => {
                 const fullName = getPatientName(patient);
 
                 return (
                   <motion.div key={patient.id} custom={index} variants={fadeUp}>
-                    <Card className="h-full rounded-2xl border-border/60 shadow-card">
+                    <Card className="h-full rounded-2xl border border-[#b5d1cc] bg-white shadow-[0_2px_12px_rgba(79,143,230,0.08)] transition-all duration-200 hover:border-[#4f8fe6] hover:shadow-[0_8px_22px_rgba(79,143,230,0.14)]">
                       <CardContent className="flex h-full flex-col gap-4 p-5">
                         <div className="flex items-center gap-3">
-                          <Avatar className="h-12 w-12 border border-border/60">
-                            <AvatarFallback className="bg-accent text-accent-foreground">
+                          <div className="h-12 w-12 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "#eaf5ff" }}>
+                            <span className="font-bold text-sm" style={{ color: "#4f8fe6", fontFamily: "Manrope, sans-serif" }}>
                               {getInitials(fullName)}
-                            </AvatarFallback>
-                          </Avatar>
+                            </span>
+                          </div>
                           <div className="min-w-0">
-                            <p className="truncate font-display font-semibold">{fullName}</p>
-                            <p className="truncate text-sm text-muted-foreground">
+                            <p className="truncate font-semibold text-[#1a2e3b]" style={{ fontFamily: "Manrope, sans-serif" }}>{fullName}</p>
+                            <p className="truncate text-sm" style={{ color: "#5a7a8a", fontFamily: "Inter, sans-serif" }}>
                               {patient.email || "E-posta bilgisi yok"}
                             </p>
                           </div>
                         </div>
 
-                        <div className="space-y-1 text-sm text-muted-foreground">
+                        <div className="space-y-1 text-sm" style={{ color: "#5a7a8a", fontFamily: "Inter, sans-serif" }}>
                           <p>{patient.email || "E-posta bilgisi yok"}</p>
                           <p>{patient.phone || "Telefon bilgisi yok"}</p>
                         </div>
 
-                        <Button
-                          className="mt-auto rounded-xl"
+                        <button
+                          className="mt-auto w-full rounded-xl py-2 text-sm font-medium text-white transition-colors"
+                          style={{ backgroundColor: "#4f8fe6", fontFamily: "Inter, sans-serif" }}
+                          onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "#2f75ca")}
+                          onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "#4f8fe6")}
                           onClick={() => navigate(`/doctor/patients/${patient.id}`)}
                         >
                           Görüntüle
-                        </Button>
+                        </button>
                       </CardContent>
                     </Card>
                   </motion.div>
@@ -153,14 +158,14 @@ export default function DoctorPatients() {
               })}
             </div>
           ) : (
-            <Card className="rounded-2xl border-dashed">
+            <Card className="rounded-2xl border border-dashed border-[#b5d1cc] bg-white">
               <CardContent className="flex min-h-[260px] flex-col items-center justify-center gap-3 p-8 text-center">
-                <div className="rounded-full bg-muted p-4">
-                  <Users className="h-6 w-6 text-muted-foreground" />
+                <div className="rounded-full p-4" style={{ backgroundColor: "#eaf5ff" }}>
+                  <Users className="h-6 w-6" style={{ color: "#4f8fe6" }} />
                 </div>
                 <div className="space-y-1">
-                  <p className="font-medium">Hasta bulunamadı</p>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="font-medium text-[#1a2e3b]" style={{ fontFamily: "Manrope, sans-serif" }}>Hasta bulunamadı</p>
+                  <p className="text-sm" style={{ color: "#5a7a8a", fontFamily: "Inter, sans-serif" }}>
                     Arama kriterlerini değiştirerek tekrar deneyin.
                   </p>
                 </div>

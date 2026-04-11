@@ -42,6 +42,7 @@ export default function ClinicSettings() {
   const [appointmentApprovalMode, setAppointmentApprovalMode] = useState("manual");
   const [maxBookingDaysAhead, setMaxBookingDaysAhead] = useState("60");
   const [cancellationHoursBefore, setCancellationHoursBefore] = useState("24");
+  const [activeSection, setActiveSection] = useState<"clinic" | "appointments" | "owner">("clinic");
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const clinicLogoInputRef = useRef<HTMLInputElement | null>(null);
   const [uploadingSpecIds, setUploadingSpecIds] = useState<Record<string, boolean>>({});
@@ -146,11 +147,18 @@ export default function ClinicSettings() {
     try {
       await api.clinics.uploadLogo(user.clinic_id, file);
       await qc.invalidateQueries({ queryKey: ["clinic", user.clinic_id] });
+      await qc.invalidateQueries({ queryKey: ["clinic-branding", user.clinic_id] });
       toast.success("Klinik logosu guncellendi");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Klinik logosu yuklenemedi");
     }
   };
+
+  const navItems = [
+    ...(canManageClinic ? [{ id: "clinic", label: "Klinik Profili", icon: "🏥" }] : []),
+    ...(canManageClinic ? [{ id: "appointments", label: "Randevu Ayarları", icon: "📅" }] : []),
+    ...(canManageClinic ? [{ id: "owner", label: "Owner Kontrolleri", icon: "⚙️" }] : []),
+  ];
 
   return (
     <AppLayout>
@@ -160,8 +168,35 @@ export default function ClinicSettings() {
           <p className="text-muted-foreground mt-1" style={{ color: "#5a7a8a" }}>{t.clinicSettingsDesc}</p>
         </motion.div>
 
-        {canManageClinic && (
-          <motion.div custom={1} variants={fadeUp}>
+        <motion.div custom={1} variants={fadeUp}>
+          <div className="flex gap-8 items-start">
+            <div className="w-56 shrink-0 sticky top-6">
+              <nav className="flex flex-col gap-1">
+                {navItems.map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => setActiveSection(item.id as "clinic" | "appointments" | "owner")}
+                    style={{
+                      fontFamily: "Inter, sans-serif",
+                      textAlign: "left",
+                      padding: "10px 14px",
+                      borderRadius: "10px",
+                      border: "none",
+                      cursor: "pointer",
+                      fontSize: "14px",
+                      fontWeight: activeSection === item.id ? 600 : 400,
+                      background: activeSection === item.id ? "#eaf5ff" : "transparent",
+                      color: activeSection === item.id ? "#4f8fe6" : "#1a2e3b",
+                      transition: "all 0.15s",
+                    }}
+                  >
+                    {item.icon} {item.label}
+                  </button>
+                ))}
+              </nav>
+            </div>
+            <div className="flex-1 min-w-0">
+              {activeSection === "clinic" && canManageClinic && (
             <Card style={{ background: "white", border: "1px solid #b5d1cc", borderRadius: "16px", boxShadow: "0 2px 12px rgba(79,143,230,0.08)" }}>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg" style={{ color: "#1a2e3b", fontFamily: "Manrope, sans-serif", fontWeight: 700 }}>
@@ -193,7 +228,7 @@ export default function ClinicSettings() {
                     >
                       {clinic?.logo_url ? (
                         <img
-                          src={clinic.logo_url}
+                          src={`${clinic.logo_url}?t=${new Date(clinic.updated_at).getTime()}`}
                           alt={clinic.name ?? "Klinik logosu"}
                           className="h-full w-full object-cover"
                         />
@@ -270,11 +305,9 @@ export default function ClinicSettings() {
                 </div>
               </CardContent>
             </Card>
-          </motion.div>
-        )}
+              )}
 
-        {canManageClinic && (
-          <motion.div custom={2} variants={fadeUp}>
+              {activeSection === "appointments" && canManageClinic && (
             <Card style={{ background: "white", border: "1px solid #b5d1cc", borderRadius: "16px", boxShadow: "0 2px 12px rgba(79,143,230,0.08)" }}>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg" style={{ color: "#1a2e3b", fontFamily: "Manrope, sans-serif", fontWeight: 700 }}>
@@ -361,11 +394,9 @@ export default function ClinicSettings() {
                 </div>
               </CardContent>
             </Card>
-          </motion.div>
-        )}
+              )}
 
-        {canManageClinic && (
-          <motion.div custom={3} variants={fadeUp}>
+              {activeSection === "owner" && canManageClinic && (
             <Card style={{ background: "white", border: "1px solid #b5d1cc", borderRadius: "16px", boxShadow: "0 2px 12px rgba(79,143,230,0.08)" }}>
               <CardHeader className="flex flex-row items-center justify-between">
                 <div>
@@ -477,8 +508,10 @@ export default function ClinicSettings() {
                 )}
               </CardContent>
             </Card>
-          </motion.div>
-        )}
+              )}
+            </div>
+          </div>
+        </motion.div>
       </motion.div>
 
       <Dialog open={showAddSpec} onOpenChange={setShowAddSpec}>

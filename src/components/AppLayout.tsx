@@ -20,6 +20,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Button } from "@/components/ui/button";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
+import { useClinicBranding } from "@/hooks/useClinicBranding";
 import api from "@/services/api";
 import { getDefaultRouteByRole } from "@/lib/auth-routing";
 import { hasActiveDoctorProfile } from "@/lib/doctor-access";
@@ -30,6 +31,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { t } = useLanguage();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
+  const { logoUrl, clinicName } = useClinicBranding();
   const isOwner = user?.role === "owner";
   const isAdmin = user?.role === "admin";
   const isStaff = user?.role === "staff";
@@ -111,14 +113,22 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <header className="glass-strong border-b sticky top-0 z-50">
         <div className="container flex h-16 items-center justify-between">
           <div className="flex items-center gap-3">
-            <Link to={homePath} className="flex items-center gap-2">
-              <svg width="36" height="36" viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">
-                <rect x="0" y="13" width="44" height="18" rx="9" fill="#65a98f" />
-                <rect x="13" y="0" width="18" height="22" rx="9" fill="#4f8fe6" />
-                <rect x="13" y="22" width="18" height="22" rx="9" fill="#4f8fe6" />
-              </svg>
+            <Link to="/" className="flex items-center gap-2">
+              {logoUrl ? (
+                <img
+                  src={logoUrl}
+                  alt={clinicName}
+                  style={{ width: 36, height: 36, borderRadius: 10, objectFit: "cover" }}
+                />
+              ) : (
+                <svg width="36" height="36" viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">
+                  <rect x="0" y="13" width="44" height="18" rx="9" fill="#65a98f" />
+                  <rect x="13" y="0" width="18" height="22" rx="9" fill="#4f8fe6" />
+                  <rect x="13" y="22" width="18" height="22" rx="9" fill="#4f8fe6" />
+                </svg>
+              )}
               <span className="font-display font-bold text-lg hidden sm:inline" style={{ color: "#1a2e3b" }}>
-                MediBook
+                {clinicName}
               </span>
             </Link>
             <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-accent text-accent-foreground">

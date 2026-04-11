@@ -29,6 +29,32 @@ const fadeUp = {
   }),
 };
 
+function humanizeError(err: any): string {
+  const raw = err?.response?.data?.message ?? err?.message;
+  const messages = Array.isArray(raw) ? raw : raw ? [raw] : [];
+
+  const map: Record<string, string> = {
+    "firstName should not be empty": "Ad boş bırakılamaz",
+    "lastName should not be empty": "Soyad boş bırakılamaz",
+    "email must be an email": "Geçerli bir e-posta adresi girin",
+    "email should not be empty": "E-posta boş bırakılamaz",
+    "password must be longer than or equal to 6 characters":
+      "Şifre en az 6 karakter olmalıdır",
+    "password should not be empty": "Şifre boş bırakılamaz",
+    "specializationId should not be empty": "Uzmanlık alanı seçiniz",
+    "specializationId must be a UUID": "Uzmanlık alanı seçiniz",
+    "title should not be empty": "Unvan boş bırakılamaz",
+    "bio should not be empty": "Biyografi boş bırakılamaz",
+    "phone should not be empty": "Telefon boş bırakılamaz",
+    "role should not be empty": "Rol seçiniz",
+    "Email already exists": "Bu e-posta adresi zaten kullanılıyor",
+  };
+
+  const first = messages[0];
+  if (!first) return "Bir hata oluştu. Lütfen tekrar deneyin.";
+  return map[first] ?? first;
+}
+
 function getDoctorName(doc: any) {
   const firstName = doc.firstName ?? doc.profiles?.first_name ?? "";
   const lastName = doc.lastName ?? doc.profiles?.last_name ?? "";
@@ -110,11 +136,17 @@ export default function ManageDoctors() {
   });
 
   const toggleActive = useMutation({
-    mutationFn: async ({ id, isActive }: { id: string; isActive: boolean }) =>
-      request(`/doctors/${id}/status`, {
-        method: "PATCH",
-        body: JSON.stringify({ isActive }),
-      }),
+    mutationFn: async ({ id, isActive }: { id: string; isActive: boolean }) => {
+      try {
+        return await request(`/doctors/${id}/status`, {
+          method: "PATCH",
+          body: JSON.stringify({ isActive }),
+        });
+      } catch (err: any) {
+        toast.error(humanizeError(err));
+        throw err;
+      }
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin-doctors"] });
       toast.success(t.doctorStatusUpdated);
@@ -122,19 +154,25 @@ export default function ManageDoctors() {
   });
 
   const updateDoctor = useMutation({
-    mutationFn: async (doc: any) =>
-      request(`/doctors/${doc.id}/admin`, {
-        method: "PATCH",
-        body: JSON.stringify({
-          firstName: doc.firstName,
-          lastName: doc.lastName,
-          email: doc.email,
-          specializationId: doc.specializationId,
-          title: doc.title,
-          bio: doc.bio,
-          phone: doc.phone,
-        }),
-      }),
+    mutationFn: async (doc: any) => {
+      try {
+        return await request(`/doctors/${doc.id}/admin`, {
+          method: "PATCH",
+          body: JSON.stringify({
+            firstName: doc.firstName,
+            lastName: doc.lastName,
+            email: doc.email,
+            specializationId: doc.specializationId,
+            title: doc.title,
+            bio: doc.bio,
+            phone: doc.phone,
+          }),
+        });
+      } catch (err: any) {
+        toast.error(humanizeError(err));
+        throw err;
+      }
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin-doctors"] });
       setEditDoctor(null);
@@ -152,8 +190,8 @@ export default function ManageDoctors() {
       setNewDoctor(emptyNewDoctor);
       setAddOpen(false);
       window.location.reload();
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      toast.error(humanizeError(err));
     }
   };
 
@@ -315,11 +353,11 @@ export default function ManageDoctors() {
               border: "1px solid #b5d1cc",
               borderRadius: "16px",
               boxShadow: "0 2px 12px rgba(79,143,230,0.08)",
-              overflow: "hidden",
+              overflow: "visible",
             }}
           >
             <CardContent className="p-0">
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto overflow-y-auto max-h-[560px]">
                 <table className="w-full">
                   <thead>
                     <tr className="text-left" style={{ background: "#f4f8fd", borderBottom: "1px solid #b5d1cc" }}>
@@ -657,6 +695,7 @@ export default function ManageDoctors() {
 
             <input
               placeholder={t.email}
+              autoComplete="off"
               value={newDoctor.email}
               onChange={(e) => setNewDoctor({ ...newDoctor, email: e.target.value })}
               className="w-full rounded border p-2"
@@ -665,6 +704,7 @@ export default function ManageDoctors() {
             <input
               placeholder={t.password}
               type="password"
+              autoComplete="new-password"
               value={newDoctor.password}
               onChange={(e) => setNewDoctor({ ...newDoctor, password: e.target.value })}
               className="w-full rounded border p-2"

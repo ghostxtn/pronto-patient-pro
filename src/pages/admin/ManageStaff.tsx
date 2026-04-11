@@ -26,20 +26,48 @@ const fadeUp = {
   }),
 };
 
-type StaffFormState = {
+function humanizeError(err: any): string {
+  const raw = err?.response?.data?.message ?? err?.message;
+  const messages = Array.isArray(raw) ? raw : raw ? [raw] : [];
+
+  const map: Record<string, string> = {
+    "firstName should not be empty": "Ad boş bırakılamaz",
+    "lastName should not be empty": "Soyad boş bırakılamaz",
+    "email must be an email": "Geçerli bir e-posta adresi girin",
+    "email should not be empty": "E-posta boş bırakılamaz",
+    "password must be longer than or equal to 6 characters":
+      "Şifre en az 6 karakter olmalıdır",
+    "password should not be empty": "Şifre boş bırakılamaz",
+    "specializationId should not be empty": "Uzmanlık alanı seçiniz",
+    "specializationId must be a UUID": "Uzmanlık alanı seçiniz",
+    "title should not be empty": "Unvan boş bırakılamaz",
+    "bio should not be empty": "Biyografi boş bırakılamaz",
+    "phone should not be empty": "Telefon boş bırakılamaz",
+    "role should not be empty": "Rol seçiniz",
+    "Email already exists": "Bu e-posta adresi zaten kullanılıyor",
+  };
+
+  const first = messages[0];
+  if (!first) return "Bir hata oluştu. Lütfen tekrar deneyin.";
+  return map[first] ?? first;
+}
+
+type StaffCreateFormState = {
   firstName: string;
   lastName: string;
   email: string;
   phone: string;
+};
+
+type StaffEditFormState = StaffCreateFormState & {
   isActive: boolean;
 };
 
-const emptyStaffForm: StaffFormState = {
+const emptyStaffForm: StaffCreateFormState = {
   firstName: "",
   lastName: "",
   email: "",
   phone: "",
-  isActive: true,
 };
 
 export default function ManageStaff() {
@@ -48,8 +76,8 @@ export default function ManageStaff() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"active" | "inactive" | "all">("active");
   const [addOpen, setAddOpen] = useState(false);
-  const [newStaff, setNewStaff] = useState<StaffFormState>(emptyStaffForm);
-  const [editStaff, setEditStaff] = useState<(StaffFormState & { id: string }) | null>(null);
+  const [newStaff, setNewStaff] = useState<StaffCreateFormState>(emptyStaffForm);
+  const [editStaff, setEditStaff] = useState<(StaffEditFormState & { id: string }) | null>(null);
 
   const { data: staff = [] } = useQuery({
     queryKey: ["admin-staff", search, statusFilter],
@@ -57,7 +85,17 @@ export default function ManageStaff() {
   });
 
   const createStaff = useMutation({
-    mutationFn: (payload: StaffFormState) => api.staff.create(payload),
+    mutationFn: async (payload: StaffCreateFormState) => {
+      try {
+        const { isActive: _removed, ...createPayload } = payload as StaffCreateFormState & {
+          isActive?: boolean;
+        };
+        return await api.staff.create(createPayload);
+      } catch (err: any) {
+        toast.error(humanizeError(err));
+        throw err;
+      }
+    },
     onSuccess: (createdStaff) => {
       qc.invalidateQueries({ queryKey: ["admin-staff"] });
       setAddOpen(false);
@@ -71,7 +109,14 @@ export default function ManageStaff() {
   });
 
   const updateStaff = useMutation({
-    mutationFn: (payload: StaffFormState & { id: string }) => api.staff.update(payload.id, payload),
+    mutationFn: async (payload: StaffEditFormState & { id: string }) => {
+      try {
+        return await api.staff.update(payload.id, payload);
+      } catch (err: any) {
+        toast.error(humanizeError(err));
+        throw err;
+      }
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin-staff"] });
       setEditStaff(null);
@@ -80,7 +125,14 @@ export default function ManageStaff() {
   });
 
   const setStaffStatus = useMutation({
-    mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) => api.staff.setStatus(id, isActive),
+    mutationFn: async ({ id, isActive }: { id: string; isActive: boolean }) => {
+      try {
+        return await api.staff.setStatus(id, isActive);
+      } catch (err: any) {
+        toast.error(humanizeError(err));
+        throw err;
+      }
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin-staff"] });
       toast.success(t.staffStatusUpdated);
@@ -88,7 +140,14 @@ export default function ManageStaff() {
   });
 
   const deleteStaff = useMutation({
-    mutationFn: (id: string) => api.staff.delete(id),
+    mutationFn: async (id: string) => {
+      try {
+        return await api.staff.delete(id);
+      } catch (err: any) {
+        toast.error(humanizeError(err));
+        throw err;
+      }
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin-staff"] });
       toast.success(t.staffDeleted);
@@ -161,11 +220,11 @@ export default function ManageStaff() {
               border: "1px solid #b5d1cc",
               borderRadius: "16px",
               boxShadow: "0 2px 12px rgba(79,143,230,0.08)",
-              overflow: "hidden",
+              overflow: "visible",
             }}
           >
             <CardContent className="p-0">
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto overflow-y-auto max-h-[560px]">
                 <table className="w-full">
                   <thead>
                     <tr className="text-left" style={{ background: "#f4f8fd", borderBottom: "1px solid #b5d1cc" }}>
@@ -324,7 +383,7 @@ export default function ManageStaff() {
   );
 }
 
-function StaffForm<T extends StaffFormState>({
+function StaffForm<T extends StaffCreateFormState>({
   form,
   onChange,
 }: {
@@ -347,7 +406,12 @@ function StaffForm<T extends StaffFormState>({
       </div>
       <div>
         <Label>{t.email}</Label>
-        <Input type="email" value={form.email} onChange={(e) => onChange({ ...form, email: e.target.value })} />
+        <Input
+          type="email"
+          autoComplete="off"
+          value={form.email}
+          onChange={(e) => onChange({ ...form, email: e.target.value })}
+        />
       </div>
       <div>
         <Label>{t.phone}</Label>

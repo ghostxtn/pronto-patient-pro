@@ -5,11 +5,18 @@ import { Button } from "@/components/ui/button";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useHomepagePreviewData } from "@/hooks/useHomepagePreviewData";
 import SmartLink from "./SmartLink";
 
 export default function LandingNav() {
   const { user, logout } = useAuth();
-  const { t } = useLanguage();
+  const { lang, t } = useLanguage();
+  const previewData = useHomepagePreviewData(lang);
+  const clinic = (previewData.data as { clinic?: { name?: string | null; logo_url?: string | null; updated_at?: string | null } | null } | undefined)?.clinic;
+  const logoUrl = clinic?.logo_url
+    ? `${clinic.logo_url}?t=${new Date(clinic.updated_at ?? Date.now()).getTime()}`
+    : null;
+  const clinicName = clinic?.name ?? "MediBook";
   const [isScrolled, setIsScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -43,14 +50,22 @@ export default function LandingNav() {
     >
       <div className="container flex h-20 items-center justify-between gap-4">
         <SmartLink href="/" className="flex min-w-0 items-center gap-3">
-          <svg width="44" height="44" viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">
-            <rect x="0" y="13" width="44" height="18" rx="9" fill="#65a98f" />
-            <rect x="13" y="0" width="18" height="22" rx="9" fill="#4f8fe6" />
-            <rect x="13" y="22" width="18" height="22" rx="9" fill="#4f8fe6" />
-          </svg>
+          {logoUrl ? (
+            <img
+              src={logoUrl}
+              alt={clinicName}
+              style={{ width: 36, height: 36, borderRadius: 10, objectFit: "cover" }}
+            />
+          ) : (
+            <svg width="36" height="36" viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">
+              <rect x="0" y="13" width="44" height="18" rx="9" fill="#65a98f" />
+              <rect x="13" y="0" width="18" height="22" rx="9" fill="#4f8fe6" />
+              <rect x="13" y="22" width="18" height="22" rx="9" fill="#4f8fe6" />
+            </svg>
+          )}
           <span className="min-w-0 hidden sm:block">
             <span className="block truncate font-display text-[1.7rem] leading-none tracking-tight text-homepage-ink">
-              MediBook
+              {clinicName}
             </span>
             <span className="mt-1 block truncate text-[0.68rem] uppercase tracking-[0.22em] text-homepage-soft">
               {t.brandLabel}

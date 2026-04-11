@@ -90,10 +90,10 @@ export default function StaffDashboard() {
   });
 
   const statusConfig: Record<string, { label: string; color: string }> = {
-    pending: { label: t.pending, color: "bg-warning/15 text-warning border-warning/30" },
-    confirmed: { label: t.confirmed, color: "bg-primary/15 text-primary border-primary/30" },
-    completed: { label: t.completed, color: "bg-success/15 text-success border-success/30" },
-    cancelled: { label: t.cancelled, color: "bg-destructive/15 text-destructive border-destructive/30" },
+    pending: { label: t.pending, color: "border-[rgba(245,166,35,0.3)] bg-[#fff8e6] text-[#f5a623]" },
+    confirmed: { label: t.confirmed, color: "border-[#b5d1cc] bg-[#eaf5ff] text-[#4f8fe6]" },
+    completed: { label: t.completed, color: "border-[#b5d1cc] bg-[#e6f4ef] text-[#65a98f]" },
+    cancelled: { label: t.cancelled, color: "border-[rgba(252,165,165,0.3)] bg-[#fef2f2] text-[#e05252]" },
   };
 
   const statCards = [
@@ -101,53 +101,68 @@ export default function StaffDashboard() {
       label: t.todaysAppointments,
       value: data?.todayAppointments.filter((appointment: any) => appointment.status !== "cancelled").length ?? 0,
       icon: CalendarDays,
-      color: "from-primary to-info",
+      iconBg: "#eaf5ff",
+      iconColor: "#4f8fe6",
       to: "/admin/appointments",
     },
     {
       label: t.pendingApprovals,
       value: data?.pendingAppointments.length ?? 0,
       icon: Clock3,
-      color: "from-warning to-destructive",
+      iconBg: "#fff8e6",
+      iconColor: "#f5a623",
       to: "/admin/appointments",
     },
     {
       label: t.totalPatientsStat,
       value: data?.totalPatients ?? 0,
       icon: Users,
-      color: "from-secondary to-success",
+      iconBg: "#e6f4ef",
+      iconColor: "#65a98f",
       to: "/admin/patients",
     },
     {
       label: t.activeDoctorsStat,
       value: data?.totalDoctors ?? 0,
       icon: Stethoscope,
-      color: "from-info to-primary",
+      iconBg: "#eaf5ff",
+      iconColor: "#2f75ca",
       to: "/staff/doctors",
     },
   ];
 
   return (
     <AppLayout>
-      <motion.div initial="hidden" animate="visible" className="space-y-8">
+      <motion.div initial="hidden" animate="visible" className="space-y-8 rounded-[28px] bg-[#f4f8fd] p-1">
         <motion.div custom={0} variants={fadeUp}>
-          <h1 className="text-3xl font-display font-bold">{t.staffDashboard}</h1>
-          <p className="mt-1 text-muted-foreground">{t.staffDashboardDesc}</p>
+          <h1 className="text-3xl font-bold tracking-tight text-[#1a2e3b]" style={{ fontFamily: "Manrope, sans-serif" }}>
+            {t.staffDashboard}
+          </h1>
+          <p className="mt-2 text-sm text-[#5a7a8a]" style={{ fontFamily: "Inter, sans-serif" }}>
+            {t.staffDashboardDesc}
+          </p>
         </motion.div>
 
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           {statCards.map((card, index) => (
             <motion.div key={card.label} custom={index + 1} variants={fadeUp}>
-              <Card className="cursor-pointer shadow-card" onClick={() => navigate(card.to)}>
+              <Card
+                className="cursor-pointer rounded-2xl border border-[#b5d1cc] bg-white shadow-[0_2px_12px_rgba(79,143,230,0.08)] transition-all duration-200 hover:border-[#4f8fe6] hover:shadow-[0_8px_22px_rgba(79,143,230,0.14)]"
+                onClick={() => navigate(card.to)}
+              >
                 <CardContent className="p-5">
-                  <div className="mb-3 flex items-center justify-between">
-                    <div className={`flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br ${card.color}`}>
-                      <card.icon className="h-5 w-5 text-primary-foreground" />
+                  <div className="mb-4 flex items-start justify-between gap-3">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-xl" style={{ backgroundColor: card.iconBg }}>
+                      <card.icon className="h-5 w-5" style={{ color: card.iconColor }} />
                     </div>
-                    <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                    <TrendingUp className="h-4 w-4 shrink-0 text-[#65a98f]" />
                   </div>
-                  <div className="text-2xl font-display font-bold">{isLoading ? "..." : card.value}</div>
-                  <div className="text-sm text-muted-foreground">{card.label}</div>
+                  <div className="text-[2rem] font-bold leading-none text-[#1a2e3b]" style={{ fontFamily: "Manrope, sans-serif" }}>
+                    {isLoading ? "..." : card.value}
+                  </div>
+                  <div className="mt-3 text-[0.85rem] text-[#5a7a8a]" style={{ fontFamily: "Inter, sans-serif" }}>
+                    {card.label}
+                  </div>
                 </CardContent>
               </Card>
             </motion.div>
@@ -156,30 +171,36 @@ export default function StaffDashboard() {
 
         <div className="grid gap-6 xl:grid-cols-2">
           <motion.div custom={5} variants={fadeUp}>
-            <Card className="shadow-card">
+            <Card className="rounded-2xl border border-[#b5d1cc] bg-white shadow-[0_2px_12px_rgba(79,143,230,0.08)]">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <CheckCircle2 className="h-5 w-5 text-primary" />
+                <CardTitle className="flex items-center gap-2 text-lg text-[#1a2e3b]" style={{ fontFamily: "Manrope, sans-serif" }}>
+                  <CheckCircle2 className="h-5 w-5" style={{ color: "#4f8fe6" }} />
                   {t.pendingApprovals}
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 {isLoading ? (
-                  <div className="space-y-3">{[1, 2, 3].map((item) => <div key={item} className="h-20 animate-pulse rounded-xl bg-muted/40" />)}</div>
+                  <div className="space-y-3">{[1, 2, 3].map((item) => <div key={item} className="h-20 animate-pulse rounded-xl" style={{ backgroundColor: "#eaf5ff" }} />)}</div>
                 ) : !data?.pendingAppointments.length ? (
-                  <p className="py-6 text-center text-sm text-muted-foreground">{t.noPendingApprovals}</p>
+                  <p className="py-6 text-center text-sm" style={{ color: "#5a7a8a", fontFamily: "Inter, sans-serif" }}>{t.noPendingApprovals}</p>
                 ) : (
                   <div className="space-y-3">
                     {data.pendingAppointments.map((appointment: any) => (
-                      <div key={appointment.id} className="flex flex-col gap-3 rounded-xl bg-muted/40 p-4 transition-colors hover:bg-muted/60 sm:flex-row sm:items-center sm:justify-between">
+                      <div key={appointment.id} className="flex flex-col gap-3 rounded-xl bg-[#f4f8fd] p-4 transition-colors hover:bg-[#eaf5ff] sm:flex-row sm:items-center sm:justify-between">
                         <div className="min-w-0">
-                          <p className="truncate text-sm font-medium">{getPatientName(appointment, t.patient)}</p>
-                          <p className="text-sm text-muted-foreground">{getDoctorName(appointment, t.doctor)}</p>
-                          <p className="text-xs text-muted-foreground">
+                          <p className="truncate text-sm font-medium text-[#1a2e3b]" style={{ fontFamily: "Inter, sans-serif" }}>{getPatientName(appointment, t.patient)}</p>
+                          <p className="text-sm font-medium text-[#1a2e3b]" style={{ fontFamily: "Inter, sans-serif" }}>{getDoctorName(appointment, t.doctor)}</p>
+                          <p className="text-xs" style={{ color: "#5a7a8a", fontFamily: "Inter, sans-serif" }}>
                             {format(new Date(appointment.appointment_date), "dd.MM.yyyy", { locale })} · {appointment.start_time?.slice(0, 5)} - {appointment.end_time?.slice(0, 5)}
                           </p>
                         </div>
-                        <Button size="sm" className="rounded-full" disabled={confirmAppointment.isPending} onClick={() => confirmAppointment.mutate(appointment.id)}>
+                        <Button
+                          size="sm"
+                          className="rounded-full text-white"
+                          style={{ backgroundColor: "#4f8fe6", fontFamily: "Inter, sans-serif" }}
+                          disabled={confirmAppointment.isPending}
+                          onClick={() => confirmAppointment.mutate(appointment.id)}
+                        >
                           {t.approve}
                         </Button>
                       </div>
@@ -191,30 +212,30 @@ export default function StaffDashboard() {
           </motion.div>
 
           <motion.div custom={6} variants={fadeUp}>
-            <Card className="shadow-card">
+            <Card className="rounded-2xl border border-[#b5d1cc] bg-white shadow-[0_2px_12px_rgba(79,143,230,0.08)]">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <CalendarDays className="h-5 w-5 text-primary" />
+                <CardTitle className="flex items-center gap-2 text-lg text-[#1a2e3b]" style={{ fontFamily: "Manrope, sans-serif" }}>
+                  <CalendarDays className="h-5 w-5" style={{ color: "#4f8fe6" }} />
                   {t.todaysAppointments}
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 {isLoading ? (
-                  <div className="space-y-3">{[1, 2, 3].map((item) => <div key={item} className="h-20 animate-pulse rounded-xl bg-muted/40" />)}</div>
+                  <div className="space-y-3">{[1, 2, 3].map((item) => <div key={item} className="h-20 animate-pulse rounded-xl" style={{ backgroundColor: "#eaf5ff" }} />)}</div>
                 ) : !data?.todayAppointments.length ? (
-                  <p className="py-6 text-center text-sm text-muted-foreground">{t.noAppointmentsToday}</p>
+                  <p className="py-6 text-center text-sm" style={{ color: "#5a7a8a", fontFamily: "Inter, sans-serif" }}>{t.noAppointmentsToday}</p>
                 ) : (
                   <div className="space-y-3">
                     {data.todayAppointments.map((appointment: any) => {
                       const status = statusConfig[appointment.status] ?? statusConfig.pending;
                       return (
-                        <div key={appointment.id} className="flex flex-col gap-3 rounded-xl bg-muted/40 p-4 transition-colors hover:bg-muted/60 sm:flex-row sm:items-center sm:justify-between">
+                        <div key={appointment.id} className="flex flex-col gap-3 rounded-xl bg-[#f4f8fd] p-4 transition-colors hover:bg-[#eaf5ff] sm:flex-row sm:items-center sm:justify-between">
                           <div className="min-w-0">
-                            <p className="text-sm font-semibold">{appointment.start_time?.slice(0, 5)} - {appointment.end_time?.slice(0, 5)}</p>
-                            <p className="truncate text-sm">{getPatientName(appointment, t.patient)}</p>
-                            <p className="text-xs text-muted-foreground">{getDoctorName(appointment, t.doctor)}</p>
+                            <p className="text-sm font-medium text-[#1a2e3b]" style={{ fontFamily: "Inter, sans-serif" }}>{appointment.start_time?.slice(0, 5)} - {appointment.end_time?.slice(0, 5)}</p>
+                            <p className="truncate text-sm font-medium text-[#1a2e3b]" style={{ fontFamily: "Inter, sans-serif" }}>{getPatientName(appointment, t.patient)}</p>
+                            <p className="text-xs" style={{ color: "#5a7a8a", fontFamily: "Inter, sans-serif" }}>{getDoctorName(appointment, t.doctor)}</p>
                           </div>
-                          <Badge variant="outline" className={cn("rounded-full border", status.color)}>{status.label}</Badge>
+                          <Badge variant="outline" className={cn("rounded-full border px-3 py-1", status.color)} style={{ fontFamily: "Inter, sans-serif" }}>{status.label}</Badge>
                         </div>
                       );
                     })}
@@ -226,32 +247,35 @@ export default function StaffDashboard() {
         </div>
 
         <motion.div custom={7} variants={fadeUp}>
-          <Card className="shadow-card">
+          <Card className="rounded-2xl border border-[#b5d1cc] bg-white shadow-[0_2px_12px_rgba(79,143,230,0.08)]">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Stethoscope className="h-5 w-5 text-primary" />
+              <CardTitle className="flex items-center gap-2 text-lg text-[#1a2e3b]" style={{ fontFamily: "Manrope, sans-serif" }}>
+                <Stethoscope className="h-5 w-5" style={{ color: "#4f8fe6" }} />
                 {t.doctorAvailabilitySummary}
               </CardTitle>
             </CardHeader>
             <CardContent>
               {isLoading ? (
-                <div className="space-y-3">{[1, 2, 3, 4].map((item) => <div key={item} className="h-16 animate-pulse rounded-xl bg-muted/40" />)}</div>
+                <div className="space-y-3">{[1, 2, 3, 4].map((item) => <div key={item} className="h-16 animate-pulse rounded-xl" style={{ backgroundColor: "#eaf5ff" }} />)}</div>
               ) : !data?.doctorAvailability.length ? (
-                <p className="py-6 text-center text-sm text-muted-foreground">{t.noDoctorsAvailable}</p>
+                <p className="py-6 text-center text-sm" style={{ color: "#5a7a8a", fontFamily: "Inter, sans-serif" }}>{t.noDoctorsAvailable}</p>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-3" style={{ maxHeight: "480px", overflowY: "auto" }}>
                   {data.doctorAvailability.map((doctor: any) => (
-                    <div key={doctor.id} className="flex flex-col gap-3 rounded-xl bg-muted/40 p-4 transition-colors hover:bg-muted/60 sm:flex-row sm:items-center sm:justify-between">
+                    <div key={doctor.id} className="flex flex-col gap-3 rounded-xl bg-[#f4f8fd] p-4 transition-colors hover:bg-[#eaf5ff] sm:flex-row sm:items-center sm:justify-between">
                       <div>
-                        <p className="text-sm font-medium">{doctor.name}</p>
-                        <p className="text-xs text-muted-foreground">{t.todaysSlotCount.replace("{{count}}", String(doctor.todaySlotCount))}</p>
+                        <p className="text-sm font-medium text-[#1a2e3b]" style={{ fontFamily: "Inter, sans-serif" }}>{doctor.name}</p>
+                        <p className="text-xs" style={{ color: "#5a7a8a", fontFamily: "Inter, sans-serif" }}>{t.todaysSlotCount.replace("{{count}}", String(doctor.todaySlotCount))}</p>
                       </div>
                       <Badge
                         variant="outline"
                         className={cn(
-                          "rounded-full border",
-                          doctor.isAvailableToday ? "bg-success/15 text-success border-success/30" : "bg-muted text-muted-foreground border-border",
+                          "rounded-full border px-3 py-1",
+                          doctor.isAvailableToday
+                            ? "border-[#b5d1cc] bg-[#e6f4ef] text-[#65a98f]"
+                            : "border-[#b5d1cc] bg-[#f4f8fd] text-[#5a7a8a]",
                         )}
+                        style={{ fontFamily: "Inter, sans-serif" }}
                       >
                         {doctor.isAvailableToday ? t.available : t.notAvailable}
                       </Badge>

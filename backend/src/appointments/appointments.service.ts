@@ -11,6 +11,7 @@ import {
   timeToMinutes,
 } from '../availability/calendar-time.utils';
 import { appointmentNotes, appointments, doctors, patients, users } from '../database/schema';
+import { EmailService } from '../email/email.service';
 import { EncryptionService } from '../encryption/encryption.service';
 import { CreateAppointmentNoteDto } from './dto/create-appointment-note.dto';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
@@ -25,6 +26,7 @@ export class AppointmentsService {
     @Inject('DRIZZLE') private readonly db: any,
     private readonly encryptionService: EncryptionService,
     private readonly availabilityService: AvailabilityService,
+    private readonly emailService: EmailService,
   ) {}
 
   async create(
@@ -74,6 +76,37 @@ export class AppointmentsService {
         notes: dto.notes,
       })
       .returning();
+
+    const notificationData = await this.getAppointmentNotificationData(
+      dto.doctorId,
+      patientId,
+      clinicId,
+    );
+
+    if (notificationData.patientEmail) {
+      void this.emailService.sendAppointmentCreated(notificationData.patientEmail, {
+        patientName: notificationData.patientName,
+        doctorName: notificationData.doctorName,
+        date: appointment.appointment_date,
+        startTime: this.formatTime(appointment.start_time),
+        endTime: this.formatTime(appointment.end_time),
+        type: appointment.type ?? '',
+      });
+    }
+
+    const staffRecipients = await this.getClinicStaffNotificationRecipients(clinicId);
+
+    for (const staffRecipient of staffRecipients) {
+      void this.emailService.sendStaffNewAppointment(staffRecipient.email, {
+        staffName: staffRecipient.staffName,
+        doctorName: notificationData.doctorName,
+        patientName: notificationData.patientName,
+        date: appointment.appointment_date,
+        startTime: this.formatTime(appointment.start_time),
+        endTime: this.formatTime(appointment.end_time),
+        type: appointment.type ?? '',
+      });
+    }
 
     return appointment;
   }
@@ -261,7 +294,7 @@ export class AppointmentsService {
   }
 
   async updateStatus(id: string, status: string, clinicId: string) {
-    await this.findById(id, clinicId);
+    const existingAppointment = await this.findById(id, clinicId);
 
     const [appointment] = await this.db
       .update(appointments)
@@ -272,11 +305,59 @@ export class AppointmentsService {
       .where(eq(appointments.id, id))
       .returning();
 
+    if (status === 'approved' || status === 'confirmed') {
+      const notificationData = await this.getAppointmentNotificationData(
+        existingAppointment.doctor_id,
+        existingAppointment.patient_id,
+        clinicId,
+      );
+
+      if (notificationData.patientEmail) {
+        void this.emailService.sendAppointmentConfirmed(notificationData.patientEmail, {
+          patientName: notificationData.patientName,
+          doctorName: notificationData.doctorName,
+          date: appointment.appointment_date,
+          startTime: this.formatTime(appointment.start_time),
+          endTime: this.formatTime(appointment.end_time),
+        });
+      }
+
+      if (notificationData.doctorEmail) {
+        void this.emailService.sendDoctorAppointmentConfirmed(
+          notificationData.doctorEmail,
+          {
+            doctorName: notificationData.doctorName,
+            patientName: notificationData.patientName,
+            date: appointment.appointment_date,
+            startTime: this.formatTime(appointment.start_time),
+            endTime: this.formatTime(appointment.end_time),
+          },
+        );
+      }
+    }
+
+    if (status === 'cancelled') {
+      const notificationData = await this.getAppointmentNotificationData(
+        existingAppointment.doctor_id,
+        existingAppointment.patient_id,
+        clinicId,
+      );
+
+      if (notificationData.patientEmail) {
+        void this.emailService.sendAppointmentCancelled(notificationData.patientEmail, {
+          patientName: notificationData.patientName,
+          doctorName: notificationData.doctorName,
+          date: appointment.appointment_date,
+          startTime: this.formatTime(appointment.start_time),
+        });
+      }
+    }
+
     return appointment;
   }
 
   async softDelete(id: string, clinicId: string) {
-    await this.findById(id, clinicId);
+    const existingAppointment = await this.findById(id, clinicId);
 
     const [appointment] = await this.db
       .update(appointments)
@@ -286,6 +367,21 @@ export class AppointmentsService {
       })
       .where(eq(appointments.id, id))
       .returning();
+
+    const notificationData = await this.getAppointmentNotificationData(
+      existingAppointment.doctor_id,
+      existingAppointment.patient_id,
+      clinicId,
+    );
+
+    if (notificationData.patientEmail) {
+      void this.emailService.sendAppointmentCancelled(notificationData.patientEmail, {
+        patientName: notificationData.patientName,
+        doctorName: notificationData.doctorName,
+        date: appointment.appointment_date,
+        startTime: this.formatTime(appointment.start_time),
+      });
+    }
 
     return appointment;
   }
@@ -564,5 +660,77 @@ export class AppointmentsService {
     if (hasOverlap) {
       throw new ForbiddenException('Doctor already has an appointment in this time range');
     }
+  }
+
+  private formatTime(value: string) {
+    return value.slice(0, 5);
+  }
+
+  private async getClinicStaffNotificationRecipients(clinicId: string) {
+    const rows = await this.db
+      .select({
+        id: users.id,
+        email: users.email,
+        firstName: users.first_name,
+        lastName: users.last_name,
+      })
+      .from(users)
+      .where(and(eq(users.clinic_id, clinicId), eq(users.role, 'staff')));
+
+    return rows
+      .filter((row: { email: string | null }) => Boolean(row.email))
+      .map((row: {
+        id: string;
+        email: string;
+        firstName: string;
+        lastName: string;
+      }) => ({
+        id: row.id,
+        email: row.email,
+        staffName: `${row.firstName} ${row.lastName}`.trim(),
+      }));
+  }
+
+  private async getAppointmentNotificationData(
+    doctorId: string,
+    patientId: string,
+    clinicId: string,
+  ) {
+    const [row] = await this.db
+      .select({
+        patientFirst: patients.first_name,
+        patientLast: patients.last_name,
+        patientEmail: patients.email,
+        doctorFirst: users.first_name,
+        doctorLast: users.last_name,
+        doctorEmail: users.email,
+      })
+      .from(patients)
+      .innerJoin(doctors, eq(doctors.id, doctorId))
+      .innerJoin(users, eq(users.id, doctors.user_id))
+      .where(eq(patients.id, patientId))
+      .limit(1);
+
+    if (!row) {
+      throw new NotFoundException('Appointment notification recipients not found');
+    }
+
+    const decryptedPatient = await this.encryptionService.decryptFields(
+      {
+        patientFirst: row.patientFirst,
+        patientLast: row.patientLast,
+        patientEmail: row.patientEmail,
+      },
+      ['patientFirst', 'patientLast', 'patientEmail'],
+      clinicId,
+    );
+
+    return {
+      patientName:
+        `${decryptedPatient.patientFirst ?? ''} ${decryptedPatient.patientLast ?? ''}`.trim(),
+      patientEmail: decryptedPatient.patientEmail as string | null,
+      doctorName: `${row.doctorFirst} ${row.doctorLast}`.trim(),
+      doctorEmail: row.doctorEmail,
+    };
   }
 }

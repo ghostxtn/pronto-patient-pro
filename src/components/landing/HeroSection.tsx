@@ -2,10 +2,17 @@ import { useEffect, useRef } from "react";
 import Lenis from "@studio-freight/lenis";
 import { useNavigate } from "react-router-dom";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useHomepagePreviewData } from "@/hooks/useHomepagePreviewData";
 
 export default function HeroSection() {
   const navigate = useNavigate();
-  const { t } = useLanguage();
+  const { lang, t } = useLanguage();
+  const previewData = useHomepagePreviewData(lang);
+  const clinic = (previewData.data as { clinic?: { name?: string | null; logo_url?: string | null; updated_at?: string | null } | null } | undefined)?.clinic;
+  const logoUrl = clinic?.logo_url
+    ? `${clinic.logo_url}?t=${new Date(clinic.updated_at ?? Date.now()).getTime()}`
+    : null;
+  const clinicName = clinic?.name ?? "MediBook";
   const rafRef = useRef<number>(0);
   const heroTotalRef = useRef<number>(1);
 
@@ -88,10 +95,18 @@ export default function HeroSection() {
         <div id="hero-content" className="hero-content">
           <div className="hero-content-shell">
             <div className="hero-logo-row">
-              <svg width="40" height="40" viewBox="0 0 40 40" fill="none" aria-hidden>
-                <rect x="4" y="16" width="32" height="8" rx="4" fill="#65a98f" />
-                <rect x="16" y="4" width="8" height="32" rx="4" fill="#4f8fe6" />
-              </svg>
+              {logoUrl ? (
+                <img
+                  src={logoUrl}
+                  alt={clinicName}
+                  style={{ width: 40, height: 40, borderRadius: 10, objectFit: "cover" }}
+                />
+              ) : (
+                <svg width="40" height="40" viewBox="0 0 40 40" fill="none" aria-hidden>
+                  <rect x="4" y="16" width="32" height="8" rx="4" fill="#65a98f" />
+                  <rect x="16" y="4" width="8" height="32" rx="4" fill="#4f8fe6" />
+                </svg>
+              )}
               <span className="hero-brand-text">{t.landingHeroBrand}</span>
             </div>
 

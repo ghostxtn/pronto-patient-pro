@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { format } from "date-fns";
@@ -25,6 +26,7 @@ export default function AdminDashboard() {
   const { lang, t } = useLanguage();
   const locale = lang === "tr" ? trLocale : enUS;
   const navigate = useNavigate();
+  const [appointmentSearch, setAppointmentSearch] = useState("");
 
   const { data: stats } = useQuery({
     queryKey: ["admin-stats"],
@@ -54,9 +56,20 @@ export default function AdminDashboard() {
           patientDisplayName: `${appointment.patient?.firstName ?? ""} ${appointment.patient?.lastName ?? ""}`.trim(),
           doctorDisplayName: `${appointment.doctor?.title ?? ""} ${appointment.doctor?.firstName ?? ""} ${appointment.doctor?.lastName ?? ""}`.trim(),
         }))
-        .sort((a: any, b: any) => new Date(b.created_at ?? b.appointment_date).getTime() - new Date(a.created_at ?? a.appointment_date).getTime())
-        .slice(0, 8);
+        .sort((a: any, b: any) =>
+          new Date(b.created_at ?? b.appointment_date).getTime() -
+          new Date(a.created_at ?? a.appointment_date).getTime(),
+        );
     },
+  });
+
+  const filteredAppointments = (recentAppointments ?? []).filter((apt: any) => {
+    if (!appointmentSearch.trim()) return true;
+    const q = appointmentSearch.toLowerCase();
+    return (
+      apt.patientDisplayName?.toLowerCase().includes(q) ||
+      apt.doctorDisplayName?.toLowerCase().includes(q)
+    );
   });
 
   const { data: myDoctorProfile } = useQuery({
@@ -151,36 +164,46 @@ export default function AdminDashboard() {
 
         <motion.div custom={6} variants={fadeUp}>
           <Card className="rounded-2xl border border-[#b5d1cc] bg-white shadow-[0_2px_12px_rgba(79,143,230,0.08)]">
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between gap-4 pb-3">
               <CardTitle className="flex items-center gap-2 text-lg text-[#1a2e3b]" style={{ fontFamily: "Manrope, sans-serif" }}>
                 <Activity className="h-5 w-5 text-[#4f8fe6]" />
                 {t.recentAppointments}
               </CardTitle>
+              <input
+                type="text"
+                placeholder="Hasta veya doktor ara..."
+                value={appointmentSearch}
+                onChange={(e) => setAppointmentSearch(e.target.value)}
+                className="h-8 w-56 rounded-lg border border-[#b5d1cc] bg-[#f4f8fd] px-3 text-sm text-[#1a2e3b] placeholder:text-[#5a7a8a] focus:outline-none focus:ring-2 focus:ring-[#4f8fe6]/30"
+                style={{ fontFamily: "Inter, sans-serif" }}
+              />
             </CardHeader>
             <CardContent>
-              {!recentAppointments?.length ? (
-                <p className="py-4 text-center text-sm text-[#5a7a8a]" style={{ fontFamily: "Inter, sans-serif" }}>
-                  {t.noAppointmentsYetAdmin}
-                </p>
-              ) : (
-                <div className="space-y-3">
-                  {recentAppointments.map((apt: any) => (
-                    <div key={apt.id} className="flex items-center justify-between gap-3 rounded-xl border border-transparent bg-[#f4f8fd] p-4 transition-colors hover:bg-[#eaf5ff]">
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-[#1a2e3b]" style={{ fontFamily: "Inter, sans-serif" }}>
-                          {apt.patientDisplayName || t.patient} → {apt.doctorDisplayName || t.doctor}
-                        </p>
-                        <p className="mt-1 text-xs text-[#5a7a8a]" style={{ fontFamily: "Inter, sans-serif" }}>
-                          {format(new Date(apt.appointment_date), "MMM d, yyyy", { locale })} · {apt.start_time?.slice(0, 5)}
-                        </p>
+              <div className="max-h-[480px] overflow-y-auto pr-1">
+                {!filteredAppointments.length ? (
+                  <p className="py-4 text-center text-sm text-[#5a7a8a]" style={{ fontFamily: "Inter, sans-serif" }}>
+                    {appointmentSearch ? "Sonuç bulunamadı." : t.noAppointmentsYetAdmin}
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {filteredAppointments.map((apt: any) => (
+                      <div key={apt.id} className="flex items-center justify-between gap-3 rounded-xl border border-transparent bg-[#f4f8fd] p-4 transition-colors hover:bg-[#eaf5ff]">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium text-[#1a2e3b]" style={{ fontFamily: "Inter, sans-serif" }}>
+                            {apt.patientDisplayName || t.patient} → {apt.doctorDisplayName || t.doctor}
+                          </p>
+                          <p className="mt-1 text-xs text-[#5a7a8a]" style={{ fontFamily: "Inter, sans-serif" }}>
+                            {format(new Date(apt.appointment_date), "MMM d, yyyy", { locale })} · {apt.start_time?.slice(0, 5)}
+                          </p>
+                        </div>
+                        <Badge variant="outline" className={`shrink-0 rounded-full border px-3 py-1 ${statusColor[apt.status] ?? ""}`} style={{ fontFamily: "Inter, sans-serif" }}>
+                          {statusLabels[apt.status] ?? apt.status}
+                        </Badge>
                       </div>
-                      <Badge variant="outline" className={`shrink-0 rounded-full border px-3 py-1 ${statusColor[apt.status] ?? ""}`} style={{ fontFamily: "Inter, sans-serif" }}>
-                        {statusLabels[apt.status] ?? apt.status}
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
-              )}
+                    ))}
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
         </motion.div>

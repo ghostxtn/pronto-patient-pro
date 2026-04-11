@@ -8,7 +8,9 @@ export default function LandingFooter() {
   const previewData = useHomepagePreviewData(lang);
   const clinic = (previewData.data as { clinic?: { name?: string | null; logo_url?: string | null } | null } | undefined)?.clinic;
   const clinicName = clinic?.name?.trim() || t.clinicFallbackName;
-  const clinicLogoUrl = clinic?.logo_url?.trim() || "";
+  const clinicLogoUrl = clinic?.logo_url
+    ? `${clinic.logo_url.trim()}?t=${new Date(clinic.updated_at ?? Date.now()).getTime()}`
+    : "";
 
   const footerColumns = useMemo(
     () => [
