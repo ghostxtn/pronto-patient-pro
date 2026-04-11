@@ -1,4 +1,10 @@
-import { ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { and, eq, gte, lte, ne } from 'drizzle-orm';
 import { AvailabilityService } from '../availability/availability.service';
 import {
@@ -7,7 +13,14 @@ import {
   rangesOverlap,
   timeToMinutes,
 } from '../availability/calendar-time.utils';
-import { appointmentNotes, appointments, doctors, patients, users } from '../database/schema';
+import {
+  appointmentNotes,
+  appointments,
+  clinics,
+  doctors,
+  patients,
+  users,
+} from '../database/schema';
 import { EncryptionService } from '../encryption/encryption.service';
 import { CreateAppointmentNoteDto } from './dto/create-appointment-note.dto';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
@@ -30,6 +43,7 @@ export class AppointmentsService {
     userRole: string,
     userId: string,
   ) {
+    const clinicSettings = await this.getClinicSettings(clinicId);
     const patientId = await this.resolvePatientId(
       dto.patientId,
       clinicId,
@@ -41,6 +55,10 @@ export class AppointmentsService {
     await this.ensurePatientInClinic(patientId, clinicId);
 
     this.validateAppointmentRange(dto.appointmentDate, dto.startTime, dto.endTime);
+    this.validateBookingWindow(
+      dto.appointmentDate,
+      clinicSettings.max_booking_days_ahead,
+    );
     await this.assertRequestedRangeIsBookable(
       clinicId,
       dto.doctorId,
@@ -65,7 +83,10 @@ export class AppointmentsService {
         appointment_date: dto.appointmentDate,
         start_time: dto.startTime,
         end_time: dto.endTime,
-        status: 'pending',
+        status:
+          clinicSettings.appointment_approval_mode === 'auto'
+            ? 'confirmed'
+            : 'pending',
         type: dto.type,
         notes: dto.notes,
       })
@@ -271,9 +292,16 @@ export class AppointmentsService {
   }
 
   async softDelete(id: string, clinicId: string) {
-    await this.findById(id, clinicId);
+    const appointment = await this.findById(id, clinicId);
+    const clinicSettings = await this.getClinicSettings(clinicId);
 
-    const [appointment] = await this.db
+    this.assertCancellationDeadline(
+      appointment.appointment_date,
+      appointment.start_time,
+      clinicSettings.cancellation_hours_before,
+    );
+
+    const [cancelledAppointment] = await this.db
       .update(appointments)
       .set({
         status: 'cancelled',
@@ -282,7 +310,7 @@ export class AppointmentsService {
       .where(eq(appointments.id, id))
       .returning();
 
-    return appointment;
+    return cancelledAppointment;
   }
 
   async createNote(
@@ -474,6 +502,46 @@ export class AppointmentsService {
     }
   }
 
+  private validateBookingWindow(
+    appointmentDate: string,
+    maxBookingDaysAhead: number,
+  ) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const requestedDate = new Date(`${appointmentDate}T00:00:00`);
+    requestedDate.setHours(0, 0, 0, 0);
+
+    const msDiff = requestedDate.getTime() - today.getTime();
+    const dayDiff = Math.floor(msDiff / (1000 * 60 * 60 * 24));
+
+    if (dayDiff > maxBookingDaysAhead) {
+      throw new BadRequestException(
+        `Appointments can only be booked up to ${maxBookingDaysAhead} days ahead`,
+      );
+    }
+  }
+
+  private assertCancellationDeadline(
+    appointmentDate: string,
+    startTime: string,
+    cancellationHoursBefore: number,
+  ) {
+    if (cancellationHoursBefore <= 0) {
+      return;
+    }
+
+    const appointmentStart = new Date(`${appointmentDate}T${startTime}`);
+    const hoursUntilAppointment =
+      (appointmentStart.getTime() - Date.now()) / (1000 * 60 * 60);
+
+    if (hoursUntilAppointment < cancellationHoursBefore) {
+      throw new BadRequestException(
+        `Appointments can only be cancelled at least ${cancellationHoursBefore} hours before start time`,
+      );
+    }
+  }
+
   private async assertRequestedRangeIsBookable(
     clinicId: string,
     doctorId: string,
@@ -550,5 +618,23 @@ export class AppointmentsService {
     if (hasOverlap) {
       throw new ForbiddenException('Doctor already has an appointment in this time range');
     }
+  }
+
+  private async getClinicSettings(clinicId: string) {
+    const [clinic] = await this.db
+      .select({
+        appointment_approval_mode: clinics.appointment_approval_mode,
+        max_booking_days_ahead: clinics.max_booking_days_ahead,
+        cancellation_hours_before: clinics.cancellation_hours_before,
+      })
+      .from(clinics)
+      .where(and(eq(clinics.id, clinicId), eq(clinics.is_active, true)))
+      .limit(1);
+
+    if (!clinic) {
+      throw new NotFoundException('Clinic not found');
+    }
+
+    return clinic;
   }
 }

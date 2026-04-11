@@ -1,21 +1,43 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
-import { doctors, specializations, users } from '../database/schema';
+import { clinics, doctors, specializations, users } from '../database/schema';
 
 @Injectable()
 export class HomepagePreviewService {
   constructor(@Inject('DRIZZLE') private readonly db: any) {}
 
   async getHomepagePreview(clinicId: string) {
-    const [doctorPreview, specialtyPreview] = await Promise.all([
+    const [clinic, doctorPreview, specialtyPreview] = await Promise.all([
+      this.getClinicPreview(clinicId),
       this.getDoctorPreview(clinicId),
       this.getSpecialtyPreview(clinicId),
     ]);
 
     return {
+      clinic,
       doctors: doctorPreview,
       specialties: specialtyPreview,
     };
+  }
+
+  private async getClinicPreview(clinicId: string) {
+    const [clinic] = await this.db
+      .select({
+        name: clinics.name,
+        phone: clinics.phone,
+        email: clinics.email,
+        address: clinics.address,
+        logo_url: clinics.logo_url,
+        default_appointment_duration: clinics.default_appointment_duration,
+        appointment_approval_mode: clinics.appointment_approval_mode,
+        max_booking_days_ahead: clinics.max_booking_days_ahead,
+        cancellation_hours_before: clinics.cancellation_hours_before,
+      })
+      .from(clinics)
+      .where(and(eq(clinics.id, clinicId), eq(clinics.is_active, true)))
+      .limit(1);
+
+    return clinic ?? null;
   }
 
   private getDoctorPreview(clinicId: string) {

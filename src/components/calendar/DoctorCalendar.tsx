@@ -127,6 +127,7 @@ interface DoctorCalendarProps {
   mode?: "staff" | "doctor";
   doctorName?: string;
   specializationName?: string;
+  defaultDuration?: number;
   calendarDate?: Date;
   onCalendarDateChange?: (date: Date) => void;
   calendarView?: View;
@@ -393,14 +394,17 @@ function normalizeMinuteRange(start: number, end: number) {
   };
 }
 
-function getSupportedSlotDuration(...candidates: Array<number | null | undefined>) {
+function getSupportedSlotDuration(
+  defaultDuration: number,
+  ...candidates: Array<number | null | undefined>
+) {
   for (const candidate of candidates) {
     if (candidate && supportedSlotDurations.includes(candidate as (typeof supportedSlotDurations)[number])) {
       return candidate;
     }
   }
 
-  return 30;
+  return defaultDuration;
 }
 
 function withTime(date: Date, time: string) {
@@ -777,6 +781,7 @@ export function DoctorCalendar({
   mode = "doctor",
   doctorName = "Doktor",
   specializationName,
+  defaultDuration = 30,
   calendarDate,
   onCalendarDateChange,
   calendarView,
@@ -786,6 +791,11 @@ export function DoctorCalendar({
   const isMobile = useIsMobile();
   const queryClient = useQueryClient();
   const calendarShellRef = useRef<HTMLDivElement | null>(null);
+  const resolvedDefaultDuration = supportedSlotDurations.includes(
+    defaultDuration as (typeof supportedSlotDurations)[number],
+  )
+    ? defaultDuration
+    : 30;
 
   const [internalCurrentDate, setInternalCurrentDate] = useState(new Date());
   const [internalView, setInternalView] = useState<View>(Views.WEEK);
@@ -1496,6 +1506,7 @@ export function DoctorCalendar({
       prefillStart,
       prefillEnd,
       slotDuration: getSupportedSlotDuration(
+        resolvedDefaultDuration,
         differenceInMinutes(end, start),
         primarySlot?.slot_duration,
         relatedSlots[0]?.slot_duration,
@@ -2104,7 +2115,7 @@ export function DoctorCalendar({
     handleSlotSelection({
       action: "select",
       start: slotStart,
-      end: addMinutes(slotStart, 30),
+      end: addMinutes(slotStart, resolvedDefaultDuration),
       slots: [slotStart],
       bounds: anchorRect ?? undefined,
       box: anchorRect ?? undefined,
@@ -2232,7 +2243,7 @@ export function DoctorCalendar({
         selectable={!isMobile || resolvedView === Views.MONTH}
         popup
         culture="tr"
-        step={30}
+        step={resolvedDefaultDuration}
         timeslots={2}
         min={setMinutes(setHours(new Date(), 6), 0)}
         max={setMinutes(setHours(new Date(), 23), 0)}
@@ -3162,6 +3173,7 @@ export function DoctorCalendar({
         }}
         mode={availabilityModal.mode}
         doctorId={doctorId}
+        defaultDuration={String(resolvedDefaultDuration)}
         initialDayOfWeek={availabilityModal.dayOfWeek}
         initialStartTime={availabilityModal.startTime}
         initialEndTime={availabilityModal.endTime}

@@ -40,6 +40,12 @@ export default function DoctorSchedule() {
     enabled: !!user,
   });
 
+  const { data: clinic } = useQuery({
+    queryKey: ["clinic", user?.clinic_id],
+    queryFn: async () => api.clinics.get(user!.clinic_id!),
+    enabled: Boolean(user?.clinic_id),
+  });
+
   useEffect(() => {
     console.debug("[doctor][schedule] query state", {
       userId: user?.id,
@@ -67,7 +73,11 @@ export default function DoctorSchedule() {
         </motion.div>
 
         {doctorRecord ? (
-          <DoctorCalendar doctorId={doctorRecord.id} mode="doctor" />
+          <DoctorCalendar
+            doctorId={doctorRecord.id}
+            mode="doctor"
+            defaultDuration={clinic?.default_appointment_duration ?? 30}
+          />
         ) : isError ? (
           <Alert className="rounded-2xl">
             <AlertTitle>Doctor schedule could not be loaded</AlertTitle>
