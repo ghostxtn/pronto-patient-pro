@@ -163,7 +163,6 @@ interface AvailabilityDraftPreview {
   dayOfWeek: number;
   startTime: string;
   endTime: string;
-  slotDuration: number;
 }
 
 interface AvailabilitySelectionTarget {
@@ -1367,13 +1366,8 @@ export function DoctorCalendar({
       }
 
       const start = withTime(baseDate, availabilityDraft.startTime);
-      const endCandidate = availabilityDraft.endTime
-        ? withTime(baseDate, availabilityDraft.endTime)
-        : addMinutes(start, availabilityDraft.slotDuration);
-      const end =
-        endCandidate > start
-          ? endCandidate
-          : addMinutes(start, availabilityDraft.slotDuration);
+      const endCandidate = withTime(baseDate, availabilityDraft.endTime);
+      const end = endCandidate > start ? endCandidate : start;
 
       return {
         id: "availability-draft-preview",
@@ -3173,11 +3167,9 @@ export function DoctorCalendar({
         }}
         mode={availabilityModal.mode}
         doctorId={doctorId}
-        defaultDuration={String(resolvedDefaultDuration)}
         initialDayOfWeek={availabilityModal.dayOfWeek}
         initialStartTime={availabilityModal.startTime}
         initialEndTime={availabilityModal.endTime}
-        initialSlotDuration={availabilityModal.slotDuration}
         slot={availabilityModal.slot}
         onDraftChange={setAvailabilityDraft}
         onSaved={() => {
