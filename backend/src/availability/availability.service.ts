@@ -7,6 +7,7 @@ import {
 import { and, eq, inArray, ne } from 'drizzle-orm';
 import {
   appointments,
+  clinics,
   doctorAvailability,
   doctorAvailabilityOverrides,
   doctors,
@@ -30,6 +31,8 @@ type AvailabilityContext = {
   slotEntries: SlotEntry[];
 };
 
+type PublicSlotEntry = Pick<SlotEntry, 'startTime' | 'endTime' | 'duration'>;
+
 @Injectable()
 export class AvailabilityService {
   constructor(@Inject('DRIZZLE') private readonly db: any) {}
@@ -38,9 +41,13 @@ export class AvailabilityService {
     clinicId: string,
     doctorId: string,
     date: string,
-  ): Promise<string[]> {
+  ): Promise<PublicSlotEntry[]> {
     const slotEntries = await this.getBookableSlotEntries(clinicId, doctorId, date);
-    return slotEntries.map((slotEntry) => slotEntry.startTime);
+    return slotEntries.map(({ startTime, endTime, duration }) => ({
+      startTime,
+      endTime,
+      duration,
+    }));
   }
 
   async create(dto: CreateAvailabilityDto, clinicId: string) {
@@ -210,6 +217,8 @@ export class AvailabilityService {
     } = {},
   ): Promise<AvailabilityContext> {
     await this.ensureDoctorInClinic(doctorId, clinicId);
+    const clinicDefaultDuration =
+      await this.getClinicDefaultAppointmentDurationForDoctor(doctorId);
 
     const dayOfWeek = new Date(`${date}T00:00:00`).getDay();
     const availabilityBlocks = await this.db
@@ -285,7 +294,11 @@ export class AvailabilityService {
 
         rawAvailabilityRanges.push(segment);
         rawSlotEntries.push(
-          ...this.generateSlotEntries(segment.start, segment.end, block.slot_duration ?? 30),
+          ...this.generateSlotEntries(
+            segment.start,
+            segment.end,
+            clinicDefaultDuration ?? block.slot_duration ?? 30,
+          ),
         );
       }
     }
@@ -362,6 +375,19 @@ export class AvailabilityService {
     if (!doctor) {
       throw new NotFoundException('Doctor not found in this clinic');
     }
+  }
+
+  private async getClinicDefaultAppointmentDurationForDoctor(doctorId: string) {
+    const [clinic] = await this.db
+      .select({
+        default_appointment_duration: clinics.default_appointment_duration,
+      })
+      .from(doctors)
+      .innerJoin(clinics, eq(doctors.clinic_id, clinics.id))
+      .where(eq(doctors.id, doctorId))
+      .limit(1);
+
+    return clinic?.default_appointment_duration ?? null;
   }
 
   private validateAvailabilityRange(startTime: string, endTime: string) {

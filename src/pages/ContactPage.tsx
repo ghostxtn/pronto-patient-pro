@@ -16,6 +16,7 @@ type ClinicContactRecord = {
   address?: string | null;
   phone?: string | null;
   email?: string | null;
+  logo_url?: string | null;
 };
 
 export default function ContactPage() {
@@ -25,7 +26,7 @@ export default function ContactPage() {
 
   const clinicName = clinic?.name?.trim() || t.clinicFallbackName;
   const clinicAddress = clinic?.address?.trim() || t.clinicFallbackAddress;
-  const clinicPhone = clinic?.phone?.trim() || "+90 (212) 000 00 00";
+  const clinicPhone = clinic?.phone?.trim() || "";
   const clinicEmail = clinic?.email?.trim() || t.clinicFallbackEmail;
 
   return (

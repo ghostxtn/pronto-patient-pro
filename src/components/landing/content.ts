@@ -115,7 +115,7 @@ const sharedImages = {
 
 const trContent: LandingContent = {
   brand: {
-    name: "MediBook",
+    name: "",
     label: "Koordinasyon destekli klinik bakım",
   },
   navigation: [
@@ -233,8 +233,8 @@ const trContent: LandingContent = {
     title: "Kliniğe ulaşım, çalışma saatleri ve temel erişim bilgileri tek yerde.",
     description:
       "Telefon, kısa adres, temel erişim notları ve güncel çalışma bilgilerine tek noktadan ulaşın.",
-    phone: "+90 (212) 000 00 00",
-    address: "Örnek Mahallesi, Sağlık Caddesi No:1, İstanbul",
+    phone: "",
+    address: "",
     hours: "Hafta içi 09:00 - 18:00 · Cumartesi 09:00 - 14:00",
     accessNote: "Engelsiz giriş ve asansör erişimi mevcuttur.",
     primaryAction: {
@@ -315,13 +315,13 @@ const trContent: LandingContent = {
       { label: "Kullanım Koşulları", href: "/legal/terms-of-use" },
       { label: "İletişim", href: "/contact" },
     ],
-    copyright: "(c) 2026 MediBook. Tüm hakları saklıdır.",
+    copyright: "(c) 2026 . Tüm hakları saklıdır.",
   },
 };
 
 const enContent: LandingContent = {
   brand: {
-    name: "MediBook",
+    name: "",
     label: "Coordination-led clinic care",
   },
   navigation: [
@@ -438,8 +438,8 @@ const enContent: LandingContent = {
     title: "Clinic access, working hours, and key information in one place.",
     description:
       "Phone, address, accessibility notes, and current working hours are available from a single point.",
-    phone: "+90 (212) 000 00 00",
-    address: "Ornek Mahallesi, Saglik Caddesi No:1, Istanbul",
+    phone: "",
+    address: "",
     hours: "Weekdays 09:00 - 18:00 · Saturday 09:00 - 14:00",
     accessNote: "Step-free entrance and elevator access available.",
     primaryAction: {
@@ -521,7 +521,7 @@ const enContent: LandingContent = {
       { label: "Terms of Use", href: "/legal/terms-of-use" },
       { label: "Contact", href: "/contact" },
     ],
-    copyright: "© 2026 MediBook. All rights reserved.",
+    copyright: "© 2026 . All rights reserved.",
   },
 };
 

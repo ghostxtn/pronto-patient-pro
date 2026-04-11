@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
-import { format, addMinutes, parse, isBefore, isToday } from "date-fns";
+import { format, isBefore, isToday } from "date-fns";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import {
@@ -39,10 +39,16 @@ export default function DoctorProfile() {
 
   const dayNames = [t.sunday, t.monday, t.tuesday, t.wednesday, t.thursday, t.friday, t.saturday];
 
+  type SlotOption = {
+    startTime: string;
+    endTime: string;
+    duration: number;
+  };
+
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
-  const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
+  const [selectedSlot, setSelectedSlot] = useState<SlotOption | null>(null);
   const [notes, setNotes] = useState("");
-  const [slots, setSlots] = useState<string[]>([]);
+  const [slots, setSlots] = useState<SlotOption[]>([]);
 
   const { data: doctor, isLoading } = useQuery({
     queryKey: ["doctor", id],
@@ -76,15 +82,12 @@ export default function DoctorProfile() {
   const bookMutation = useMutation({
     mutationFn: async () => {
       if (!user || !selectedDate || !selectedSlot || !id) throw new Error("Missing data");
-      const startTime = selectedSlot;
-      const endParsed = addMinutes(parse(selectedSlot, "HH:mm", new Date()), 30);
-      const endTime = format(endParsed, "HH:mm");
       return api.appointments.create({
         patientId: user.id,
         doctorId: id,
         appointmentDate: format(selectedDate, "yyyy-MM-dd"),
-        startTime: startTime,
-        endTime: endTime,
+        startTime: selectedSlot.startTime,
+        endTime: selectedSlot.endTime,
         notes: notes || null,
       });
     },
@@ -207,7 +210,7 @@ export default function DoctorProfile() {
                 </div>
                 <div>
                   <h3 className="text-sm font-semibold mb-3" style={{ color: "#1a2e3b", fontWeight: 600, fontSize: "0.875rem", marginBottom: "12px" }}>{selectedDate ? `${t.availableSlots} — ${format(selectedDate, "EEE, MMM d")}` : t.selectDateFirst}</h3>
-                  {selectedDate ? (availableSlots.length > 0 ? (<div className="grid grid-cols-3 gap-2">{availableSlots.map((slot) => (<button key={slot} onClick={() => setSelectedSlot(slot)} style={{ padding: "8px", borderRadius: "10px", fontSize: "0.85rem", fontWeight: 500, border: `1.5px solid ${selectedSlot === slot ? "#4f8fe6" : "#b5d1cc"}`, background: selectedSlot === slot ? "#eaf5ff" : "white", color: selectedSlot === slot ? "#4f8fe6" : "#1a2e3b", cursor: "pointer", transition: "all 0.15s" }}>{slot}</button>))}</div>) : (<div className="text-center py-8 text-muted-foreground text-sm">{t.noSlotsAvailable}</div>)) : (<div className="text-center py-8 text-muted-foreground text-sm">{t.pickDate}</div>)}
+                  {selectedDate ? (availableSlots.length > 0 ? (<div className="grid grid-cols-3 gap-2">{availableSlots.map((slot) => (<button key={slot.startTime} onClick={() => setSelectedSlot(slot)} style={{ padding: "8px", borderRadius: "10px", fontSize: "0.85rem", fontWeight: 500, border: `1.5px solid ${selectedSlot?.startTime === slot.startTime ? "#4f8fe6" : "#b5d1cc"}`, background: selectedSlot?.startTime === slot.startTime ? "#eaf5ff" : "white", color: selectedSlot?.startTime === slot.startTime ? "#4f8fe6" : "#1a2e3b", cursor: "pointer", transition: "all 0.15s" }}>{slot.startTime}</button>))}</div>) : (<div className="text-center py-8 text-muted-foreground text-sm">{t.noSlotsAvailable}</div>)) : (<div className="text-center py-8 text-muted-foreground text-sm">{t.pickDate}</div>)}
                 </div>
               </div>
             </div>
@@ -222,7 +225,7 @@ export default function DoctorProfile() {
                     <span className="text-muted-foreground" style={{ color: "#5a7a8a", fontSize: "0.875rem" }}>{t.doctor}</span><span className="font-medium" style={{ color: "#1a2e3b", fontWeight: 600, fontSize: "0.875rem" }}>Dr. {profile?.full_name}</span>
                     <span className="text-muted-foreground" style={{ color: "#5a7a8a", fontSize: "0.875rem" }}>{t.specialty}</span><span className="font-medium" style={{ color: "#1a2e3b", fontWeight: 600, fontSize: "0.875rem" }}>{spec?.name}</span>
                     <span className="text-muted-foreground" style={{ color: "#5a7a8a", fontSize: "0.875rem" }}>{t.date}</span><span className="font-medium" style={{ color: "#1a2e3b", fontWeight: 600, fontSize: "0.875rem" }}>{format(selectedDate, "EEEE, MMMM d, yyyy")}</span>
-                    <span className="text-muted-foreground" style={{ color: "#5a7a8a", fontSize: "0.875rem" }}>{t.time}</span><span className="font-medium" style={{ color: "#1a2e3b", fontWeight: 600, fontSize: "0.875rem" }}>{selectedSlot} — {format(addMinutes(parse(selectedSlot, "HH:mm", new Date()), 30), "HH:mm")}</span>
+                    <span className="text-muted-foreground" style={{ color: "#5a7a8a", fontSize: "0.875rem" }}>{t.time}</span><span className="font-medium" style={{ color: "#1a2e3b", fontWeight: 600, fontSize: "0.875rem" }}>{selectedSlot.startTime} — {selectedSlot.endTime}</span>
                     <span className="text-muted-foreground" style={{ color: "#5a7a8a", fontSize: "0.875rem" }}>{t.fee}</span><span className="font-medium" style={{ color: "#1a2e3b", fontWeight: 600, fontSize: "0.875rem" }}>{doctor.consultation_fee ?? doctor.consultationFee ?? "-"}</span>
                   </div>
                 </div>

@@ -320,6 +320,14 @@ const api = {
         method: "PATCH",
         body: JSON.stringify(data),
       }),
+    uploadLogo: (id: string, file: File) => {
+      const formData = new FormData();
+      formData.append("logo", file);
+      return request<any>(`/clinics/${id}/logo`, {
+        method: "PATCH",
+        body: formData,
+      });
+    },
   },
   profiles: {
     me: () => request<any>("/profiles/me"),
@@ -333,6 +341,17 @@ const api = {
   homepagePreview: {
     get: () =>
       request<{
+        clinic?: {
+          name?: string | null;
+          phone?: string | null;
+          email?: string | null;
+          address?: string | null;
+          logo_url?: string | null;
+          default_appointment_duration?: number | null;
+          appointment_approval_mode?: "auto" | "manual" | null;
+          max_booking_days_ahead?: number | null;
+          cancellation_hours_before?: number | null;
+        } | null;
         doctors: Array<{
           id: string;
           firstName?: string | null;
@@ -433,7 +452,7 @@ const api = {
   availability: {
     listByDoctor: (doctorId: string) => request<any[]>(`/availability/${doctorId}`),
     getDoctorSlots: (doctorId: string, date: string) =>
-      request<string[]>(
+      request<Array<{ startTime: string; endTime: string; duration: number }>>(
         `/availability/slots?doctor_id=${encodeURIComponent(doctorId)}&date=${encodeURIComponent(date)}`,
         { omitAuth: true },
       ),

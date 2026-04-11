@@ -2,6 +2,7 @@ import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
 import { clinics } from '../database/schema';
 import { CreateClinicDto } from './dto/create-clinic.dto';
+import { UpdateClinicDto } from './dto/update-clinic.dto';
 
 @Injectable()
 export class ClinicsService {
@@ -33,11 +34,28 @@ export class ClinicsService {
     return clinic;
   }
 
-  async update(id: string, dto: Partial<CreateClinicDto>) {
+  async update(id: string, dto: UpdateClinicDto) {
     const [clinic] = await this.db
       .update(clinics)
       .set({
         ...dto,
+        updated_at: new Date(),
+      })
+      .where(eq(clinics.id, id))
+      .returning();
+
+    if (!clinic) {
+      throw new NotFoundException('Clinic not found');
+    }
+
+    return clinic;
+  }
+
+  async updateLogoUrl(id: string, logoUrl: string) {
+    const [clinic] = await this.db
+      .update(clinics)
+      .set({
+        logo_url: logoUrl,
         updated_at: new Date(),
       })
       .where(eq(clinics.id, id))

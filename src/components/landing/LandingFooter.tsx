@@ -1,9 +1,14 @@
 import { useMemo } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useHomepagePreviewData } from "@/hooks/useHomepagePreviewData";
 import SmartLink from "./SmartLink";
 
 export default function LandingFooter() {
-  const { t } = useLanguage();
+  const { lang, t } = useLanguage();
+  const previewData = useHomepagePreviewData(lang);
+  const clinic = (previewData.data as { clinic?: { name?: string | null; logo_url?: string | null } | null } | undefined)?.clinic;
+  const clinicName = clinic?.name?.trim() || t.clinicFallbackName;
+  const clinicLogoUrl = clinic?.logo_url?.trim() || "";
 
   const footerColumns = useMemo(
     () => [
@@ -64,17 +69,25 @@ export default function LandingFooter() {
         >
           <div className="max-w-md">
             <div className="flex items-center gap-3">
-              <svg width="38" height="38" viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">
-                <rect x="0" y="13" width="44" height="18" rx="9" fill="rgb(var(--homepage-support))" />
-                <rect x="13" y="0" width="18" height="22" rx="9" fill="rgb(var(--homepage-brand))" />
-                <rect x="13" y="22" width="18" height="22" rx="9" fill="rgb(var(--homepage-brand))" />
-              </svg>
+              {clinicLogoUrl ? (
+                <img
+                  src={clinicLogoUrl}
+                  alt={clinicName}
+                  className="h-[38px] w-[38px] rounded-xl object-cover"
+                />
+              ) : (
+                <svg width="38" height="38" viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg">
+                  <rect x="0" y="13" width="44" height="18" rx="9" fill="rgb(var(--homepage-support))" />
+                  <rect x="13" y="0" width="18" height="22" rx="9" fill="rgb(var(--homepage-brand))" />
+                  <rect x="13" y="22" width="18" height="22" rx="9" fill="rgb(var(--homepage-brand))" />
+                </svg>
+              )}
               <div>
                 <p
                   className="font-display text-[1.8rem] leading-none tracking-tight"
                   style={{ color: "hsl(var(--homepage-footer-text))" }}
                 >
-                  MediBook
+                  {clinicName}
                 </p>
                 <p
                   className="mt-1 text-xs uppercase tracking-[0.22em]"

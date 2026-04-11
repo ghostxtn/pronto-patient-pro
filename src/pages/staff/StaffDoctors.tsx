@@ -5,6 +5,7 @@ import { Views, type View } from "react-big-calendar";
 import { CalendarDays, ChevronRight, PanelLeftOpen, Search, Stethoscope } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import { DoctorCalendar } from "@/components/calendar/DoctorCalendar";
+import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import api from "@/services/api";
 import { Badge } from "@/components/ui/badge";
@@ -366,6 +367,7 @@ function StaffSchedulerRail({
 
 export default function StaffDoctors() {
   const { t } = useLanguage();
+  const { user } = useAuth();
   const previousCompactLayoutRef = useRef(false);
   const [isCompactLayout, setIsCompactLayout] = useState(false);
   const [selectedDoctorId, setSelectedDoctorId] = useState<string | null>(null);
@@ -400,6 +402,12 @@ export default function StaffDoctors() {
         todaySlotCount: 0,
         isAvailableToday: false,
       })),
+  });
+
+  const { data: clinic } = useQuery({
+    queryKey: ["clinic", user?.clinic_id],
+    queryFn: async () => api.clinics.get(user!.clinic_id!),
+    enabled: Boolean(user?.clinic_id),
   });
 
   useEffect(() => {
@@ -583,6 +591,7 @@ export default function StaffDoctors() {
                 mode="staff"
                 doctorName={getDoctorDisplayName(selectedDoctor, t.doctor)}
                 specializationName={selectedDoctor.specialization?.name ?? t.specialtyNotSpecified}
+                defaultDuration={clinic?.default_appointment_duration ?? 30}
                 calendarDate={calendarDate}
                 onCalendarDateChange={handleCalendarDateChange}
                 calendarView={calendarView}

@@ -1,7 +1,7 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
-import { Loader2, Plus, Shield, Trash2 } from "lucide-react";
+import { Building2, Loader2, Plus, Shield, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -13,6 +13,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 
 const fadeUp = {
   hidden: { opacity: 0, y: 20 },
@@ -28,16 +30,44 @@ export default function ClinicSettings() {
   const { user } = useAuth();
   const qc = useQueryClient();
   const isOwner = user?.role === "owner";
+  const canManageClinic = isOwner || user?.role === "admin";
   const [showAddSpec, setShowAddSpec] = useState(false);
   const [specName, setSpecName] = useState("");
   const [specDesc, setSpecDesc] = useState("");
+  const [clinicName, setClinicName] = useState("");
+  const [clinicPhone, setClinicPhone] = useState("");
+  const [clinicEmail, setClinicEmail] = useState("");
+  const [clinicAddress, setClinicAddress] = useState("");
+  const [defaultAppointmentDuration, setDefaultAppointmentDuration] = useState("30");
+  const [appointmentApprovalMode, setAppointmentApprovalMode] = useState("manual");
+  const [maxBookingDaysAhead, setMaxBookingDaysAhead] = useState("60");
+  const [cancellationHoursBefore, setCancellationHoursBefore] = useState("24");
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const clinicLogoInputRef = useRef<HTMLInputElement | null>(null);
   const [uploadingSpecIds, setUploadingSpecIds] = useState<Record<string, boolean>>({});
+
+  const { data: clinic, isLoading: isClinicLoading } = useQuery({
+    queryKey: ["clinic", user?.clinic_id],
+    queryFn: async () => api.clinics.get(user!.clinic_id!),
+    enabled: Boolean(user?.clinic_id && canManageClinic),
+  });
 
   const { data: specializations } = useQuery({
     queryKey: ["specializations"],
     queryFn: async () => api.specializations.list(),
+    enabled: canManageClinic,
   });
+
+  useEffect(() => {
+    setClinicName(clinic?.name ?? "");
+    setClinicPhone(clinic?.phone ?? "");
+    setClinicEmail(clinic?.email ?? "");
+    setClinicAddress(clinic?.address ?? "");
+    setDefaultAppointmentDuration(String(clinic?.default_appointment_duration ?? 30));
+    setAppointmentApprovalMode(clinic?.appointment_approval_mode ?? "manual");
+    setMaxBookingDaysAhead(String(clinic?.max_booking_days_ahead ?? 60));
+    setCancellationHoursBefore(String(clinic?.cancellation_hours_before ?? 24));
+  }, [clinic]);
 
   const addSpec = useMutation({
     mutationFn: async () => api.specializations.create({ name: specName, description: specDesc || undefined }),
@@ -60,6 +90,40 @@ export default function ClinicSettings() {
     onError: () => toast.error(t.specDeleteFailed),
   });
 
+  const saveClinicProfile = useMutation({
+    mutationFn: async () =>
+      api.clinics.update(user!.clinic_id!, {
+        name: clinicName.trim(),
+        phone: clinicPhone.trim() || undefined,
+        email: clinicEmail.trim() || undefined,
+        address: clinicAddress.trim() || undefined,
+      }),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ["clinic", user?.clinic_id] });
+      toast.success(t.settingsSaved);
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : "Klinik bilgileri kaydedilemedi");
+    },
+  });
+
+  const saveAppointmentSettings = useMutation({
+    mutationFn: async () =>
+      api.clinics.update(user!.clinic_id!, {
+        default_appointment_duration: Number(defaultAppointmentDuration),
+        appointment_approval_mode: appointmentApprovalMode,
+        max_booking_days_ahead: Number(maxBookingDaysAhead),
+        cancellation_hours_before: Number(cancellationHoursBefore),
+      }),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ["clinic", user?.clinic_id] });
+      toast.success(t.settingsSaved);
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : "Randevu ayarlari kaydedilemedi");
+    },
+  });
+
   const handleSpecImageUpload = async (specId: string, file?: File) => {
     if (!file) return;
 
@@ -76,6 +140,18 @@ export default function ClinicSettings() {
     }
   };
 
+  const handleClinicLogoUpload = async (file?: File) => {
+    if (!file || !user?.clinic_id) return;
+
+    try {
+      await api.clinics.uploadLogo(user.clinic_id, file);
+      await qc.invalidateQueries({ queryKey: ["clinic", user.clinic_id] });
+      toast.success("Klinik logosu guncellendi");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Klinik logosu yuklenemedi");
+    }
+  };
+
   return (
     <AppLayout>
       <motion.div initial="hidden" animate="visible" className="space-y-6">
@@ -84,8 +160,212 @@ export default function ClinicSettings() {
           <p className="text-muted-foreground mt-1" style={{ color: "#5a7a8a" }}>{t.clinicSettingsDesc}</p>
         </motion.div>
 
-        {(isOwner || user?.role === "admin") && (
+        {canManageClinic && (
           <motion.div custom={1} variants={fadeUp}>
+            <Card style={{ background: "white", border: "1px solid #b5d1cc", borderRadius: "16px", boxShadow: "0 2px 12px rgba(79,143,230,0.08)" }}>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg" style={{ color: "#1a2e3b", fontFamily: "Manrope, sans-serif", fontWeight: 700 }}>
+                  <Building2 className="h-5 w-5" style={{ color: "#4f8fe6" }} />
+                  Klinik Profili
+                </CardTitle>
+                <CardDescription style={{ color: "#5a7a8a" }}>
+                  Klinik adi, iletisim bilgileri, adres ve logo burada yonetilir.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="flex flex-col gap-4 md:flex-row md:items-start">
+                  <div className="space-y-3">
+                    <input
+                      ref={clinicLogoInputRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      className="hidden"
+                      onChange={(event) => {
+                        const file = event.target.files?.[0];
+                        void handleClinicLogoUpload(file);
+                        event.target.value = "";
+                      }}
+                    />
+                    <button
+                      type="button"
+                      className="flex h-28 w-28 items-center justify-center overflow-hidden rounded-[20px] border border-dashed border-[#b5d1cc] bg-[#f4f8fd] transition-colors"
+                      onClick={() => isOwner && clinicLogoInputRef.current?.click()}
+                    >
+                      {clinic?.logo_url ? (
+                        <img
+                          src={clinic.logo_url}
+                          alt={clinic.name ?? "Klinik logosu"}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex flex-col items-center gap-2 px-3 text-center text-xs text-[#5a7a8a]">
+                          <Upload className="h-5 w-5" />
+                          Logo yok
+                        </div>
+                      )}
+                    </button>
+                    <div className="space-y-1 text-xs text-[#5a7a8a]">
+                      <p>JPEG, PNG veya WebP</p>
+                      <p>{isOwner ? "Logoyu degistirmek icin tiklayin" : "Logo yukleme sadece owner rolunde acik"}</p>
+                    </div>
+                  </div>
+
+                  <div className="grid flex-1 gap-4 md:grid-cols-2">
+                    <div className="space-y-2 md:col-span-2">
+                      <Label htmlFor="clinic-name">Klinik Adi</Label>
+                      <Input
+                        id="clinic-name"
+                        value={clinicName}
+                        onChange={(event) => setClinicName(event.target.value)}
+                        placeholder="Klinik adi"
+                        className="rounded-xl"
+                        disabled={isClinicLoading}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="clinic-phone">{t.phone}</Label>
+                      <Input
+                        id="clinic-phone"
+                        value={clinicPhone}
+                        onChange={(event) => setClinicPhone(event.target.value)}
+                        placeholder={t.phone}
+                        className="rounded-xl"
+                        disabled={isClinicLoading}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="clinic-email">{t.email}</Label>
+                      <Input
+                        id="clinic-email"
+                        value={clinicEmail}
+                        onChange={(event) => setClinicEmail(event.target.value)}
+                        placeholder={t.email}
+                        className="rounded-xl"
+                        disabled={isClinicLoading}
+                      />
+                    </div>
+                    <div className="space-y-2 md:col-span-2">
+                      <Label htmlFor="clinic-address">{t.address}</Label>
+                      <Textarea
+                        id="clinic-address"
+                        value={clinicAddress}
+                        onChange={(event) => setClinicAddress(event.target.value)}
+                        placeholder={t.address}
+                        className="min-h-[110px] rounded-xl"
+                        disabled={isClinicLoading}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex justify-end">
+                  <Button
+                    onClick={() => saveClinicProfile.mutate()}
+                    disabled={!clinicName.trim() || saveClinicProfile.isPending || isClinicLoading}
+                    style={{ background: "#4f8fe6", color: "white", borderRadius: "10px" }}
+                  >
+                    {saveClinicProfile.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    {t.saveSettings}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+
+        {canManageClinic && (
+          <motion.div custom={2} variants={fadeUp}>
+            <Card style={{ background: "white", border: "1px solid #b5d1cc", borderRadius: "16px", boxShadow: "0 2px 12px rgba(79,143,230,0.08)" }}>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg" style={{ color: "#1a2e3b", fontFamily: "Manrope, sans-serif", fontWeight: 700 }}>
+                  <Building2 className="h-5 w-5" style={{ color: "#4f8fe6" }} />
+                  Randevu Ayarlari
+                </CardTitle>
+                <CardDescription style={{ color: "#5a7a8a" }}>
+                  Randevu sureleri, onay akisi, ileri tarih siniri ve iptal deadline burada yonetilir.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="default-appointment-duration">Varsayilan randevu suresi</Label>
+                    <Select value={defaultAppointmentDuration} onValueChange={setDefaultAppointmentDuration}>
+                      <SelectTrigger id="default-appointment-duration" className="rounded-xl">
+                        <SelectValue placeholder="Sure secin" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {["15", "20", "30", "45", "60", "90"].map((option) => (
+                          <SelectItem key={option} value={option}>
+                            {option} dk
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="appointment-approval-mode">Onay modu</Label>
+                    <Select value={appointmentApprovalMode} onValueChange={setAppointmentApprovalMode}>
+                      <SelectTrigger id="appointment-approval-mode" className="rounded-xl">
+                        <SelectValue placeholder="Onay modunu secin" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="auto">Otomatik Onayla</SelectItem>
+                        <SelectItem value="manual">Manuel Onay</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="max-booking-days-ahead">Max rezervasyon gunu</Label>
+                    <Input
+                      id="max-booking-days-ahead"
+                      type="number"
+                      min={1}
+                      max={365}
+                      value={maxBookingDaysAhead}
+                      onChange={(event) => setMaxBookingDaysAhead(event.target.value)}
+                      className="rounded-xl"
+                      disabled={isClinicLoading}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="cancellation-hours-before">Iptal deadline (saat)</Label>
+                    <Input
+                      id="cancellation-hours-before"
+                      type="number"
+                      min={0}
+                      max={168}
+                      value={cancellationHoursBefore}
+                      onChange={(event) => setCancellationHoursBefore(event.target.value)}
+                      className="rounded-xl"
+                      disabled={isClinicLoading}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end">
+                  <Button
+                    onClick={() => saveAppointmentSettings.mutate()}
+                    disabled={
+                      saveAppointmentSettings.isPending ||
+                      isClinicLoading ||
+                      !defaultAppointmentDuration ||
+                      !appointmentApprovalMode ||
+                      !maxBookingDaysAhead ||
+                      !cancellationHoursBefore
+                    }
+                    style={{ background: "#4f8fe6", color: "white", borderRadius: "10px" }}
+                  >
+                    {saveAppointmentSettings.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    {t.saveSettings}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
+
+        {canManageClinic && (
+          <motion.div custom={3} variants={fadeUp}>
             <Card style={{ background: "white", border: "1px solid #b5d1cc", borderRadius: "16px", boxShadow: "0 2px 12px rgba(79,143,230,0.08)" }}>
               <CardHeader className="flex flex-row items-center justify-between">
                 <div>

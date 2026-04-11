@@ -34,6 +34,17 @@ export type HomepagePreviewSpecialtyRecord = {
 };
 
 export type HomepagePreviewResponse = {
+  clinic?: {
+    name?: string | null;
+    phone?: string | null;
+    email?: string | null;
+    address?: string | null;
+    logo_url?: string | null;
+    default_appointment_duration?: number | null;
+    appointment_approval_mode?: "auto" | "manual" | null;
+    max_booking_days_ahead?: number | null;
+    cancellation_hours_before?: number | null;
+  } | null;
   doctors: HomepagePreviewDoctorRecord[];
   specialties: HomepagePreviewSpecialtyRecord[];
 };
