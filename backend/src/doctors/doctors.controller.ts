@@ -35,7 +35,7 @@ export class DoctorsController {
   }
 
   @Post('onboard')
-  @Roles('admin')
+  @Roles('owner', 'admin')
   onboardDoctor(
     @Body() dto: OnboardDoctorDto,
     @CurrentUser() user: { clinicId: string },
