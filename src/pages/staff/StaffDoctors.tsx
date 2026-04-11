@@ -370,6 +370,9 @@ export default function StaffDoctors() {
   const { user } = useAuth();
   const previousCompactLayoutRef = useRef(false);
   const [isCompactLayout, setIsCompactLayout] = useState(false);
+  const [doctorAvailabilityMap, setDoctorAvailabilityMap] = useState<
+    Record<string, Pick<DoctorSummary, "todaySlotCount" | "isAvailableToday">>
+  >({});
   const [selectedDoctorId, setSelectedDoctorId] = useState<string | null>(null);
   const [isDoctorDrawerOpen, setIsDoctorDrawerOpen] = useState(false);
   const [calendarDate, setCalendarDate] = useState(new Date());
@@ -381,6 +384,7 @@ export default function StaffDoctors() {
   const [searchValue, setSearchValue] = useState("");
   const [filterMode, setFilterMode] = useState<DoctorFilter>("all");
   const todayDayOfWeek = new Date().getDay();
+  const todayDateString = new Date().toISOString().slice(0, 10);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia("(max-width: 1023px)");
@@ -403,6 +407,58 @@ export default function StaffDoctors() {
         isAvailableToday: false,
       })),
   });
+
+  useEffect(() => {
+    let isCancelled = false;
+
+    setDoctorAvailabilityMap({});
+
+    if (doctors.length === 0) {
+      return;
+    }
+
+    void Promise.allSettled(
+      doctors.map(async (doctor) => {
+        const slots = await api.availability.getDoctorSlots(doctor.id, todayDateString);
+        return {
+          doctorId: doctor.id,
+          todaySlotCount: slots.length,
+          isAvailableToday: slots.length > 0,
+        };
+      }),
+    ).then((results) => {
+      if (isCancelled) {
+        return;
+      }
+
+      const nextAvailabilityMap = doctors.reduce<
+        Record<string, Pick<DoctorSummary, "todaySlotCount" | "isAvailableToday">>
+      >((accumulator, doctor) => {
+        accumulator[doctor.id] = {
+          todaySlotCount: 0,
+          isAvailableToday: false,
+        };
+        return accumulator;
+      }, {});
+
+      for (const result of results) {
+        if (result.status !== "fulfilled") {
+          continue;
+        }
+
+        nextAvailabilityMap[result.value.doctorId] = {
+          todaySlotCount: result.value.todaySlotCount,
+          isAvailableToday: result.value.isAvailableToday,
+        };
+      }
+
+      setDoctorAvailabilityMap(nextAvailabilityMap);
+    });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [doctors, todayDateString]);
 
   const { data: clinic } = useQuery({
     queryKey: ["clinic", user?.clinic_id],
@@ -441,7 +497,12 @@ export default function StaffDoctors() {
   const filteredDoctors = useMemo(() => {
     const normalizedQuery = searchValue.trim().toLocaleLowerCase("tr-TR");
 
-    return doctors.filter((doctor) => {
+    return doctors
+      .map((doctor) => ({
+        ...doctor,
+        ...doctorAvailabilityMap[doctor.id],
+      }))
+      .filter((doctor) => {
       if (filterMode === "available" && !doctor.isAvailableToday) {
         return false;
       }
@@ -458,13 +519,19 @@ export default function StaffDoctors() {
         .join(" ")
         .toLocaleLowerCase("tr-TR");
 
-      return haystack.includes(normalizedQuery);
-    });
-  }, [doctors, filterMode, searchValue]);
+        return haystack.includes(normalizedQuery);
+      });
+  }, [doctorAvailabilityMap, doctors, filterMode, searchValue]);
 
   const selectedDoctor = useMemo(
-    () => doctors.find((doctor) => doctor.id === selectedDoctorId) ?? null,
-    [doctors, selectedDoctorId],
+    () =>
+      doctors
+        .map((doctor) => ({
+          ...doctor,
+          ...doctorAvailabilityMap[doctor.id],
+        }))
+        .find((doctor) => doctor.id === selectedDoctorId) ?? null,
+    [doctorAvailabilityMap, doctors, selectedDoctorId],
   );
 
   const handleDoctorSelect = (doctorId: string) => {
