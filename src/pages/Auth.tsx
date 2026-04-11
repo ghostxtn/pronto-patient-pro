@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { ArrowLeft, Loader2, Lock, Mail, User } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useHomepagePreviewData } from "@/hooks/useHomepagePreviewData";
 import { getDefaultRouteByRole } from "@/lib/auth-routing";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,7 +47,13 @@ export default function Auth() {
   const [pendingOtp, setPendingOtp] = useState<PendingOtpState | null>(() => readOtpState(searchParams));
   const navigate = useNavigate();
   const { user, login, register, googleLogin, verifyOtp, resendOtp } = useAuth();
-  const { t } = useLanguage();
+  const { lang, t } = useLanguage();
+  const previewData = useHomepagePreviewData(lang);
+  const clinic = (previewData.data as { clinic?: { name?: string | null; logo_url?: string | null; updated_at?: string | null } | null } | undefined)?.clinic;
+  const logoUrl = clinic?.logo_url
+    ? `${clinic.logo_url}?t=${new Date(clinic.updated_at ?? Date.now()).getTime()}`
+    : null;
+  const clinicName = clinic?.name ?? "MediBook";
 
   useEffect(() => {
     if (user) navigate(getDefaultRouteByRole(user.role), { replace: true });
@@ -169,18 +176,26 @@ export default function Auth() {
       >
         <div className="absolute left-[-5rem] top-[-4rem] h-64 w-64 rounded-full bg-[#4f8fe6] opacity-20 blur-[80px]" />
         <div className="absolute bottom-[-5rem] right-[-4rem] h-72 w-72 rounded-full bg-[#236a53] opacity-15 blur-[90px]" />
-        <div className="relative z-10 w-full max-w-xl px-10">
-          <div className="rounded-3xl border border-white/40 bg-white/20 p-10 backdrop-blur-xl">
-            <div className="inline-flex items-center gap-3 rounded-full border border-white/50 bg-white/30 px-4 py-1.5">
-              <svg width="44" height="44" viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg" className="h-9 w-9">
-                <rect x="0" y="13" width="44" height="18" rx="9" fill="#65a98f" />
-                <rect x="13" y="0" width="18" height="22" rx="9" fill="#4f8fe6" />
-                <rect x="13" y="22" width="18" height="22" rx="9" fill="#4f8fe6" />
-              </svg>
-              <span className="font-medium tracking-tight text-[#081e2a]" style={{ fontFamily: "Manrope, sans-serif" }}>
-                Pronto Klinik
-              </span>
-            </div>
+          <div className="relative z-10 w-full max-w-xl px-10">
+            <div className="rounded-3xl border border-white/40 bg-white/20 p-10 backdrop-blur-xl">
+              <div className="inline-flex items-center gap-3 rounded-full border border-white/50 bg-white/30 px-4 py-1.5">
+                {logoUrl ? (
+                  <img
+                    src={logoUrl}
+                    alt={clinicName}
+                    style={{ width: 36, height: 36, borderRadius: 10, objectFit: "cover" }}
+                  />
+                ) : (
+                  <svg width="44" height="44" viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg" className="h-9 w-9">
+                    <rect x="0" y="13" width="44" height="18" rx="9" fill="#65a98f" />
+                    <rect x="13" y="0" width="18" height="22" rx="9" fill="#4f8fe6" />
+                    <rect x="13" y="22" width="18" height="22" rx="9" fill="#4f8fe6" />
+                  </svg>
+                )}
+                <span className="font-medium tracking-tight text-[#081e2a]" style={{ fontFamily: "Manrope, sans-serif" }}>
+                  {clinicName}
+                </span>
+              </div>
 
             <div className="mt-8 space-y-3">
               <h2
@@ -229,19 +244,27 @@ export default function Auth() {
           </div>
 
           <div className="w-full rounded-2xl bg-white p-6 shadow-[0_20px_40px_rgba(8,30,42,0.07)] md:p-10">
-            <div className="mb-8 flex items-center gap-3">
-              <svg width="44" height="44" viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg" className="h-11 w-11">
-                <rect x="0" y="13" width="44" height="18" rx="9" fill="#65a98f" />
-                <rect x="13" y="0" width="18" height="22" rx="9" fill="#4f8fe6" />
-                <rect x="13" y="22" width="18" height="22" rx="9" fill="#4f8fe6" />
-              </svg>
+            <Link to="/" className="mb-8 flex items-center gap-3" style={{ textDecoration: "none" }}>
+              {logoUrl ? (
+                <img
+                  src={logoUrl}
+                  alt={clinicName}
+                  style={{ width: 36, height: 36, borderRadius: 10, objectFit: "cover" }}
+                />
+              ) : (
+                <svg width="44" height="44" viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg" className="h-11 w-11">
+                  <rect x="0" y="13" width="44" height="18" rx="9" fill="#65a98f" />
+                  <rect x="13" y="0" width="18" height="22" rx="9" fill="#4f8fe6" />
+                  <rect x="13" y="22" width="18" height="22" rx="9" fill="#4f8fe6" />
+                </svg>
+              )}
               <span
                 className="text-[15px] font-light tracking-tight text-[#081e2a]"
                 style={{ fontFamily: "Manrope, sans-serif" }}
               >
-                Pronto Klinik
+                {clinicName}
               </span>
-            </div>
+            </Link>
 
             {!pendingOtp ? (
               <>

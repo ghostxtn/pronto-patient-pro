@@ -7,6 +7,7 @@ import AppLayout from "@/components/AppLayout";
 import { AppointmentDetailSheet } from "@/components/appointments/AppointmentDetailSheet";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
@@ -52,10 +53,10 @@ export default function DoctorAppointments() {
   const [detailId, setDetailId] = useState<string | null>(null);
 
   const statusConfig: Record<string, { color: string; icon: React.ElementType; label: string }> = {
-    pending: { color: "bg-warning/10 text-warning border-warning/20", icon: AlertCircle, label: t.pending },
-    confirmed: { color: "bg-success/10 text-success border-success/20", icon: CheckCircle2, label: t.confirmed },
-    completed: { color: "bg-primary/10 text-primary border-primary/20", icon: CheckCircle2, label: t.completed },
-    cancelled: { color: "bg-destructive/10 text-destructive border-destructive/20", icon: XCircle, label: t.cancelled },
+    pending: { color: "border-[rgba(245,166,35,0.3)] bg-[#fff8e6] text-[#f5a623]", icon: AlertCircle, label: t.pending },
+    confirmed: { color: "border-[#b5d1cc] bg-[#eaf5ff] text-[#4f8fe6]", icon: CheckCircle2, label: t.confirmed },
+    completed: { color: "border-[#b5d1cc] bg-[#e6f4ef] text-[#65a98f]", icon: CheckCircle2, label: t.completed },
+    cancelled: { color: "border-[rgba(252,165,165,0.3)] bg-[#fef2f2] text-[#e05252]", icon: XCircle, label: t.cancelled },
   };
 
   const { data: doctorRecord } = useQuery<DoctorRecord>({
@@ -127,22 +128,69 @@ export default function DoctorAppointments() {
     : null;
 
   const renderList = (list: typeof appointments) => {
-    if (!list || list.length === 0) return <div className="text-center py-12 text-muted-foreground text-sm">{t.noAppointmentsInCategory}</div>;
+    if (!list || list.length === 0) {
+      return (
+        <div className="text-center py-12 text-sm" style={{ color: "#5a7a8a", fontFamily: "Inter, sans-serif" }}>
+          {t.noAppointmentsInCategory}
+        </div>
+      );
+    }
     return (
-      <div className="space-y-3">
+      <div className="space-y-3" style={{ maxHeight: "560px", overflowY: "auto" }}>
         {list.map((apt, i) => { const patient = apt.profiles; const status = statusConfig[apt.status]; const StatusIcon = status.icon; return (
-          <motion.div key={apt.id} className="glass rounded-2xl p-5 shadow-card hover:shadow-elevated transition-all cursor-pointer" custom={i} variants={fadeUp} initial="hidden" animate="visible" onClick={() => { setDetailId(apt.id); }}>
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-4 min-w-0">
-                <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-secondary to-success flex items-center justify-center flex-shrink-0"><span className="text-secondary-foreground font-display font-bold">{patient?.full_name?.[0] || "P"}</span></div>
-                <div className="min-w-0"><div className="font-display font-semibold truncate">{patient?.full_name || t.patient}</div><div className="flex items-center gap-3 text-sm text-muted-foreground mt-0.5"><span className="flex items-center gap-1"><CalendarDays className="h-3 w-3" />{format(parseISO(apt.appointment_date), "MMM d, yyyy")}</span><span className="flex items-center gap-1"><Clock className="h-3 w-3" />{apt.start_time.slice(0, 5)}</span></div></div>
-              </div>
-              <div className="flex items-center gap-2 flex-shrink-0">
-                {apt.status === "confirmed" && <Button size="sm" variant="outline" className="rounded-full text-xs" onClick={(e) => { e.stopPropagation(); updateStatus.mutate({ id: apt.id, status: "completed" }); }}><CheckCircle2 className="h-3 w-3 mr-1" /> {t.complete}</Button>}
-                <Badge className={cn("rounded-full border", status.color)} variant="outline"><StatusIcon className="h-3 w-3 mr-1" /><span className="hidden sm:inline">{status.label}</span></Badge>
-              </div>
-            </div>
-            {apt.notes && <div className="mt-3 p-2 rounded-lg bg-muted/50 text-xs text-muted-foreground flex items-start gap-2"><FileText className="h-3 w-3 mt-0.5 flex-shrink-0" /><span className="line-clamp-1">{apt.notes}</span></div>}
+          <motion.div key={apt.id} custom={i} variants={fadeUp} initial="hidden" animate="visible">
+            <Card
+              className="cursor-pointer rounded-2xl border border-[#b5d1cc] bg-white shadow-[0_2px_12px_rgba(79,143,230,0.08)] transition-all duration-200 hover:border-[#4f8fe6] hover:shadow-[0_8px_22px_rgba(79,143,230,0.14)]"
+              onClick={() => { setDetailId(apt.id); }}
+            >
+              <CardContent className="p-5">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-4 min-w-0">
+                    <div className="h-12 w-12 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "#eaf5ff" }}>
+                      <span className="font-bold text-sm" style={{ color: "#4f8fe6", fontFamily: "Manrope, sans-serif" }}>
+                        {patient?.full_name?.[0] || "P"}
+                      </span>
+                    </div>
+                    <div className="min-w-0">
+                      <div className="font-semibold truncate text-[#1a2e3b]" style={{ fontFamily: "Manrope, sans-serif" }}>
+                        {patient?.full_name || t.patient}
+                      </div>
+                      <div className="flex items-center gap-3 text-sm mt-0.5" style={{ color: "#5a7a8a", fontFamily: "Inter, sans-serif" }}>
+                        <span className="flex items-center gap-1"><CalendarDays className="h-3 w-3" />{format(parseISO(apt.appointment_date), "MMM d, yyyy")}</span>
+                        <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{apt.start_time.slice(0, 5)}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {apt.status === "confirmed" && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="rounded-full text-xs border-[#b5d1cc] text-[#65a98f] hover:bg-[#e6f4ef] hover:text-[#65a98f]"
+                        style={{ fontFamily: "Inter, sans-serif" }}
+                        onClick={(e) => { e.stopPropagation(); updateStatus.mutate({ id: apt.id, status: "completed" }); }}
+                      >
+                        <CheckCircle2 className="h-3 w-3 mr-1" />{t.complete}
+                      </Button>
+                    )}
+                    <Badge
+                      variant="outline"
+                      className={cn("shrink-0 rounded-full border px-3 py-1", status.color)}
+                      style={{ fontFamily: "Inter, sans-serif" }}
+                    >
+                      <StatusIcon className="h-3 w-3 mr-1" />
+                      <span className="hidden sm:inline">{status.label}</span>
+                    </Badge>
+                  </div>
+                </div>
+                {apt.notes && (
+                  <div className="mt-3 p-2 rounded-lg text-xs flex items-start gap-2" style={{ backgroundColor: "#f4f8fd", color: "#5a7a8a" }}>
+                    <FileText className="h-3 w-3 mt-0.5 flex-shrink-0" style={{ color: "#4f8fe6" }} />
+                    <span className="line-clamp-1" style={{ fontFamily: "Inter, sans-serif" }}>{apt.notes}</span>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </motion.div>
         ); })}
       </div>
@@ -151,17 +199,30 @@ export default function DoctorAppointments() {
 
   return (
     <AppLayout>
-      <motion.div initial="hidden" animate="visible">
-        <motion.div className="mb-8" custom={0} variants={fadeUp}><h1 className="text-3xl font-display font-bold mb-2">{t.appointments}</h1><p className="text-muted-foreground">{t.appointmentsDesc}</p></motion.div>
+      <motion.div initial="hidden" animate="visible" className="space-y-6 rounded-[28px] bg-[#f4f8fd] p-1">
+        <motion.div custom={0} variants={fadeUp}>
+          <h1 className="text-3xl font-bold tracking-tight text-[#1a2e3b]" style={{ fontFamily: "Manrope, sans-serif" }}>
+            {t.appointments}
+          </h1>
+          <p className="mt-2 text-sm text-[#5a7a8a]" style={{ fontFamily: "Inter, sans-serif" }}>
+            {t.appointmentsDesc}
+          </p>
+        </motion.div>
         <Tabs defaultValue="confirmed">
           <motion.div custom={1} variants={fadeUp}>
-            <TabsList className="rounded-xl mb-6">
-              <TabsTrigger value="confirmed" className="rounded-lg">{t.confirmed} ({confirmed.length})</TabsTrigger>
-              <TabsTrigger value="completed" className="rounded-lg">{t.completed} ({completed.length})</TabsTrigger>
-              <TabsTrigger value="cancelled" className="rounded-lg">{t.cancelled} ({cancelled.length})</TabsTrigger>
+            <TabsList className="rounded-xl mb-6 bg-white border border-[#b5d1cc] shadow-[0_2px_8px_rgba(79,143,230,0.06)]">
+              <TabsTrigger value="confirmed" className="rounded-lg data-[state=active]:bg-[#eaf5ff] data-[state=active]:text-[#4f8fe6]" style={{ fontFamily: "Inter, sans-serif" }}>
+                {t.confirmed} ({confirmed.length})
+              </TabsTrigger>
+              <TabsTrigger value="completed" className="rounded-lg data-[state=active]:bg-[#e6f4ef] data-[state=active]:text-[#65a98f]" style={{ fontFamily: "Inter, sans-serif" }}>
+                {t.completed} ({completed.length})
+              </TabsTrigger>
+              <TabsTrigger value="cancelled" className="rounded-lg data-[state=active]:bg-[#fef2f2] data-[state=active]:text-[#e05252]" style={{ fontFamily: "Inter, sans-serif" }}>
+                {t.cancelled} ({cancelled.length})
+              </TabsTrigger>
             </TabsList>
           </motion.div>
-          {isLoading ? <div className="space-y-3">{[1, 2, 3].map((i) => <div key={i} className="glass rounded-2xl p-5 shadow-card animate-pulse h-20" />)}</div> : (<><TabsContent value="confirmed">{renderList(confirmed)}</TabsContent><TabsContent value="completed">{renderList(completed)}</TabsContent><TabsContent value="cancelled">{renderList(cancelled)}</TabsContent></>)}
+          {isLoading ? <div className="space-y-3" style={{ maxHeight: "560px", overflowY: "auto" }}>{[1, 2, 3].map((i) => <div key={i} className="rounded-2xl border border-[#b5d1cc] bg-white shadow-[0_2px_12px_rgba(79,143,230,0.08)] animate-pulse h-20" />)}</div> : (<><TabsContent value="confirmed">{renderList(confirmed)}</TabsContent><TabsContent value="completed">{renderList(completed)}</TabsContent><TabsContent value="cancelled">{renderList(cancelled)}</TabsContent></>)}
         </Tabs>
       </motion.div>
 

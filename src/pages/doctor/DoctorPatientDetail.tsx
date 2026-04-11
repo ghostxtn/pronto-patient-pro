@@ -133,10 +133,10 @@ function toAppointment(
 
 function getStatusConfig(status: string) {
   const config: Record<string, { color: string; icon: React.ElementType; label: string }> = {
-    pending: { color: "bg-warning/10 text-warning border-warning/20", icon: AlertCircle, label: "Bekliyor" },
-    confirmed: { color: "bg-success/10 text-success border-success/20", icon: CheckCircle2, label: "Onaylandı" },
-    completed: { color: "bg-primary/10 text-primary border-primary/20", icon: CheckCircle2, label: "Tamamlandı" },
-    cancelled: { color: "bg-destructive/10 text-destructive border-destructive/20", icon: XCircle, label: "İptal" },
+    pending: { color: "border-[rgba(245,166,35,0.3)] bg-[#fff8e6] text-[#f5a623]", icon: AlertCircle, label: "Bekliyor" },
+    confirmed: { color: "border-[#b5d1cc] bg-[#eaf5ff] text-[#4f8fe6]", icon: CheckCircle2, label: "Onaylandı" },
+    completed: { color: "border-[#b5d1cc] bg-[#e6f4ef] text-[#65a98f]", icon: CheckCircle2, label: "Tamamlandı" },
+    cancelled: { color: "border-[rgba(252,165,165,0.3)] bg-[#fef2f2] text-[#e05252]", icon: XCircle, label: "İptal" },
   };
 
   return config[status] ?? config.pending;
@@ -261,12 +261,13 @@ export default function DoctorPatientDetail() {
 
   return (
     <AppLayout>
-      <motion.div initial="hidden" animate="visible" className="space-y-6">
+      <motion.div initial="hidden" animate="visible" className="space-y-6 rounded-[28px] bg-[#f4f8fd] p-1">
         <motion.div custom={0} variants={fadeUp}>
           <Button
             type="button"
             variant="ghost"
             className="mb-4 rounded-xl px-0 hover:bg-transparent"
+            style={{ color: "#4f8fe6", fontFamily: "Inter, sans-serif" }}
             onClick={() => navigate("/doctor/patients")}
           >
             <ArrowLeft className="mr-2 h-4 w-4" />
@@ -275,9 +276,9 @@ export default function DoctorPatientDetail() {
         </motion.div>
 
         <motion.div custom={1} variants={fadeUp}>
-          <Card className="rounded-2xl border-border/60 shadow-card">
+          <Card className="rounded-2xl border border-[#b5d1cc] bg-white shadow-[0_2px_12px_rgba(79,143,230,0.08)]">
             <CardContent className="flex flex-col gap-4 p-6 md:flex-row md:items-start md:justify-between">
-              <div className="space-y-2">
+              <div className="space-y-1">
                 {isPatientLoading ? (
                   <>
                     <Skeleton className="h-7 w-48 rounded-xl" />
@@ -286,9 +287,9 @@ export default function DoctorPatientDetail() {
                   </>
                 ) : (
                   <>
-                    <h1 className="text-3xl font-display font-bold">{patientName}</h1>
-                    <p className="text-muted-foreground">{patient?.email || "E-posta bilgisi yok"}</p>
-                    <p className="text-muted-foreground">{patient?.phone || "Telefon bilgisi yok"}</p>
+                    <h1 className="text-3xl font-bold text-[#1a2e3b]" style={{ fontFamily: "Manrope, sans-serif" }}>{patientName}</h1>
+                    <p className="text-sm" style={{ color: "#5a7a8a", fontFamily: "Inter, sans-serif" }}>{patient?.email || "E-posta bilgisi yok"}</p>
+                    <p className="text-sm" style={{ color: "#5a7a8a", fontFamily: "Inter, sans-serif" }}>{patient?.phone || "Telefon bilgisi yok"}</p>
                   </>
                 )}
               </div>
@@ -296,7 +297,8 @@ export default function DoctorPatientDetail() {
               <Button
                 type="button"
                 variant="outline"
-                className="rounded-xl"
+                className="rounded-xl border-[#b5d1cc] text-[#4f8fe6] hover:bg-[#eaf5ff] hover:text-[#2f75ca]"
+                style={{ fontFamily: "Inter, sans-serif" }}
                 onClick={() => navigate("/doctor/patients")}
               >
                 Geri
@@ -307,18 +309,19 @@ export default function DoctorPatientDetail() {
 
         <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
           <motion.div custom={2} variants={fadeUp} className="space-y-6">
-            <Card className="rounded-2xl border-border/60 shadow-card">
+            <Card className="rounded-2xl border border-[#b5d1cc] bg-white shadow-[0_2px_12px_rgba(79,143,230,0.08)]">
               <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
                 <div>
-                  <CardTitle className="font-display text-xl">Klinik Notlar</CardTitle>
-                  <p className="mt-1 text-sm text-muted-foreground">
+                  <CardTitle className="text-xl text-[#1a2e3b]" style={{ fontFamily: "Manrope, sans-serif" }}>Klinik Notlar</CardTitle>
+                  <p className="mt-1 text-sm" style={{ color: "#5a7a8a", fontFamily: "Inter, sans-serif" }}>
                     Hastaya ait klinik değerlendirmeler ve tedavi notları.
                   </p>
                 </div>
                 <Button
                   type="button"
                   variant="outline"
-                  className="rounded-xl"
+                  className="rounded-xl border-[#b5d1cc] text-[#4f8fe6] hover:bg-[#eaf5ff] hover:text-[#2f75ca]"
+                  style={{ fontFamily: "Inter, sans-serif" }}
                   onClick={() => setIsFormOpen((current) => !current)}
                 >
                   <Plus className="mr-2 h-4 w-4" />
@@ -327,67 +330,68 @@ export default function DoctorPatientDetail() {
               </CardHeader>
               <CardContent className="space-y-4">
                 {isFormOpen ? (
-                  <div className="space-y-4 rounded-2xl bg-muted/40 p-4">
+                  <div className="space-y-4 rounded-2xl p-4" style={{ backgroundColor: "#f4f8fd" }}>
                     <div className="space-y-2">
-                      <Label htmlFor="clinical-note-diagnosis">Tanı</Label>
+                      <Label htmlFor="clinical-note-diagnosis" style={{ color: "#1a2e3b", fontFamily: "Inter, sans-serif" }}>Tanı</Label>
                       <Textarea
                         id="clinical-note-diagnosis"
                         rows={3}
                         value={diagnosis}
                         onChange={(event) => setDiagnosis(event.target.value)}
-                        className="rounded-xl text-sm"
+                        className="rounded-xl text-sm border-[#b5d1cc] focus-visible:ring-[#4f8fe6]/30"
                       />
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="clinical-note-treatment">Tedavi</Label>
+                      <Label htmlFor="clinical-note-treatment" style={{ color: "#1a2e3b", fontFamily: "Inter, sans-serif" }}>Tedavi</Label>
                       <Textarea
                         id="clinical-note-treatment"
                         rows={3}
                         value={treatment}
                         onChange={(event) => setTreatment(event.target.value)}
-                        className="rounded-xl text-sm"
+                        className="rounded-xl text-sm border-[#b5d1cc] focus-visible:ring-[#4f8fe6]/30"
                       />
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="clinical-note-prescription">Reçete</Label>
+                      <Label htmlFor="clinical-note-prescription" style={{ color: "#1a2e3b", fontFamily: "Inter, sans-serif" }}>Reçete</Label>
                       <Textarea
                         id="clinical-note-prescription"
                         rows={3}
                         value={prescription}
                         onChange={(event) => setPrescription(event.target.value)}
-                        className="rounded-xl text-sm"
+                        className="rounded-xl text-sm border-[#b5d1cc] focus-visible:ring-[#4f8fe6]/30"
                       />
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="clinical-note-notes">Not</Label>
+                      <Label htmlFor="clinical-note-notes" style={{ color: "#1a2e3b", fontFamily: "Inter, sans-serif" }}>Not</Label>
                       <Textarea
                         id="clinical-note-notes"
                         rows={4}
                         value={notes}
                         onChange={(event) => setNotes(event.target.value)}
-                        className="rounded-xl text-sm"
+                        className="rounded-xl text-sm border-[#b5d1cc] focus-visible:ring-[#4f8fe6]/30"
                       />
                     </div>
 
                     <div className="flex flex-wrap gap-3">
-                      <Button
-                        type="button"
-                        className="rounded-xl"
+                      <button
+                        className="rounded-xl px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                        style={{ backgroundColor: "#4f8fe6", fontFamily: "Inter, sans-serif" }}
                         onClick={() => createClinicalNote.mutate()}
                         disabled={!hasAtLeastOneField || createClinicalNote.isPending}
                       >
                         {createClinicalNote.isPending ? (
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin inline" />
                         ) : null}
                         Kaydet
-                      </Button>
+                      </button>
                       <Button
                         type="button"
                         variant="ghost"
                         className="rounded-xl"
+                        style={{ color: "#5a7a8a" }}
                         onClick={() => setIsFormOpen(false)}
                       >
                         Vazgeç
@@ -410,29 +414,23 @@ export default function DoctorPatientDetail() {
                 ) : clinicalNotes && clinicalNotes.length > 0 ? (
                   <div className="space-y-4">
                     {clinicalNotes.map((note) => (
-                      <Card key={note.id} className="rounded-2xl border-border/60 shadow-none">
+                      <Card key={note.id} className="rounded-2xl border border-[#b5d1cc] bg-white shadow-none">
                         <CardHeader className="space-y-2 pb-3">
-                          <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-                            <div className="flex items-center gap-3">
-                              <div className="rounded-full bg-muted p-2">
-                                <UserRound className="h-4 w-4 text-muted-foreground" />
-                              </div>
-                              <div>
-                                <CardTitle className="text-base font-semibold">
-                                  {[note.doctor.title, note.doctor.firstName, note.doctor.lastName]
-                                    .filter(Boolean)
-                                    .join(" ")}
-                                </CardTitle>
-                                <p className="text-xs text-muted-foreground">
-                                  {format(new Date(note.created_at), "d MMMM yyyy, HH:mm", {
-                                    locale: tr,
-                                  })}
-                                </p>
-                              </div>
+                          <div className="flex items-center gap-3">
+                            <div className="rounded-full p-2" style={{ backgroundColor: "#eaf5ff" }}>
+                              <UserRound className="h-4 w-4" style={{ color: "#4f8fe6" }} />
+                            </div>
+                            <div>
+                              <CardTitle className="text-base font-semibold text-[#1a2e3b]" style={{ fontFamily: "Manrope, sans-serif" }}>
+                                {[note.doctor.title, note.doctor.firstName, note.doctor.lastName].filter(Boolean).join(" ")}
+                              </CardTitle>
+                              <p className="text-xs" style={{ color: "#5a7a8a", fontFamily: "Inter, sans-serif" }}>
+                                {format(new Date(note.created_at), "d MMMM yyyy, HH:mm", { locale: tr })}
+                              </p>
                             </div>
                           </div>
                         </CardHeader>
-                        <CardContent className="space-y-3 text-sm">
+                        <CardContent className="space-y-3 text-sm" style={{ color: "#1a2e3b", fontFamily: "Inter, sans-serif" }}>
                           {note.diagnosis ? (
                             <p><span className="font-medium">Tanı:</span> {note.diagnosis}</p>
                           ) : null}
@@ -450,7 +448,7 @@ export default function DoctorPatientDetail() {
                     ))}
                   </div>
                 ) : (
-                  <div className="rounded-2xl border border-dashed p-6 text-sm text-muted-foreground">
+                  <div className="rounded-2xl border border-dashed border-[#b5d1cc] p-6 text-sm" style={{ color: "#5a7a8a", fontFamily: "Inter, sans-serif" }}>
                     Bu hasta için henüz klinik not eklenmemiş.
                   </div>
                 )}
@@ -459,10 +457,10 @@ export default function DoctorPatientDetail() {
           </motion.div>
 
           <motion.div custom={3} variants={fadeUp}>
-            <Card className="rounded-2xl border-border/60 shadow-card">
+            <Card className="rounded-2xl border border-[#b5d1cc] bg-white shadow-[0_2px_12px_rgba(79,143,230,0.08)]">
               <CardHeader>
-                <CardTitle className="font-display text-xl">Randevu Geçmişi</CardTitle>
-                <p className="text-sm text-muted-foreground">
+                <CardTitle className="text-xl text-[#1a2e3b]" style={{ fontFamily: "Manrope, sans-serif" }}>Randevu Geçmişi</CardTitle>
+                <p className="text-sm" style={{ color: "#5a7a8a", fontFamily: "Inter, sans-serif" }}>
                   En yeni randevular üstte listelenir. Detay için karta tıklayın.
                 </p>
               </CardHeader>
@@ -484,29 +482,29 @@ export default function DoctorPatientDetail() {
                       <button
                         key={appointment.id}
                         type="button"
-                        className="w-full rounded-2xl border border-border/60 p-4 text-left transition-colors hover:bg-muted/40"
+                        className="w-full rounded-2xl border border-[#b5d1cc] bg-white p-4 text-left transition-colors hover:bg-[#eaf5ff] hover:border-[#4f8fe6]"
                         onClick={() => setSelectedAppointmentId(appointment.id)}
                       >
                         <div className="flex flex-col gap-3">
                           <div className="flex items-start justify-between gap-3">
                             <div>
-                              <p className="font-medium">
+                              <p className="font-medium text-[#1a2e3b]" style={{ fontFamily: "Manrope, sans-serif" }}>
                                 {format(parseISO(appointment.appointment_date), "d MMMM yyyy", {
                                   locale: tr,
                                 })}
                               </p>
-                              <p className="text-sm text-muted-foreground">
+                              <p className="text-sm" style={{ color: "#5a7a8a", fontFamily: "Inter, sans-serif" }}>
                                 {appointment.start_time.slice(0, 5)} - {appointment.end_time.slice(0, 5)}
                               </p>
                             </div>
-                            <Badge className={cn("rounded-full border", status.color)} variant="outline">
+                            <Badge className={cn("rounded-full border", status.color)} variant="outline" style={{ fontFamily: "Inter, sans-serif" }}>
                               <StatusIcon className="mr-1 h-3 w-3" />
                               {status.label}
                             </Badge>
                           </div>
                           {appointment.notes ? (
-                            <div className="flex items-start gap-2 text-sm text-muted-foreground">
-                              <FileText className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                            <div className="flex items-start gap-2 text-sm" style={{ color: "#5a7a8a", fontFamily: "Inter, sans-serif" }}>
+                              <FileText className="mt-0.5 h-4 w-4 flex-shrink-0" style={{ color: "#4f8fe6" }} />
                               <span className="line-clamp-2">{appointment.notes}</span>
                             </div>
                           ) : null}
@@ -515,7 +513,7 @@ export default function DoctorPatientDetail() {
                     );
                   })
                 ) : (
-                  <div className="rounded-2xl border border-dashed p-6 text-sm text-muted-foreground">
+                  <div className="rounded-2xl border border-dashed border-[#b5d1cc] p-6 text-sm" style={{ color: "#5a7a8a", fontFamily: "Inter, sans-serif" }}>
                     Henüz tamamlanmış randevu bulunmuyor.
                   </div>
                 )}
