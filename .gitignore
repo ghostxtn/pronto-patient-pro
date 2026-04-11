@@ -31,3 +31,6 @@ redis_data/
 uploads_data/
 bun.lock
 bun.lockb
+.codex/
+AGENTS.md
+graphify-out/
