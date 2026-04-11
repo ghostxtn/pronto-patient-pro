@@ -110,10 +110,16 @@ export default function AppLayout({ children, mainClassName }: AppLayoutProps) {
 
   const isActiveLink = (path: string) =>
     location.pathname === path || location.pathname.startsWith(`${path}/`);
+  const isStaffDoctorsPage = location.pathname.startsWith("/staff/doctors");
 
   return (
-    <div className="flex min-h-screen flex-col bg-background">
-      <header className="glass-strong border-b sticky top-0 z-50">
+    <div
+      className={cn(
+        "flex min-h-screen flex-col bg-background",
+        isStaffDoctorsPage && "h-dvh min-h-0 overflow-hidden",
+      )}
+    >
+      <header className="glass-strong sticky top-0 z-50 shrink-0 border-b">
         <div className="container flex h-16 items-center justify-between">
           <div className="flex items-center gap-3">
             <Link to={homePath} className="flex items-center gap-2">
@@ -209,7 +215,15 @@ export default function AppLayout({ children, mainClassName }: AppLayoutProps) {
         )}
       </AnimatePresence>
 
-      <main className={cn("container flex-1 py-6", mainClassName)}>{children}</main>
+      <main
+        className={cn(
+          "container flex-1 py-6",
+          isStaffDoctorsPage && "min-h-0 overflow-hidden",
+          mainClassName,
+        )}
+      >
+        {children}
+      </main>
     </div>
   );
 }

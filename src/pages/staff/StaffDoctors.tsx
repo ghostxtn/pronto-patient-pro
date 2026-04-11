@@ -563,7 +563,11 @@ export default function StaffDoctors() {
         className="relative left-1/2 flex min-h-0 w-[min(calc(100vw-1.5rem),1520px)] flex-1 -translate-x-1/2 flex-col gap-5 overflow-hidden md:w-[min(calc(100vw-2.5rem),1520px)]"
       >
         <div className="grid min-h-0 flex-1 gap-5 overflow-hidden lg:grid-cols-[292px_minmax(0,1fr)] xl:grid-cols-[308px_minmax(0,1fr)] 2xl:grid-cols-[320px_minmax(0,1fr)]">
-          <motion.aside custom={0} variants={fadeUp} className="hidden min-h-0 lg:block">
+          <motion.aside
+            custom={0}
+            variants={fadeUp}
+            className="hidden min-h-0 shrink-0 overflow-hidden lg:block"
+          >
             <div className="h-full min-h-0">
               <StaffSchedulerRail
                 calendarDate={calendarDate}
@@ -584,7 +588,11 @@ export default function StaffDoctors() {
             </div>
           </motion.aside>
 
-          <motion.section custom={1} variants={fadeUp} className="flex min-h-0 min-w-0 flex-col gap-4 overflow-hidden">
+          <motion.section
+            custom={1}
+            variants={fadeUp}
+            className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-hidden"
+          >
             {isCompactLayout ? (
               <Card className="shrink-0 rounded-[28px] border-border/60 bg-card/95 shadow-soft lg:hidden">
                 <CardContent className="flex flex-col gap-4 p-4 md:flex-row md:items-center md:justify-between">

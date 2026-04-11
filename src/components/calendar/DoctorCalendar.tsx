@@ -185,12 +185,6 @@ interface QuickActionState {
   dayOfWeek: number;
   dateLabel: string;
   timeLabel: string;
-  anchor: {
-    left: number;
-    right: number;
-    top: number;
-    bottom: number;
-  };
   override: AvailabilityOverride | null;
   availabilityTarget: AvailabilitySelectionTarget | null;
 }
@@ -478,7 +472,7 @@ function formatToolbarRangeLabel(date: Date, view: View) {
   }
 
   if (view === Views.DAY) {
-    return format(date, "EEEE, d MMMM yyyy", { locale: tr });
+    return format(date, "d MMMM yyyy, EEEE", { locale: tr });
   }
 
   if (view === Views.MONTH) {
@@ -521,62 +515,6 @@ const RollingWeekView = Object.assign(
   },
 );
 
-function getQuickActionPosition(
-  anchor: QuickActionState["anchor"],
-  calendarBounds?: DOMRect | null,
-) {
-  const panelWidth = 320;
-  const panelHeight = 360;
-  const gutter = 12;
-  const calendarInset = 8;
-  const viewportWidth = window.innerWidth;
-  const viewportHeight = window.innerHeight;
-  const calendarLeft = calendarBounds ? calendarBounds.left + calendarInset : gutter;
-  const calendarRight = calendarBounds
-    ? calendarBounds.right - calendarInset
-    : viewportWidth - gutter;
-  const calendarTop = calendarBounds ? calendarBounds.top + calendarInset : gutter;
-  const calendarBottom = calendarBounds
-    ? calendarBounds.bottom - calendarInset
-    : viewportHeight - gutter;
-  const minLeft = Math.max(gutter, calendarLeft);
-  const maxLeft = Math.min(
-    viewportWidth - panelWidth - gutter,
-    calendarRight - panelWidth,
-  );
-  const anchorMidY = anchor.top + (anchor.bottom - anchor.top) / 2;
-  const preferredRight = anchor.right + 10;
-  const preferredLeft = anchor.left - panelWidth - 10;
-  const canPlaceRight =
-    preferredRight + panelWidth <= Math.min(calendarRight, viewportWidth - gutter);
-  const canPlaceLeft = preferredLeft >= Math.max(gutter, calendarLeft);
-
-  let left = canPlaceRight
-    ? preferredRight
-    : canPlaceLeft
-      ? preferredLeft
-      : Math.min(
-          Math.max(anchor.left - panelWidth / 2, minLeft),
-          Math.max(minLeft, maxLeft),
-        );
-
-  let top = anchorMidY - panelHeight / 2;
-  const minTop = Math.max(gutter, calendarTop);
-  const maxTop = Math.min(
-    viewportHeight - panelHeight - gutter,
-    calendarBottom - panelHeight,
-  );
-
-  top = Math.min(Math.max(top, minTop), Math.max(minTop, maxTop));
-  left = Math.min(Math.max(left, minLeft), Math.max(minLeft, maxLeft));
-
-  return {
-    left: left - (calendarBounds?.left ?? 0),
-    top: top - (calendarBounds?.top ?? 0),
-    width: panelWidth,
-  };
-}
-
 function getCalendarScrollContainer(calendarShell: HTMLElement | null) {
   return calendarShell?.querySelector(".rbc-time-content") as HTMLElement | null;
 }
@@ -604,66 +542,57 @@ function getPatientName(patient: PatientLookupRecord) {
     .trim();
 }
 
+function formatCalendarHeaderDay(date: Date) {
+  return format(date, "EEE", { locale: tr })
+    .replace(".", "")
+    .toLocaleLowerCase("tr-TR");
+}
+
 const CustomToolbar = ({
   date,
   onNavigate,
   onView,
   view,
   onManageAvailability,
-  calendarTitle,
-  specializationName,
 }: CustomToolbarProps) => (
   <div className="scheduler-toolbar-shell">
     <div className="scheduler-toolbar-row">
       <div className="scheduler-toolbar-primary">
-        <Button
-          type="button"
-          variant="outline"
-          className="scheduler-toolbar-today-button rounded-full"
-          onClick={() => onNavigate("TODAY")}
-        >
-          Bugun
-        </Button>
-
         <div className="scheduler-nav-group">
           <Button
             type="button"
-            variant="outline"
+            variant="ghost"
             size="icon"
-            className="scheduler-toolbar-nav-button rounded-full"
+            className="scheduler-toolbar-nav-button"
             onClick={() => onNavigate("PREV")}
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
           <Button
             type="button"
-            variant="outline"
+            variant="ghost"
             size="icon"
-            className="scheduler-toolbar-nav-button rounded-full"
+            className="scheduler-toolbar-nav-button"
             onClick={() => onNavigate("NEXT")}
           >
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
 
-        <div className="min-w-0">
-          <div className="scheduler-toolbar-title-row">
-            <h3 className="scheduler-toolbar-title">
-              {formatToolbarRangeLabel(date, view)}
-            </h3>
-            <div className="scheduler-toolbar-context">
-              <span className="scheduler-toolbar-context-name">{calendarTitle}</span>
-              {specializationName ? (
-                <span className="scheduler-toolbar-context-dot" aria-hidden="true" />
-              ) : null}
-              {specializationName ? (
-                <span className="scheduler-toolbar-context-specialization">
-                  {specializationName}
-                </span>
-              ) : null}
-            </div>
-          </div>
-        </div>
+        <Button
+          type="button"
+          variant="ghost"
+          className="scheduler-toolbar-today-button"
+          onClick={() => onNavigate("TODAY")}
+        >
+          Bugun
+        </Button>
+      </div>
+
+      <div className="scheduler-toolbar-title-row">
+        <h3 className="scheduler-toolbar-title">
+          {formatToolbarRangeLabel(date, view)}
+        </h3>
       </div>
 
       <div className="scheduler-toolbar-actions">
@@ -672,7 +601,7 @@ const CustomToolbar = ({
             <Button
               type="button"
               variant="outline"
-              className="scheduler-toolbar-view-button rounded-full"
+              className="scheduler-toolbar-view-button"
             >
               {toolbarViewLabels[view]}
               <ChevronDown className="ml-2 h-4 w-4" />
@@ -697,7 +626,7 @@ const CustomToolbar = ({
         <Button
           type="button"
           variant="outline"
-          className="scheduler-toolbar-manage-button rounded-full"
+          className="scheduler-toolbar-manage-button"
           onClick={onManageAvailability}
         >
           <Settings2 className="mr-2 h-4 w-4" />
@@ -705,7 +634,6 @@ const CustomToolbar = ({
         </Button>
       </div>
     </div>
-
   </div>
 );
 
@@ -722,7 +650,7 @@ const CalendarHeader = ({ date, onContextMenu }: CalendarHeaderProps) => {
       title="Sag tik: gunluk istisna ekle. Haftalik slotlar panelden duzenlenir."
     >
       <span className="scheduler-week-header-day">
-        {format(date, "EEE", { locale: tr })}
+        {formatCalendarHeaderDay(date)}
       </span>
       <span className="scheduler-week-header-date">
         {format(date, "d", { locale: tr })}
@@ -768,9 +696,17 @@ function CalendarEventContent({
   }
 
   if (view === Views.AGENDA) {
+    const eventStatus =
+      event.type === "appointment"
+        ? ((event.resource as Appointment | undefined)?.status ?? "").toLowerCase()
+        : "";
     const agendaToneClass =
       event.type === "appointment"
-        ? "scheduler-agenda-event-appointment"
+        ? eventStatus === "pending"
+          ? "scheduler-agenda-event-appointment-pending"
+          : eventStatus === "completed"
+            ? "scheduler-agenda-event-appointment-completed"
+          : "scheduler-agenda-event-appointment"
         : event.type === "blackout"
           ? "scheduler-agenda-event-blackout"
           : "scheduler-agenda-event-custom-hours";
@@ -817,6 +753,7 @@ export function DoctorCalendar({
   const isMobile = useIsMobile();
   const queryClient = useQueryClient();
   const calendarShellRef = useRef<HTMLDivElement | null>(null);
+  const lastMouseDownPos = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const resolvedDefaultDuration = supportedSlotDurations.includes(
     defaultDuration as (typeof supportedSlotDurations)[number],
   )
@@ -865,6 +802,10 @@ export function DoctorCalendar({
   const [quickActionSlot, setQuickActionSlot] = useState<QuickActionState | null>(
     null,
   );
+  const [panelPosition, setPanelPosition] = useState<{ top: number; left: number }>({
+    top: 0,
+    left: 0,
+  });
   const [blockActionState, setBlockActionState] = useState<BlockActionState | null>(
     null,
   );
@@ -1586,6 +1527,14 @@ export function DoctorCalendar({
       "scheduler-event",
       event.type === "appointment" && "scheduler-event-appointment",
       event.type === "appointment" &&
+        ((event.resource as Appointment | undefined)?.status ?? "").toLowerCase() ===
+          "pending" &&
+        "scheduler-event-appointment-pending",
+      event.type === "appointment" &&
+        ((event.resource as Appointment | undefined)?.status ?? "").toLowerCase() ===
+          "completed" &&
+        "scheduler-event-appointment-completed",
+      event.type === "appointment" &&
         selectedAppointmentId === event.id &&
         "scheduler-event-appointment-selected",
       event.type === "blackout" &&
@@ -1603,6 +1552,18 @@ export function DoctorCalendar({
       return {
         className: "scheduler-event scheduler-event-availability-surface",
         style: {
+          backgroundColor: "rgba(220, 252, 231, 0.55)",
+          borderLeft: "3px solid #16a34a",
+          borderRadius: 0,
+          left: 0,
+          right: 0,
+          width: "100%",
+          margin: 0,
+          marginLeft: 0,
+          marginRight: 0,
+          height: "100%",
+          paddingLeft: 0,
+          paddingRight: 0,
           pointerEvents: "none",
           zIndex: 0,
         },
@@ -1613,6 +1574,10 @@ export function DoctorCalendar({
       return {
         className: "scheduler-event scheduler-event-blackout-surface",
         style: {
+          borderRadius: 0,
+          width: "100%",
+          margin: 0,
+          height: "100%",
           pointerEvents: "none",
           zIndex: 1,
         },
@@ -1630,6 +1595,37 @@ export function DoctorCalendar({
 
     if (resolvedView === Views.AGENDA) {
       return {};
+    }
+
+    if (event.type === "appointment") {
+      const raw = (event.resource as Appointment | undefined)?.status ?? "";
+      const status = raw.toLowerCase();
+      console.log("appointment status raw:", raw, "lowercased:", status);
+
+      let bg = "#4f8fe6";
+      let border = "#2f75ca";
+
+      if (status === "pending") {
+        bg = "#d4943a";
+        border = "#b8782a";
+      } else if (status === "completed") {
+        bg = "#65a98f";
+        border = "#4a8a72";
+      } else if (status === "cancelled" || status === "canceled") {
+        bg = "#5a7a8a";
+        border = "#3d5a6a";
+      }
+
+      return {
+        className: getSchedulerEventClassName(event),
+        style: {
+          backgroundColor: bg,
+          borderLeft: `3px solid ${border}`,
+          color: "#ffffff",
+          borderRadius: "6px",
+          boxShadow: "0 1px 3px rgba(0,0,0,0.15)",
+        },
+      };
     }
 
     return {
@@ -1714,14 +1710,17 @@ export function DoctorCalendar({
       availabilityTarget?: AvailabilitySelectionTarget | null;
     },
   ) => {
-    const anchorSource =
-      slotInfo.box ??
-      slotInfo.bounds ??
-      calendarShellRef.current?.getBoundingClientRect();
+    const PANEL_W = 320;
+    const PANEL_H = 400;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const x = lastMouseDownPos.current.x;
+    const y = lastMouseDownPos.current.y;
 
-    if (!anchorSource) {
-      return;
-    }
+    setPanelPosition({
+      left: Math.max(8, x + PANEL_W + 16 < vw ? x + 12 : x - PANEL_W - 12),
+      top: Math.max(8, y + PANEL_H + 16 < vh ? y + 8 : y - PANEL_H - 8),
+    });
 
     setContextMenuState({ open: false, x: 0, y: 0 });
     clearCalendarSelection();
@@ -1737,13 +1736,6 @@ export function DoctorCalendar({
         slotInfo.end,
         "HH:mm",
       )}`,
-      anchor: {
-        left: "left" in anchorSource ? anchorSource.left : anchorSource.x,
-        right: "right" in anchorSource ? anchorSource.right : anchorSource.x,
-        top: "top" in anchorSource ? anchorSource.top : anchorSource.y,
-        bottom:
-          "bottom" in anchorSource ? anchorSource.bottom : anchorSource.y,
-      },
       override: config.override ?? null,
       availabilityTarget: config.availabilityTarget ?? null,
     });
@@ -1894,14 +1886,6 @@ export function DoctorCalendar({
       </Alert>
     );
   }
-
-  const quickActionPosition =
-    quickActionSlot?.open && !isMobile
-      ? getQuickActionPosition(
-          quickActionSlot.anchor,
-          calendarShellRef.current?.getBoundingClientRect() ?? null,
-        )
-      : null;
 
   const surfaceContextTitle =
     doctorName ?? (mode === "staff" ? "Doktor takvimi" : "Kendi takviminiz");
@@ -2151,6 +2135,7 @@ export function DoctorCalendar({
     slotStart: Date,
     currentTarget: HTMLElement | null,
     sourceTarget: EventTarget | null,
+    e: React.MouseEvent,
   ) => {
     if (!isMobile || (resolvedView !== Views.DAY && resolvedView !== Views.WEEK)) {
       return;
@@ -2163,6 +2148,25 @@ export function DoctorCalendar({
     }
 
     const anchorRect = currentTarget?.getBoundingClientRect();
+    const PANEL_W = 320;
+    const PANEL_H = 400;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const x = e.clientX;
+    const y = e.clientY;
+
+    const left = x + PANEL_W + 16 < vw
+      ? x + 12
+      : x - PANEL_W - 12;
+
+    const top = y + PANEL_H + 16 < vh
+      ? y + 8
+      : y - PANEL_H - 8;
+
+    setPanelPosition({
+      top: Math.max(8, top),
+      left: Math.max(8, left),
+    });
 
     handleSlotSelection({
       action: "select",
@@ -2177,6 +2181,9 @@ export function DoctorCalendar({
   return (
     <div
       ref={calendarShellRef}
+      onMouseDown={(e) => {
+        lastMouseDownPos.current = { x: e.clientX, y: e.clientY };
+      }}
       className="scheduler-calendar-shell flex h-full min-h-0 flex-col overflow-hidden rounded-[34px] border border-border/60 bg-card/95 shadow-soft"
     >
       {mode === "staff" ? (
@@ -2193,7 +2200,7 @@ export function DoctorCalendar({
       ) : null}
 
       <BigCalendar<SchedulerEvent>
-        className="scheduler-calendar min-h-0 flex-1"
+        className="scheduler-calendar min-h-0 flex-1 overflow-hidden"
         views={{
           month: true,
           agenda: true,
@@ -2251,7 +2258,14 @@ export function DoctorCalendar({
         selected={selectedCalendarEvent ?? undefined}
         startAccessor="start"
         endAccessor="end"
-        style={{ height: "100%" }}
+        style={{
+          height: "100%",
+          display: "flex",
+          flexDirection: "column",
+          flex: 1,
+          minHeight: 0,
+          overflow: "hidden",
+        }}
         messages={calendarMessages}
         eventPropGetter={eventPropGetter}
         backgroundEventPropGetter={eventPropGetter}
@@ -2270,8 +2284,10 @@ export function DoctorCalendar({
                   onClick: (event: {
                     currentTarget: HTMLElement;
                     target: EventTarget | null;
+                    clientX: number;
+                    clientY: number;
                   }) => {
-                    handleMobileSlotTap(date, event.currentTarget, event.target);
+                    handleMobileSlotTap(date, event.currentTarget, event.target, event);
                   },
                 }
               : {}),
@@ -2305,11 +2321,17 @@ export function DoctorCalendar({
         dayLayoutAlgorithm="no-overlap"
       />
 
-      {quickActionSlot?.open && quickActionPosition ? (
+      {quickActionSlot?.open && !isMobile ? (
         <div
           data-quick-slot-panel
-          className="absolute z-50 hidden rounded-[24px] border border-border/70 bg-popover/95 p-4 text-popover-foreground shadow-card outline-none backdrop-blur-xl lg:block"
-          style={quickActionPosition}
+          className="z-50 hidden rounded-[24px] border border-border/70 bg-popover/95 p-4 text-popover-foreground shadow-card outline-none backdrop-blur-xl lg:block"
+          style={{
+            position: "fixed",
+            top: panelPosition.top,
+            left: panelPosition.left,
+            width: 320,
+            zIndex: 9999,
+          }}
         >
           <div className="space-y-4">
             <div className="flex items-start justify-between gap-3">
