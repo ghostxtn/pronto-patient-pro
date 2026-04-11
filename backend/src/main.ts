@@ -2,6 +2,7 @@ import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import { NestExpressApplication } from '@nestjs/platform-express';
+import cookieParser = require('cookie-parser');
 import helmet from 'helmet';
 import { join } from 'path';
 import { AppModule } from './app.module';
@@ -15,6 +16,7 @@ async function bootstrap() {
     'http://localhost:5173',
   );
 
+  app.use(cookieParser());
   app.setGlobalPrefix('api');
   app.useStaticAssets(join(__dirname, '..', 'uploads', 'avatars'), {
     prefix: '/uploads/avatars/',
