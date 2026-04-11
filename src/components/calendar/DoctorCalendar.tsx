@@ -29,6 +29,7 @@ import {
 import { tr } from "date-fns/locale";
 import {
   Ban,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   CircleOff,
@@ -152,6 +153,8 @@ interface CalendarAppointmentResponse {
 
 interface CustomToolbarProps extends ToolbarProps<SchedulerEvent, object> {
   onManageAvailability: () => void;
+  calendarTitle: string;
+  specializationName?: string;
 }
 
 interface CalendarHeaderProps {
@@ -518,19 +521,6 @@ const RollingWeekView = Object.assign(
   },
 );
 
-function getToolbarSubtitle(view: View) {
-  switch (view) {
-    case Views.WEEK:
-      return "Haftalik gorunum";
-    case Views.DAY:
-      return "Gunluk odak";
-    case Views.MONTH:
-      return "Aylik plan";
-    default:
-      return "Ajanda gorunumu";
-  }
-}
-
 function getQuickActionPosition(
   anchor: QuickActionState["anchor"],
   calendarBounds?: DOMRect | null,
@@ -580,7 +570,15 @@ function getQuickActionPosition(
   top = Math.min(Math.max(top, minTop), Math.max(minTop, maxTop));
   left = Math.min(Math.max(left, minLeft), Math.max(minLeft, maxLeft));
 
-  return { left, top, width: panelWidth };
+  return {
+    left: left - (calendarBounds?.left ?? 0),
+    top: top - (calendarBounds?.top ?? 0),
+    width: panelWidth,
+  };
+}
+
+function getCalendarScrollContainer(calendarShell: HTMLElement | null) {
+  return calendarShell?.querySelector(".rbc-time-content") as HTMLElement | null;
 }
 
 function splitFullName(fullName: string) {
@@ -612,19 +610,15 @@ const CustomToolbar = ({
   onView,
   view,
   onManageAvailability,
+  calendarTitle,
+  specializationName,
 }: CustomToolbarProps) => (
   <div className="scheduler-toolbar-shell">
     <div className="scheduler-toolbar-row">
-      <div className="min-w-0">
-        <p className="scheduler-toolbar-caption">{getToolbarSubtitle(view)}</p>
-        <h3 className="scheduler-toolbar-title">
-          {formatToolbarRangeLabel(date, view)}
-        </h3>
-      </div>
-
-      <div className="scheduler-toolbar-actions">
+      <div className="scheduler-toolbar-primary">
         <Button
           type="button"
+          variant="outline"
           className="scheduler-toolbar-today-button rounded-full"
           onClick={() => onNavigate("TODAY")}
         >
@@ -652,6 +646,54 @@ const CustomToolbar = ({
           </Button>
         </div>
 
+        <div className="min-w-0">
+          <div className="scheduler-toolbar-title-row">
+            <h3 className="scheduler-toolbar-title">
+              {formatToolbarRangeLabel(date, view)}
+            </h3>
+            <div className="scheduler-toolbar-context">
+              <span className="scheduler-toolbar-context-name">{calendarTitle}</span>
+              {specializationName ? (
+                <span className="scheduler-toolbar-context-dot" aria-hidden="true" />
+              ) : null}
+              {specializationName ? (
+                <span className="scheduler-toolbar-context-specialization">
+                  {specializationName}
+                </span>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="scheduler-toolbar-actions">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              type="button"
+              variant="outline"
+              className="scheduler-toolbar-view-button rounded-full"
+            >
+              {toolbarViewLabels[view]}
+              <ChevronDown className="ml-2 h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-40 rounded-2xl">
+            {toolbarViews.map((toolbarView) => (
+              <DropdownMenuItem
+                key={toolbarView}
+                onClick={() => onView(toolbarView)}
+                className={cn(
+                  "rounded-xl",
+                  view === toolbarView && "bg-accent text-foreground",
+                )}
+              >
+                {toolbarViewLabels[toolbarView]}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+
         <Button
           type="button"
           variant="outline"
@@ -664,21 +706,6 @@ const CustomToolbar = ({
       </div>
     </div>
 
-    <div className="scheduler-view-switch">
-      {toolbarViews.map((toolbarView) => (
-        <button
-          key={toolbarView}
-          onClick={() => onView(toolbarView)}
-          className={cn(
-            "scheduler-view-switch-item",
-            view === toolbarView && "scheduler-view-switch-item-active",
-          )}
-          type="button"
-        >
-          {toolbarViewLabels[toolbarView]}
-        </button>
-      ))}
-    </div>
   </div>
 );
 
@@ -1767,16 +1794,18 @@ export function DoctorCalendar({
       const draftElement = calendarShellRef.current?.querySelector(
         ".scheduler-event-draft",
       ) as HTMLElement | null;
+      const scrollContainer = getCalendarScrollContainer(calendarShellRef.current);
 
-      if (!draftElement) {
+      if (!draftElement || !scrollContainer) {
         return;
       }
 
-      const topBuffer = 112;
-      const bottomBuffer = 48;
+      const topBuffer = 32;
+      const bottomBuffer = 32;
       const draftRect = draftElement.getBoundingClientRect();
-      const viewportTop = topBuffer;
-      const viewportBottom = window.innerHeight - bottomBuffer;
+      const containerRect = scrollContainer.getBoundingClientRect();
+      const viewportTop = containerRect.top + topBuffer;
+      const viewportBottom = containerRect.bottom - bottomBuffer;
 
       let delta = 0;
       if (draftRect.top < viewportTop) {
@@ -1786,10 +1815,7 @@ export function DoctorCalendar({
       }
 
       if (Math.abs(delta) > 12) {
-        window.scrollTo({
-          top: window.scrollY + delta,
-          behavior: "smooth",
-        });
+        scrollContainer.scrollBy({ top: delta, behavior: "smooth" });
       }
     });
 
@@ -1802,6 +1828,48 @@ export function DoctorCalendar({
     activeDraftPreview?.start.getTime(),
     resolvedView,
   ]);
+
+  useEffect(() => {
+    if (resolvedView !== Views.WEEK && resolvedView !== Views.DAY) {
+      return;
+    }
+
+    const calendarShell = calendarShellRef.current;
+    const scrollContainer = getCalendarScrollContainer(calendarShell);
+
+    if (!calendarShell || !scrollContainer) {
+      return;
+    }
+
+    const forwardWheelToGrid = (event: WheelEvent) => {
+      const target = event.target as HTMLElement | null;
+      const isExcludedTarget =
+        target?.closest(".rbc-toolbar") ||
+        target?.closest(".scheduler-surface-context") ||
+        target?.closest("[data-quick-slot-panel]");
+      const shouldForwardFromFixedChrome =
+        target?.closest(".rbc-time-header") || target?.closest(".rbc-time-gutter");
+
+      if (isExcludedTarget || !shouldForwardFromFixedChrome || event.deltaY === 0) {
+        return;
+      }
+
+      event.preventDefault();
+      scrollContainer.scrollBy({
+        top: event.deltaY,
+        behavior: "auto",
+      });
+    };
+
+    calendarShell.addEventListener("wheel", forwardWheelToGrid, {
+      passive: false,
+      capture: true,
+    });
+
+    return () => {
+      calendarShell.removeEventListener("wheel", forwardWheelToGrid, true);
+    };
+  }, [resolvedView]);
 
   const isLoading = isAvailabilityLoading || isCalendarLoading;
   const isError = isAvailabilityError || isCalendarError;
@@ -1835,18 +1903,8 @@ export function DoctorCalendar({
         )
       : null;
 
-  const calendarHeight =
-    resolvedView === Views.MONTH ? 920 : resolvedView === Views.AGENDA ? 760 : 1320;
-
-  const surfaceContextLabel = mode === "staff" ? "Staff scheduler" : "Doctor workspace";
   const surfaceContextTitle =
     doctorName ?? (mode === "staff" ? "Doktor takvimi" : "Kendi takviminiz");
-  const surfaceContextDescription =
-    mode === "staff"
-      ? specializationName
-        ? `${specializationName} takvimi, musaitlik ve randevu akislari tek yuzeyde yonetilir.`
-        : "Secili doktorun musaitlik, istisna ve randevu akislarini bu yuzeyden yonetin."
-      : "Musaitlik, gunluk istisnalar ve randevu akislarini ayni takvim yuzeyinde takip edin.";
 
   const quickActionBadge =
     quickActionSlot?.kind === "available"
@@ -2119,23 +2177,23 @@ export function DoctorCalendar({
   return (
     <div
       ref={calendarShellRef}
-      className="scheduler-calendar-shell overflow-hidden rounded-[34px] border border-border/60 bg-card/95 shadow-soft"
+      className="scheduler-calendar-shell flex h-full min-h-0 flex-col overflow-hidden rounded-[34px] border border-border/60 bg-card/95 shadow-soft"
     >
-      <div className="scheduler-surface-context">
-        <div className="min-w-0">
-          <p className="scheduler-surface-context-label">{surfaceContextLabel}</p>
-          <h2 className="scheduler-surface-context-title">{surfaceContextTitle}</h2>
-          <p className="scheduler-surface-context-description">{surfaceContextDescription}</p>
+      {mode === "staff" ? (
+        <div className="scheduler-surface-context shrink-0">
+          <div className="min-w-0">
+            <h2 className="scheduler-surface-context-title">{surfaceContextTitle}</h2>
+          </div>
+          {specializationName ? (
+            <Badge variant="outline" className="scheduler-surface-context-badge">
+              {specializationName}
+            </Badge>
+          ) : null}
         </div>
-        {specializationName ? (
-          <Badge variant="outline" className="scheduler-surface-context-badge">
-            {specializationName}
-          </Badge>
-        ) : null}
-      </div>
+      ) : null}
 
       <BigCalendar<SchedulerEvent>
-        className="scheduler-calendar"
+        className="scheduler-calendar min-h-0 flex-1"
         views={{
           month: true,
           agenda: true,
@@ -2168,6 +2226,8 @@ export function DoctorCalendar({
           toolbar: (toolbarProps) => (
             <CustomToolbar
               {...toolbarProps}
+              calendarTitle={surfaceContextTitle}
+              specializationName={specializationName}
               onManageAvailability={() => {
                 resetCalendarActiveState();
                 setIsAvailabilitySheetOpen(true);
@@ -2191,7 +2251,7 @@ export function DoctorCalendar({
         selected={selectedCalendarEvent ?? undefined}
         startAccessor="start"
         endAccessor="end"
-        style={{ height: calendarHeight }}
+        style={{ height: "100%" }}
         messages={calendarMessages}
         eventPropGetter={eventPropGetter}
         backgroundEventPropGetter={eventPropGetter}
@@ -2248,7 +2308,7 @@ export function DoctorCalendar({
       {quickActionSlot?.open && quickActionPosition ? (
         <div
           data-quick-slot-panel
-          className="fixed z-50 hidden rounded-[24px] border border-border/70 bg-popover/95 p-4 text-popover-foreground shadow-card outline-none backdrop-blur-xl lg:block"
+          className="absolute z-50 hidden rounded-[24px] border border-border/70 bg-popover/95 p-4 text-popover-foreground shadow-card outline-none backdrop-blur-xl lg:block"
           style={quickActionPosition}
         >
           <div className="space-y-4">

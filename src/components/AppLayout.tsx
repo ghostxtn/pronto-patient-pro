@@ -25,7 +25,12 @@ import { getDefaultRouteByRole } from "@/lib/auth-routing";
 import { hasActiveDoctorProfile } from "@/lib/doctor-access";
 import { cn } from "@/lib/utils";
 
-export default function AppLayout({ children }: { children: React.ReactNode }) {
+interface AppLayoutProps {
+  children: React.ReactNode;
+  mainClassName?: string;
+}
+
+export default function AppLayout({ children, mainClassName }: AppLayoutProps) {
   const { user, logout } = useAuth();
   const { t } = useLanguage();
   const location = useLocation();
@@ -107,7 +112,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     location.pathname === path || location.pathname.startsWith(`${path}/`);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="flex min-h-screen flex-col bg-background">
       <header className="glass-strong border-b sticky top-0 z-50">
         <div className="container flex h-16 items-center justify-between">
           <div className="flex items-center gap-3">
@@ -204,7 +209,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         )}
       </AnimatePresence>
 
-      <main className="container py-6">{children}</main>
+      <main className={cn("container flex-1 py-6", mainClassName)}>{children}</main>
     </div>
   );
 }

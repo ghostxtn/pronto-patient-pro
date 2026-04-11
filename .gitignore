@@ -34,3 +34,8 @@ bun.lockb
 .codex/
 AGENTS.md
 graphify-out/
+.graphify-venv/
+.graphify-tmp/
+.graphify*.json
+scripts/graphify.cmd
+*.ps1

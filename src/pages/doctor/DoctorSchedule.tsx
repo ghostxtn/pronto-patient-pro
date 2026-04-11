@@ -6,21 +6,10 @@ import AppLayout from "@/components/AppLayout";
 import { DoctorCalendar } from "@/components/calendar/DoctorCalendar";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useAuth } from "@/contexts/AuthContext";
-import { useLanguage } from "@/contexts/LanguageContext";
 import api from "@/services/api";
-
-const fadeUp = {
-  hidden: { opacity: 0, y: 20 },
-  visible: (i: number) => ({
-    opacity: 1,
-    y: 0,
-    transition: { delay: i * 0.06, duration: 0.5, ease: [0.22, 1, 0.36, 1] as const },
-  }),
-};
 
 export default function DoctorSchedule() {
   const { user } = useAuth();
-  const { t } = useLanguage();
 
   useEffect(() => {
     console.debug("[doctor][schedule] mounted", {
@@ -59,25 +48,20 @@ export default function DoctorSchedule() {
   }, [doctorRecord, error, isError, isLoading, user?.id, user?.role]);
 
   return (
-    <AppLayout>
-      <motion.div initial="hidden" animate="visible">
-        <motion.div
-          className="mb-5 rounded-[28px] border border-border/60 bg-card/80 px-4 py-4 shadow-soft"
-          custom={0}
-          variants={fadeUp}
-        >
-          <h1 className="mb-1 text-[1.9rem] font-display font-bold tracking-[-0.03em]">
-            {t.mySchedule}
-          </h1>
-          <p className="text-muted-foreground">{t.myScheduleDesc}</p>
-        </motion.div>
-
+    <AppLayout mainClassName="flex min-h-0 overflow-hidden pt-3 pb-4 sm:pt-4 sm:pb-6">
+      <motion.div
+        initial="hidden"
+        animate="visible"
+        className="flex min-h-0 flex-1 flex-col overflow-hidden"
+      >
         {doctorRecord ? (
-          <DoctorCalendar
-            doctorId={doctorRecord.id}
-            mode="doctor"
-            defaultDuration={clinic?.default_appointment_duration ?? 30}
-          />
+          <div className="min-h-0 flex-1 overflow-hidden">
+            <DoctorCalendar
+              doctorId={doctorRecord.id}
+              mode="doctor"
+              defaultDuration={clinic?.default_appointment_duration ?? 30}
+            />
+          </div>
         ) : isError ? (
           <Alert className="rounded-2xl">
             <AlertTitle>Doctor schedule could not be loaded</AlertTitle>

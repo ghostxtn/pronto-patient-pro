@@ -17,6 +17,14 @@ Codex quota is limited — keep prompts minimal and targeted.
 - **Infrastructure:** Docker Compose + Nginx, Turkish VPS
 - **Testing:** `curl` on Mac/zsh
 
+## Graphify
+- Knowledge graph output lives in `graphify-out/`
+- Windows/PowerShell bootstrap command: `powershell -ExecutionPolicy Bypass -File .\scripts\graphify.ps1 bootstrap`
+- Rebuild command after code changes: `powershell -ExecutionPolicy Bypass -File .\scripts\graphify.ps1 rebuild`
+- Smoke test: `powershell -ExecutionPolicy Bypass -File .\scripts\graphify.ps1 smoke`
+- The script is Windows-safe: it tries `py -3`, then `python3`, then `python`; forces UTF-8 to avoid CP1254 crashes; sets `PYTHONPATH` to `graphify-out/vendor`; and installs/updates `graphifyy` into `graphify-out/vendor` if imports are missing
+- Do not use raw `python -c "from graphify..."` commands in this repo as the default workflow; future Codex sessions should always prefer the repo-local `scripts/graphify.ps1` runner
+
 ---
 
 ## Production & Local Routing
