@@ -394,25 +394,12 @@ export default function StaffDoctors() {
 
   const { data: doctors = [], isLoading } = useQuery<DoctorSummary[]>({
     queryKey: ["staff-doctors", todayDayOfWeek],
-    queryFn: async () => {
-      const doctors = await api.doctors.list() as DoctorSummary[];
-      const doctorAvailability = await Promise.all(
-        doctors.map(async (doctor) => {
-          const availability = await api.availability.listByDoctor(doctor.id) as AvailabilitySlot[];
-          const todaySlots = availability.filter(
-            (slot) => slot.day_of_week === todayDayOfWeek && slot.is_active !== false,
-          );
-
-          return {
-            ...doctor,
-            todaySlotCount: todaySlots.length,
-            isAvailableToday: todaySlots.length > 0,
-          };
-        }),
-      );
-
-      return doctorAvailability;
-    },
+    queryFn: async () =>
+      (await api.doctors.list() as DoctorSummary[]).map((doctor) => ({
+        ...doctor,
+        todaySlotCount: 0,
+        isAvailableToday: false,
+      })),
   });
 
   useEffect(() => {

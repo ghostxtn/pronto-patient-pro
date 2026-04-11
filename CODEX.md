@@ -101,6 +101,11 @@ npm run db:seed
 - Fresh DB: `docker compose up -d` -> `npm run db:migrate` -> `npm run db:seed`
 - Schema change: `npm run db:generate` -> commit migration -> `npm run db:migrate`
 - Avoid treating `db:push` as the default team flow; prefer committed migrations
+### Staff Calendar 429 Note
+- 429 root cause was per-doctor availability fan-out in `src/pages/staff/StaffDoctors.tsx`
+- Final fix was removing the `Promise.all(...api.availability.listByDoctor...)` burst from the staff page
+- Throttle `300/min` is kept only as buffer, not the primary solution
+
 
 ### Existing DB Repair Flow
 Use this only if the local database already has clinic tables and `npm run db:migrate` fails with errors like `relation "users" already exists`.

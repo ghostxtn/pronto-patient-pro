@@ -41,7 +41,7 @@ import { StorageModule } from './storage/storage.module';
       envFilePath: ['.env', '../.env'],
     }),
     ThrottlerModule.forRoot([
-      { name: 'global', ttl: 60000, limit: 100 },
+      { name: 'global', ttl: 60000, limit: 300 },
     ]),
     HealthModule,
     HomepagePreviewModule,
