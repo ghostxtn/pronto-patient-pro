@@ -13,15 +13,18 @@ export class EmailService {
 
   constructor(private readonly configService: ConfigService) {}
 
-  async sendAuthOtp(email: string, code: string): Promise<void> {
-    const from =
+  private getFromAddress(): string {
+    return (
       this.configService.get<string>('SMTP_FROM') ||
       this.configService.get<string>('SMTP_USER') ||
-      'no-reply@localhost';
+      'no-reply@localhost'
+    );
+  }
 
+  async sendAuthOtp(email: string, code: string): Promise<void> {
     try {
       await this.getTransporter().sendMail({
-        from,
+        from: this.getFromAddress(),
         to: email,
         subject: 'Your verification code',
         text: `Your verification code is ${code}. It expires in 10 minutes.`,
@@ -45,14 +48,9 @@ export class EmailService {
     resetLink: string,
     expiresInMinutes: number,
   ): Promise<void> {
-    const from =
-      this.configService.get<string>('SMTP_FROM') ||
-      this.configService.get<string>('SMTP_USER') ||
-      'no-reply@localhost';
-
     try {
       await this.getTransporter().sendMail({
-        from,
+        from: this.getFromAddress(),
         to: email,
         subject: 'Reset your password',
         text: [
@@ -71,6 +69,196 @@ export class EmailService {
     } catch (error) {
       this.logger.error(
         `Failed to send password reset email to ${email}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+
+      throw new ServiceUnavailableException(
+        'Email delivery failed. Check SMTP settings and use a verified SMTP_FROM sender address.',
+      );
+    }
+  }
+
+  async sendAppointmentCreated(
+    to: string,
+    payload: {
+      patientName: string;
+      doctorName: string;
+      date: string;
+      startTime: string;
+      endTime: string;
+      type: string;
+    },
+  ): Promise<void> {
+    try {
+      await this.getTransporter().sendMail({
+        from: this.getFromAddress(),
+        to,
+        subject: 'Randevunuz Oluşturuldu',
+        html: `
+          <p>Merhaba ${payload.patientName},</p>
+          <p>Randevu talebiniz başarıyla oluşturuldu.</p>
+          <p><strong>Doktor:</strong> ${payload.doctorName}</p>
+          <p><strong>Tarih:</strong> ${payload.date}</p>
+          <p><strong>Saat:</strong> ${payload.startTime} - ${payload.endTime}</p>
+          <p><strong>Randevu Türü:</strong> ${payload.type}</p>
+          <p>Randevunuz onaylandığında sizinle tekrar paylaşılacaktır.</p>
+        `,
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to send appointment created email to ${to}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+
+      throw new ServiceUnavailableException(
+        'Email delivery failed. Check SMTP settings and use a verified SMTP_FROM sender address.',
+      );
+    }
+  }
+
+  async sendAppointmentConfirmed(
+    to: string,
+    payload: {
+      patientName: string;
+      doctorName: string;
+      date: string;
+      startTime: string;
+      endTime: string;
+    },
+  ): Promise<void> {
+    try {
+      await this.getTransporter().sendMail({
+        from: this.getFromAddress(),
+        to,
+        subject: 'Randevunuz Onaylandı',
+        html: `
+          <p>Merhaba ${payload.patientName},</p>
+          <p>Randevunuz onaylandı.</p>
+          <p><strong>Doktor:</strong> ${payload.doctorName}</p>
+          <p><strong>Tarih:</strong> ${payload.date}</p>
+          <p><strong>Saat:</strong> ${payload.startTime} - ${payload.endTime}</p>
+          <p>Sağlıklı günler dileriz.</p>
+        `,
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to send appointment confirmed email to ${to}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+
+      throw new ServiceUnavailableException(
+        'Email delivery failed. Check SMTP settings and use a verified SMTP_FROM sender address.',
+      );
+    }
+  }
+
+  async sendAppointmentCancelled(
+    to: string,
+    payload: {
+      patientName: string;
+      doctorName: string;
+      date: string;
+      startTime: string;
+    },
+  ): Promise<void> {
+    try {
+      await this.getTransporter().sendMail({
+        from: this.getFromAddress(),
+        to,
+        subject: 'Randevunuz İptal Edildi',
+        html: `
+          <p>Merhaba ${payload.patientName},</p>
+          <p>Aşağıdaki randevunuz iptal edilmiştir.</p>
+          <p><strong>Doktor:</strong> ${payload.doctorName}</p>
+          <p><strong>Tarih:</strong> ${payload.date}</p>
+          <p><strong>Saat:</strong> ${payload.startTime}</p>
+          <p>Detaylı bilgi için kliniğinizle iletişime geçebilirsiniz.</p>
+        `,
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to send appointment cancelled email to ${to}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+
+      throw new ServiceUnavailableException(
+        'Email delivery failed. Check SMTP settings and use a verified SMTP_FROM sender address.',
+      );
+    }
+  }
+
+  async sendStaffNewAppointment(
+    to: string,
+    payload: {
+      staffName: string;
+      patientName: string;
+      doctorName: string;
+      date: string;
+      startTime: string;
+      endTime: string;
+      type: string;
+    },
+  ): Promise<void> {
+    try {
+      await this.getTransporter().sendMail({
+        from: this.getFromAddress(),
+        to,
+        subject: 'Yeni Randevu Talebi',
+        html: `
+          <p>Merhaba ${payload.staffName},</p>
+          <p>Yeni bir randevu talebi oluşturuldu.</p>
+          <p><strong>Hasta:</strong> ${payload.patientName}</p>
+          <p><strong>Doktor:</strong> ${payload.doctorName}</p>
+          <p><strong>Tarih:</strong> ${payload.date}</p>
+          <p><strong>Saat:</strong> ${payload.startTime} - ${payload.endTime}</p>
+          <p><strong>Randevu Türü:</strong> ${payload.type}</p>
+          <p>Lutfen randevu talebini sistem uzerinden degerlendirin.</p>
+        `,
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to send staff new appointment email to ${to}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+
+      throw new ServiceUnavailableException(
+        'Email delivery failed. Check SMTP settings and use a verified SMTP_FROM sender address.',
+      );
+    }
+  }
+
+  async sendDoctorAppointmentConfirmed(
+    to: string,
+    payload: {
+      doctorName: string;
+      patientName: string;
+      date: string;
+      startTime: string;
+      endTime: string;
+    },
+  ): Promise<void> {
+    try {
+      await this.getTransporter().sendMail({
+        from: this.getFromAddress(),
+        to,
+        subject: 'Randevu Onaylandı',
+        html: `
+          <p>Merhaba ${payload.doctorName},</p>
+          <p>Randevunuz onaylandı.</p>
+          <p><strong>Hasta:</strong> ${payload.patientName}</p>
+          <p><strong>Tarih:</strong> ${payload.date}</p>
+          <p><strong>Saat:</strong> ${payload.startTime} - ${payload.endTime}</p>
+          <p>Takviminizi buna gore planlayabilirsiniz.</p>
+        `,
+      });
+    } catch (error) {
+      this.logger.error(
+        `Failed to send doctor appointment confirmed email to ${to}: ${
           error instanceof Error ? error.message : String(error)
         }`,
       );
