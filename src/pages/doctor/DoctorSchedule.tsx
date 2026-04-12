@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Loader2 } from "lucide-react";
+import { Views, type View } from "react-big-calendar";
 import AppLayout from "@/components/AppLayout";
 import { DoctorCalendar } from "@/components/calendar/DoctorCalendar";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -10,6 +11,8 @@ import api from "@/services/api";
 
 export default function DoctorSchedule() {
   const { user } = useAuth();
+  const [calendarDate, setCalendarDate] = useState(new Date());
+  const [calendarView, setCalendarView] = useState<View>(Views.WEEK);
 
   useEffect(() => {
     console.debug("[doctor][schedule] mounted", {
@@ -63,6 +66,10 @@ export default function DoctorSchedule() {
               doctorId={doctorRecord.id}
               mode="doctor"
               defaultDuration={clinic?.default_appointment_duration ?? 30}
+              calendarDate={calendarDate}
+              onCalendarDateChange={setCalendarDate}
+              calendarView={calendarView}
+              onCalendarViewChange={setCalendarView}
             />
           </div>
         ) : isError ? (

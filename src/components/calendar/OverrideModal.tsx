@@ -138,7 +138,7 @@ export function OverrideModal({
         <SheetContent
           side="right"
           overlayClassName="bg-foreground/10 backdrop-blur-sm data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
-          className="w-full overflow-y-auto border-l border-border/40 bg-background/95 backdrop-blur-2xl px-0 shadow-2xl sm:max-w-[32rem]"
+          className="w-[480px] overflow-y-auto border-l border-border/40 bg-background/95 px-0 shadow-2xl sm:max-w-[480px]"
         >
           <SheetHeader className="border-b border-border/50 px-6 pb-5 pt-8">
             <div className="flex items-center justify-between gap-3">

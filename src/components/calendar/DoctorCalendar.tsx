@@ -221,6 +221,15 @@ interface AppointmentComposerState {
   timeLabel: string;
 }
 
+interface QuickActionAnchorRect {
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
+  width: number;
+  height: number;
+}
+
 interface PatientLookupRecord {
   id: string;
   first_name?: string;
@@ -964,6 +973,106 @@ function toApiDate(date: Date) {
 
 const QUICK_ACTION_PANEL_W = 340;
 const QUICK_ACTION_PANEL_MAX_H = 560;
+const QUICK_ACTION_PANEL_MARGIN = 12;
+
+function createQuickActionAnchorRect(
+  rect: Pick<QuickActionAnchorRect, "top" | "right" | "bottom" | "left">,
+): QuickActionAnchorRect {
+  return {
+    top: rect.top,
+    right: rect.right,
+    bottom: rect.bottom,
+    left: rect.left,
+    width: rect.right - rect.left,
+    height: rect.bottom - rect.top,
+  };
+}
+
+function getQuickActionAnchorRect(slotInfo: SlotInfo): QuickActionAnchorRect | null {
+  const point = slotInfo.box
+    ? {
+        x: slotInfo.box.clientX,
+        y: slotInfo.box.clientY,
+      }
+    : slotInfo.bounds
+      ? {
+          x: (slotInfo.bounds.left + slotInfo.bounds.right) / 2,
+          y: Math.min(
+            slotInfo.bounds.top + 1,
+            Math.max(slotInfo.bounds.top, slotInfo.bounds.bottom - 1),
+          ),
+        }
+      : null;
+
+  if (typeof document !== "undefined" && point) {
+    const slotElement = document
+      .elementsFromPoint(point.x, point.y)
+      .find(
+        (element): element is HTMLElement =>
+          element instanceof HTMLElement &&
+          Boolean(element.closest("[data-scheduler-slot]")),
+      )
+      ?.closest<HTMLElement>("[data-scheduler-slot]");
+
+    if (slotElement) {
+      return createQuickActionAnchorRect(slotElement.getBoundingClientRect());
+    }
+  }
+
+  if (slotInfo.bounds) {
+    return createQuickActionAnchorRect(slotInfo.bounds);
+  }
+
+  if (slotInfo.box) {
+    return createQuickActionAnchorRect({
+      top: slotInfo.box.clientY,
+      right: slotInfo.box.clientX,
+      bottom: slotInfo.box.clientY,
+      left: slotInfo.box.clientX,
+    });
+  }
+
+  return null;
+}
+
+function getQuickActionPanelPosition(
+  rect: QuickActionAnchorRect,
+  panelWidth: number,
+  panelHeight: number,
+) {
+  let left = rect.right + QUICK_ACTION_PANEL_MARGIN;
+  let top = rect.top;
+
+  if (left + panelWidth > window.innerWidth - QUICK_ACTION_PANEL_MARGIN) {
+    left = rect.left - panelWidth - QUICK_ACTION_PANEL_MARGIN;
+  }
+
+  if (top + panelHeight > window.innerHeight - QUICK_ACTION_PANEL_MARGIN) {
+    top = window.innerHeight - panelHeight - QUICK_ACTION_PANEL_MARGIN;
+  }
+
+  if (top < QUICK_ACTION_PANEL_MARGIN) {
+    top = QUICK_ACTION_PANEL_MARGIN;
+  }
+
+  if (left < QUICK_ACTION_PANEL_MARGIN) {
+    left = QUICK_ACTION_PANEL_MARGIN;
+  }
+
+  const maxLeft = Math.max(
+    QUICK_ACTION_PANEL_MARGIN,
+    window.innerWidth - panelWidth - QUICK_ACTION_PANEL_MARGIN,
+  );
+  const maxTop = Math.max(
+    QUICK_ACTION_PANEL_MARGIN,
+    window.innerHeight - panelHeight - QUICK_ACTION_PANEL_MARGIN,
+  );
+
+  return {
+    left: Math.min(left, maxLeft),
+    top: Math.min(top, maxTop),
+  };
+}
 
 export function DoctorCalendar({
   doctorId,
@@ -980,7 +1089,6 @@ export function DoctorCalendar({
   const queryClient = useQueryClient();
   const calendarShellRef = useRef<HTMLDivElement | null>(null);
   const quickActionPanelRef = useRef<HTMLDivElement | null>(null);
-  const lastMousePos = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const hasAutoScrolledToCurrentTimeRef = useRef(false);
   const resolvedDefaultDuration = supportedSlotDurations.includes(
     defaultDuration as (typeof supportedSlotDurations)[number],
@@ -1042,6 +1150,8 @@ export function DoctorCalendar({
     top: 0,
     left: 0,
   });
+  const [quickActionAnchorRect, setQuickActionAnchorRect] =
+    useState<QuickActionAnchorRect | null>(null);
   const [blockActionState, setBlockActionState] = useState<BlockActionState | null>(
     null,
   );
@@ -1063,6 +1173,11 @@ export function DoctorCalendar({
 
   const resolvedCurrentDate = calendarDate ?? internalCurrentDate;
   const resolvedView = calendarView ?? internalView;
+
+  const closeQuickActionPanel = () => {
+    setQuickActionSlot(null);
+    setQuickActionAnchorRect(null);
+  };
 
   const setCalendarDate = (nextDate: Date) => {
     onCalendarDateChange?.(nextDate);
@@ -1277,7 +1392,7 @@ export function DoctorCalendar({
     onSuccess: async () => {
       toast.success("Zaman bloklamasi eklendi");
       setBlockActionState(null);
-      setQuickActionSlot(null);
+      closeQuickActionPanel();
       clearCalendarSelection();
       await queryClient.invalidateQueries({
         queryKey: ["availability-overrides", doctorId],
@@ -1338,7 +1453,7 @@ export function DoctorCalendar({
       setManualPatientPhone("");
       setManualPatientNote("");
       setAppointmentNotes("");
-      setQuickActionSlot(null);
+      closeQuickActionPanel();
       clearCalendarSelection();
       await queryClient.invalidateQueries({
         queryKey: ["doctor-calendar", doctorId],
@@ -1636,7 +1751,7 @@ export function DoctorCalendar({
   };
 
   const resetCalendarActiveState = () => {
-    setQuickActionSlot(null);
+    closeQuickActionPanel();
     setAvailabilityDraft(null);
     setBlockActionState(null);
     setContextMenuState({ open: false, x: 0, y: 0 });
@@ -1959,23 +2074,18 @@ export function DoctorCalendar({
       availabilityTarget?: AvailabilitySelectionTarget | null;
     },
   ) => {
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    const x = lastMousePos.current.x;
-    const y = lastMousePos.current.y;
-    const left =
-      x + QUICK_ACTION_PANEL_W + 20 < vw
-        ? x + 12
-        : x - QUICK_ACTION_PANEL_W - 12;
-    const top =
-      y + QUICK_ACTION_PANEL_MAX_H + 20 < vh
-        ? y + 8
-        : y - QUICK_ACTION_PANEL_MAX_H - 8;
+    const anchorRect = getQuickActionAnchorRect(slotInfo);
+    setQuickActionAnchorRect(anchorRect);
 
-    setPanelPosition({
-      top: Math.max(8, Math.min(top, vh - QUICK_ACTION_PANEL_MAX_H - 8)),
-      left: Math.max(8, Math.min(left, vw - QUICK_ACTION_PANEL_W - 8)),
-    });
+    if (anchorRect) {
+      setPanelPosition(
+        getQuickActionPanelPosition(
+          anchorRect,
+          QUICK_ACTION_PANEL_W,
+          QUICK_ACTION_PANEL_MAX_H,
+        ),
+      );
+    }
 
     setContextMenuState({ open: false, x: 0, y: 0 });
     clearCalendarSelection();
@@ -1997,15 +2107,6 @@ export function DoctorCalendar({
   };
 
   useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      lastMousePos.current = { x: e.clientX, y: e.clientY };
-    };
-
-    document.addEventListener("mousemove", handler);
-    return () => document.removeEventListener("mousemove", handler);
-  }, []);
-
-  useEffect(() => {
     if (!quickActionSlot?.open) {
       return;
     }
@@ -2013,6 +2114,7 @@ export function DoctorCalendar({
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setQuickActionSlot(null);
+        setQuickActionAnchorRect(null);
       }
     };
 
@@ -2022,14 +2124,24 @@ export function DoctorCalendar({
         return;
       }
       setQuickActionSlot(null);
+      setQuickActionAnchorRect(null);
+    };
+
+    const handleViewportChange = () => {
+      setQuickActionSlot(null);
+      setQuickActionAnchorRect(null);
     };
 
     window.addEventListener("keydown", handleEscape);
     window.addEventListener("mousedown", handleClickAway);
+    window.addEventListener("scroll", handleViewportChange, true);
+    window.addEventListener("resize", handleViewportChange);
 
     return () => {
       window.removeEventListener("keydown", handleEscape);
       window.removeEventListener("mousedown", handleClickAway);
+      window.removeEventListener("scroll", handleViewportChange, true);
+      window.removeEventListener("resize", handleViewportChange);
     };
   }, [quickActionSlot]);
 
@@ -2075,27 +2187,38 @@ export function DoctorCalendar({
   }, [quickActionPicker, quickActionSlot]);
 
   useLayoutEffect(() => {
-    if (!quickActionSlot?.open || isMobile) {
+    if (!quickActionSlot?.open || isMobile || !quickActionAnchorRect) {
       return;
     }
 
-    const panelHeight = quickActionPanelRef.current?.offsetHeight;
-    if (!panelHeight) {
+    const panelWidth = quickActionPanelRef.current?.offsetWidth ?? QUICK_ACTION_PANEL_W;
+    const panelHeight =
+      quickActionPanelRef.current?.offsetHeight ?? QUICK_ACTION_PANEL_MAX_H;
+    if (!panelWidth || !panelHeight) {
       return;
     }
 
-    const vh = window.innerHeight;
-    const nextTop = Math.max(8, Math.min(panelPosition.top, vh - panelHeight - 8));
+    const nextPosition = getQuickActionPanelPosition(
+      quickActionAnchorRect,
+      panelWidth,
+      panelHeight,
+    );
 
-    if (nextTop !== panelPosition.top) {
+    if (
+      nextPosition.top !== panelPosition.top ||
+      nextPosition.left !== panelPosition.left
+    ) {
       setPanelPosition((current) =>
-        current.top === nextTop ? current : { ...current, top: nextTop },
+        current.top === nextPosition.top && current.left === nextPosition.left
+          ? current
+          : nextPosition,
       );
     }
   });
 
   useEffect(() => {
     setQuickActionSlot(null);
+    setQuickActionAnchorRect(null);
     setQuickActionPicker(null);
     setBlockActionState(null);
     clearCalendarSelection();
@@ -2815,7 +2938,7 @@ export function DoctorCalendar({
     }
 
     if (slotState.isPast) {
-      setQuickActionSlot(null);
+      closeQuickActionPanel();
       return;
     }
 
@@ -2952,6 +3075,7 @@ export function DoctorCalendar({
               "scheduler-slot",
               isPast && "scheduler-slot-past",
             ),
+            "data-scheduler-slot": "true",
             ...(isMobile &&
             (resolvedView === Views.DAY || resolvedView === Views.WEEK)
               ? {
@@ -2982,6 +3106,7 @@ export function DoctorCalendar({
           setCalendarView(Views.DAY);
         }}
         getDrilldownView={() => Views.DAY}
+        onSelecting={() => true}
         onSelectSlot={handleSlotSelection}
         onSelectEvent={handleSelectEvent}
         selectable={!isMobile || resolvedView === Views.MONTH}
@@ -3026,7 +3151,7 @@ export function DoctorCalendar({
                 variant="ghost"
                 size="icon"
                 className="absolute right-3 top-3 h-8 w-8 rounded-full"
-                onClick={() => setQuickActionSlot(null)}
+                onClick={closeQuickActionPanel}
               >
                 <X className="h-4 w-4" />
               </Button>

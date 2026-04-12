@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -114,28 +114,26 @@ export function AppointmentDetailSheet({
   const StatusIcon = status?.icon;
 
   return (
-    <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
-      <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto rounded-2xl">
+    <Sheet open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
+      <SheetContent side="right" className="w-[480px] sm:max-w-[480px] overflow-y-auto">
         {appointment && status && StatusIcon ? (
           <>
-            <DialogHeader>
-              <DialogTitle className="font-display">{t.appointmentDetails}</DialogTitle>
-              <DialogDescription asChild>
-                <div>
-                  <Badge
-                    className={cn("mt-2 rounded-full border")}
-                    variant="outline"
-                    style={{
-                      backgroundColor: `${status.color}26`,
-                      borderColor: `${status.color}26`,
-                      color: status.color,
-                    }}
-                  >
-                    <StatusIcon className="mr-1 h-3 w-3" /> {status.label}
-                  </Badge>
-                </div>
-              </DialogDescription>
-            </DialogHeader>
+            <SheetHeader>
+              <SheetTitle className="font-display">{t.appointmentDetails}</SheetTitle>
+              <div>
+                <Badge
+                  className={cn("mt-2 rounded-full border")}
+                  variant="outline"
+                  style={{
+                    backgroundColor: `${status.color}26`,
+                    borderColor: `${status.color}26`,
+                    color: status.color,
+                  }}
+                >
+                  <StatusIcon className="mr-1 h-3 w-3" /> {status.label}
+                </Badge>
+              </div>
+            </SheetHeader>
 
             <div className="space-y-4">
               <div className="flex items-center gap-3">
@@ -271,7 +269,7 @@ export function AppointmentDetailSheet({
             </div>
           </>
         ) : null}
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   );
 }
