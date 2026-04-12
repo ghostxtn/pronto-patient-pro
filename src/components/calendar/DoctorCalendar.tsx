@@ -135,7 +135,7 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 const OVERRIDE_COLORS: Record<string, string> = {
-  custom_hours: "#6366f1",
+  custom_hours: "#c0392b",
   blackout: "#8b8fa3",
 };
 
@@ -297,6 +297,10 @@ const toolbarViewLabels = {
 const toolbarViews = [Views.WEEK, Views.DAY, Views.MONTH, Views.AGENDA] as const;
 const QUICK_ACTION_TIME_MINUTES_START = 6 * 60;
 const QUICK_ACTION_TIME_MINUTES_END = 23 * 60 + 45;
+const CALENDAR_START_HOUR = 6;
+const CALENDAR_END_HOUR = 23;
+const CALENDAR_START_MINUTES = CALENDAR_START_HOUR * 60;
+const CALENDAR_END_MINUTES = CALENDAR_END_HOUR * 60;
 const quarterHourTimes = Array.from(
   {
     length:
@@ -663,6 +667,58 @@ function getCalendarScrollContainer(calendarShell: HTMLElement | null) {
   return calendarShell?.querySelector(".rbc-time-content") as HTMLElement | null;
 }
 
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
+}
+
+function getMinutesSinceMidnight(date: Date) {
+  return date.getHours() * 60 + date.getMinutes();
+}
+
+function getTimeGridDaySlots(scrollContainer: HTMLElement) {
+  return Array.from(scrollContainer.children).filter(
+    (child): child is HTMLElement =>
+      child instanceof HTMLElement && child.classList.contains("rbc-day-slot"),
+  );
+}
+
+function getTodayTimeColumn(
+  calendarShell: HTMLElement,
+  scrollContainer: HTMLElement,
+  view: View,
+  currentDate: Date,
+) {
+  const daySlots = getTimeGridDaySlots(scrollContainer);
+
+  if (daySlots.length === 0) {
+    return null;
+  }
+
+  if (view === Views.DAY) {
+    return isToday(currentDate) ? daySlots[0] : null;
+  }
+
+  if (view !== Views.WEEK) {
+    return null;
+  }
+
+  const headerCells = Array.from(
+    calendarShell.querySelectorAll(".rbc-time-header-content .rbc-header"),
+  ).filter((cell): cell is HTMLElement => cell instanceof HTMLElement);
+  const backgroundCells = Array.from(calendarShell.querySelectorAll(".rbc-day-bg")).filter(
+    (cell): cell is HTMLElement => cell instanceof HTMLElement,
+  );
+  const todayIndex = [headerCells, backgroundCells]
+    .map((cells) => cells.findIndex((cell) => cell.classList.contains("rbc-today")))
+    .find((index) => index !== -1);
+
+  if (todayIndex === undefined || todayIndex < 0) {
+    return null;
+  }
+
+  return daySlots[todayIndex] ?? null;
+}
+
 function splitFullName(fullName: string) {
   const parts = fullName.trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) {
@@ -925,6 +981,7 @@ export function DoctorCalendar({
   const calendarShellRef = useRef<HTMLDivElement | null>(null);
   const quickActionPanelRef = useRef<HTMLDivElement | null>(null);
   const lastMousePos = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const hasAutoScrolledToCurrentTimeRef = useRef(false);
   const resolvedDefaultDuration = supportedSlotDurations.includes(
     defaultDuration as (typeof supportedSlotDurations)[number],
   )
@@ -998,6 +1055,11 @@ export function DoctorCalendar({
   const [manualPatientPhone, setManualPatientPhone] = useState("");
   const [manualPatientNote, setManualPatientNote] = useState("");
   const [appointmentNotes, setAppointmentNotes] = useState("");
+  const [currentTime, setCurrentTime] = useState(() => new Date());
+  const [currentTimeIndicatorStyle, setCurrentTimeIndicatorStyle] =
+    useState<CSSProperties | null>(null);
+  const [currentTimeIndicatorPortalTarget, setCurrentTimeIndicatorPortalTarget] =
+    useState<HTMLElement | null>(null);
 
   const resolvedCurrentDate = calendarDate ?? internalCurrentDate;
   const resolvedView = calendarView ?? internalView;
@@ -1801,9 +1863,15 @@ export function DoctorCalendar({
         className: getSchedulerEventClassName(event),
         style: {
           "--scheduler-event-color": color,
-          backgroundColor: `${color}33`,
-          boxShadow: `inset 3px 0 0 0 ${color}, 0 1px 3px rgba(0,0,0,0.15)`,
-          color,
+          backgroundColor:
+            event.type === "custom_hours" ? "rgba(192, 57, 43, 0.18)" : `${color}33`,
+          borderLeft:
+            event.type === "custom_hours" ? "3px solid #c0392b" : undefined,
+          boxShadow:
+            event.type === "custom_hours"
+              ? "0 1px 3px rgba(0,0,0,0.15)"
+              : `inset 3px 0 0 0 ${color}, 0 1px 3px rgba(0,0,0,0.15)`,
+          color: event.type === "custom_hours" ? "#c0392b" : color,
           borderRadius: "6px",
         } as CSSProperties,
       };
@@ -2036,6 +2104,24 @@ export function DoctorCalendar({
   }, [resolvedCurrentDate, resolvedView, doctorId]);
 
   useEffect(() => {
+    if (resolvedView !== Views.WEEK && resolvedView !== Views.DAY) {
+      setCurrentTimeIndicatorPortalTarget(null);
+      setCurrentTimeIndicatorStyle(null);
+      return;
+    }
+
+    setCurrentTime(new Date());
+
+    const intervalId = window.setInterval(() => {
+      setCurrentTime(new Date());
+    }, 60_000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [resolvedView]);
+
+  useEffect(() => {
     if (!activeDraftPreview || (resolvedView !== Views.WEEK && resolvedView !== Views.DAY)) {
       return;
     }
@@ -2076,6 +2162,140 @@ export function DoctorCalendar({
     activeDraftPreview?.end.getTime(),
     activeDraftPreview?.id,
     activeDraftPreview?.start.getTime(),
+    resolvedView,
+  ]);
+
+  useEffect(() => {
+    if (hasAutoScrolledToCurrentTimeRef.current) {
+      return;
+    }
+
+    if (isAvailabilityLoading || isCalendarLoading) {
+      return;
+    }
+
+    if (resolvedView !== Views.WEEK && resolvedView !== Views.DAY) {
+      return;
+    }
+
+    let rafId = 0;
+
+    const scrollToCurrentTime = () => {
+      const scrollContainer = getCalendarScrollContainer(calendarShellRef.current);
+      const firstDaySlot = scrollContainer
+        ? getTimeGridDaySlots(scrollContainer)[0] ?? null
+        : null;
+
+      if (!scrollContainer || !firstDaySlot) {
+        return;
+      }
+
+      const totalMinutes = CALENDAR_END_MINUTES - CALENDAR_START_MINUTES;
+      const minutesSinceCalendarStart = clamp(
+        getMinutesSinceMidnight(new Date()) - CALENDAR_START_MINUTES,
+        0,
+        totalMinutes,
+      );
+      const scrollHeight = firstDaySlot.scrollHeight || scrollContainer.scrollHeight;
+      const indicatorTop = (minutesSinceCalendarStart / totalMinutes) * scrollHeight;
+      const targetScrollTop = clamp(
+        indicatorTop - scrollContainer.clientHeight * 0.35,
+        0,
+        Math.max(scrollHeight - scrollContainer.clientHeight, 0),
+      );
+
+      scrollContainer.scrollTop = targetScrollTop;
+      hasAutoScrolledToCurrentTimeRef.current = true;
+    };
+
+    rafId = window.requestAnimationFrame(scrollToCurrentTime);
+
+    return () => {
+      window.cancelAnimationFrame(rafId);
+    };
+  }, [isAvailabilityLoading, isCalendarLoading, resolvedView]);
+
+  useEffect(() => {
+    if (isAvailabilityLoading || isCalendarLoading) {
+      setCurrentTimeIndicatorPortalTarget(null);
+      setCurrentTimeIndicatorStyle(null);
+      return;
+    }
+
+    if (resolvedView !== Views.WEEK && resolvedView !== Views.DAY) {
+      setCurrentTimeIndicatorPortalTarget(null);
+      setCurrentTimeIndicatorStyle(null);
+      return;
+    }
+
+    const calendarShell = calendarShellRef.current;
+
+    if (!calendarShell) {
+      setCurrentTimeIndicatorPortalTarget(null);
+      setCurrentTimeIndicatorStyle(null);
+      return;
+    }
+
+    let rafId = 0;
+
+    const syncCurrentTimeIndicator = () => {
+      const scrollContainer = getCalendarScrollContainer(calendarShell);
+
+      if (!scrollContainer) {
+        setCurrentTimeIndicatorPortalTarget(null);
+        setCurrentTimeIndicatorStyle(null);
+        return;
+      }
+
+      setCurrentTimeIndicatorPortalTarget(scrollContainer);
+
+      const targetColumn = getTodayTimeColumn(
+        calendarShell,
+        scrollContainer,
+        resolvedView,
+        resolvedCurrentDate,
+      );
+      const currentMinutes = getMinutesSinceMidnight(currentTime);
+      const totalMinutes = CALENDAR_END_MINUTES - CALENDAR_START_MINUTES;
+
+      if (
+        !targetColumn ||
+        currentMinutes < CALENDAR_START_MINUTES ||
+        currentMinutes > CALENDAR_END_MINUTES
+      ) {
+        setCurrentTimeIndicatorStyle(null);
+        return;
+      }
+
+      const top =
+        ((currentMinutes - CALENDAR_START_MINUTES) / totalMinutes) *
+        targetColumn.scrollHeight;
+
+      setCurrentTimeIndicatorStyle({
+        left: targetColumn.offsetLeft,
+        width: targetColumn.offsetWidth,
+        top,
+      });
+    };
+
+    const scheduleSync = () => {
+      window.cancelAnimationFrame(rafId);
+      rafId = window.requestAnimationFrame(syncCurrentTimeIndicator);
+    };
+
+    scheduleSync();
+    window.addEventListener("resize", scheduleSync);
+
+    return () => {
+      window.cancelAnimationFrame(rafId);
+      window.removeEventListener("resize", scheduleSync);
+    };
+  }, [
+    currentTime,
+    data?.appointments?.length,
+    isAvailabilityLoading,
+    isCalendarLoading,
+    resolvedCurrentDate,
     resolvedView,
   ]);
 
@@ -2769,11 +2989,22 @@ export function DoctorCalendar({
         culture="tr"
         step={resolvedDefaultDuration}
         timeslots={2}
-        min={setMinutes(setHours(new Date(), 6), 0)}
-        max={setMinutes(setHours(new Date(), 23), 0)}
+        min={setMinutes(setHours(new Date(), CALENDAR_START_HOUR), 0)}
+        max={setMinutes(setHours(new Date(), CALENDAR_END_HOUR), 0)}
         drilldownView={Views.DAY}
         dayLayoutAlgorithm="no-overlap"
       />
+
+      {currentTimeIndicatorPortalTarget && currentTimeIndicatorStyle
+        ? createPortal(
+            <div
+              aria-hidden="true"
+              className="scheduler-current-time-indicator"
+              style={currentTimeIndicatorStyle}
+            />,
+            currentTimeIndicatorPortalTarget,
+          )
+        : null}
 
       {quickActionSlot?.open && !isMobile && typeof document !== "undefined"
         ? createPortal(

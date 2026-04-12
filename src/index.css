@@ -587,24 +587,31 @@
   }
 
   .scheduler-calendar-shell .rbc-today {
-    background-color: rgba(219, 234, 254, 0.15);
+    background-color: rgba(79, 143, 230, 0.05);
   }
 
   .scheduler-calendar-shell .rbc-current-time-indicator {
-    background: #dc2626;
-    height: 2px;
-    box-shadow: none;
+    display: none;
   }
 
-  .scheduler-calendar-shell .rbc-current-time-indicator::before {
+  .scheduler-current-time-indicator {
+    position: absolute;
+    z-index: 5;
+    height: 2px;
+    background: #dc2626;
+    box-shadow: none;
+    pointer-events: none;
+  }
+
+  .scheduler-current-time-indicator::before {
     content: "";
     position: absolute;
-    left: -5px;
+    left: 0;
     top: 50%;
     width: 10px;
     height: 10px;
     border-radius: 9999px;
-    transform: translateY(-50%);
+    transform: translate(-50%, -50%);
     background: #dc2626;
     box-shadow: none;
   }
@@ -814,9 +821,10 @@
 
   .scheduler-event-custom-hours,
   .scheduler-calendar-shell .rbc-event.custom_hours {
-    background: #6366f133 !important;
-    color: var(--scheduler-event-color, #6366f1) !important;
+    background-color: rgba(192, 57, 43, 0.18) !important;
+    color: #c0392b !important;
     border: none !important;
+    border-left: 3px solid #c0392b !important;
     opacity: 1;
     border-radius: 6px;
     overflow: hidden;
@@ -842,8 +850,8 @@
 
   .scheduler-calendar-shell .rbc-event.scheduler-event-custom-hours.rbc-selected,
   .scheduler-calendar-shell .rbc-event.custom_hours.rbc-selected {
-    color: #ffffff !important;
-    background-color: #4f46e5 !important;
+    color: #c0392b !important;
+    background-color: rgba(192, 57, 43, 0.28) !important;
     overflow: hidden;
     box-sizing: border-box;
   }
