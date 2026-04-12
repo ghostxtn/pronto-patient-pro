@@ -392,6 +392,21 @@ function timeToMinutes(time: string) {
   return hours * 60 + minutes;
 }
 
+function formatDuration(diffMinutes: number): string {
+  const hours = Math.floor(diffMinutes / 60);
+  const mins = diffMinutes % 60;
+
+  if (hours === 0) {
+    return `(${mins} dk.)`;
+  }
+
+  if (mins === 0) {
+    return `(${hours} sa.)`;
+  }
+
+  return `(${hours} sa. ${mins} dk.)`;
+}
+
 function minutesToTime(totalMinutes: number) {
   const hours = String(Math.floor(totalMinutes / 60)).padStart(2, "0");
   const minutes = String(totalMinutes % 60).padStart(2, "0");
@@ -2119,29 +2134,60 @@ export function DoctorCalendar({
     };
 
     const handleClickAway = (event: MouseEvent) => {
-      const target = event.target as HTMLElement | null;
-      if (target?.closest("[data-quick-slot-panel]")) {
+      // event.target can be a Text node when the user clicks directly on a
+      // bare text node inside a button (no wrapping element). Text nodes do
+      // not have .closest(), so we must walk up to the parent Element first.
+      const node = event.target as Node | null;
+      const element: HTMLElement | null =
+        node?.nodeType === Node.TEXT_NODE
+          ? (node.parentElement as HTMLElement | null)
+          : (node as HTMLElement | null);
+
+      if (element?.closest("[data-quick-slot-panel]")) {
         return;
       }
       setQuickActionSlot(null);
       setQuickActionAnchorRect(null);
     };
 
-    const handleViewportChange = () => {
+    const handleViewportChange = (event?: Event) => {
+      // If the scroll originated from inside the panel itself, ignore it.
+      // This prevents the time picker expanding from closing the panel.
+      if (event?.type === "scroll") {
+        const target = event.target as Node | null;
+        if (
+          quickActionPanelRef.current &&
+          target instanceof Node &&
+          quickActionPanelRef.current.contains(target)
+        ) {
+          return;
+        }
+      }
       setQuickActionSlot(null);
       setQuickActionAnchorRect(null);
+    };
+
+    let resizeTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const handleResize = () => {
+      if (resizeTimer !== null) clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        setQuickActionSlot(null);
+        setQuickActionAnchorRect(null);
+      }, 150);
     };
 
     window.addEventListener("keydown", handleEscape);
     window.addEventListener("mousedown", handleClickAway);
     window.addEventListener("scroll", handleViewportChange, true);
-    window.addEventListener("resize", handleViewportChange);
+    window.addEventListener("resize", handleResize);
 
     return () => {
+      if (resizeTimer !== null) clearTimeout(resizeTimer);
       window.removeEventListener("keydown", handleEscape);
       window.removeEventListener("mousedown", handleClickAway);
       window.removeEventListener("scroll", handleViewportChange, true);
-      window.removeEventListener("resize", handleViewportChange);
+      window.removeEventListener("resize", handleResize);
     };
   }, [quickActionSlot]);
 
@@ -3137,6 +3183,8 @@ export function DoctorCalendar({
               ref={quickActionPanelRef}
               data-quick-slot-panel
               className="z-50 max-h-[560px] overflow-y-auto rounded-[20px] border border-border/70 bg-popover/95 p-5 text-popover-foreground shadow-card outline-none backdrop-blur-xl transition-all duration-200"
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
               style={{
                 position: "fixed",
                 top: panelPosition.top,
@@ -3186,14 +3234,20 @@ export function DoctorCalendar({
 
                     <button
                       type="button"
-                      className="rounded-lg border border-border/40 bg-muted/60 px-3 py-1.5 text-sm font-medium transition-colors hover:bg-muted"
+                      className="flex items-center gap-1.5 rounded-lg border border-border/40 bg-muted/60 px-3 py-1.5 text-sm font-medium transition-colors hover:bg-muted"
                       onClick={() =>
                         setQuickActionPicker((current) =>
                           current === "start" ? null : "start",
                         )
                       }
                     >
-                      {format(quickActionSlot.start, "HH:mm")}
+                      <span>{format(quickActionSlot.start, "HH:mm")}</span>
+                      <ChevronDown
+                        className={cn(
+                          "h-4 w-4 shrink-0 transition-transform",
+                          quickActionPicker === "start" && "rotate-180",
+                        )}
+                      />
                     </button>
 
                     <div className="flex h-[38px] items-center justify-center text-sm font-medium text-muted-foreground">
@@ -3202,14 +3256,20 @@ export function DoctorCalendar({
 
                     <button
                       type="button"
-                      className="rounded-lg border border-border/40 bg-muted/60 px-3 py-1.5 text-sm font-medium transition-colors hover:bg-muted"
+                      className="flex items-center gap-1.5 rounded-lg border border-border/40 bg-muted/60 px-3 py-1.5 text-sm font-medium transition-colors hover:bg-muted"
                       onClick={() =>
                         setQuickActionPicker((current) =>
                           current === "end" ? null : "end",
                         )
                       }
                     >
-                      {format(quickActionSlot.end, "HH:mm")}
+                      <span>{format(quickActionSlot.end, "HH:mm")}</span>
+                      <ChevronDown
+                        className={cn(
+                          "h-4 w-4 shrink-0 transition-transform",
+                          quickActionPicker === "end" && "rotate-180",
+                        )}
+                      />
                     </button>
 
                     {quickActionPicker === "date" ? (
@@ -3332,7 +3392,13 @@ export function DoctorCalendar({
                                   handleQuickActionTimeOptionSelect("end", timeValue)
                                 }
                               >
-                                {timeValue}
+                                <span>{timeValue}</span>
+                                <span className="ml-auto text-xs text-muted-foreground">
+                                  {formatDuration(
+                                    timeToMinutes(timeValue) -
+                                      timeToMinutes(format(quickActionSlot.start, "HH:mm")),
+                                  )}
+                                </span>
                               </button>
                             ))}
                           </div>
