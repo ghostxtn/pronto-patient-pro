@@ -158,7 +158,7 @@ const APPOINTMENT_STATUS_STYLES: Record<
     accent: "#16A34A",
   },
   cancelled: {
-    background: "#F3F4F6",
+    background: "#E5E7EB",
     text: "#6B7280",
     accent: "#9CA3AF",
   },
@@ -1952,8 +1952,8 @@ export function DoctorCalendar({
       return {
         className: "scheduler-event scheduler-event-availability-surface",
         style: {
-          backgroundColor: "rgba(34, 197, 94, 0.09)",
-          border: "1px solid rgba(34, 197, 94, 0.18)",
+          backgroundColor: "rgba(148,163,184,0.12)",
+          border: "1px solid rgba(148,163,184,0.20)",
           borderRadius: "4px",
           left: 0,
           right: 0,
