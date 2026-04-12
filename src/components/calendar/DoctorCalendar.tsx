@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Calendar as BigCalendar,
@@ -738,6 +739,9 @@ function toApiDate(date: Date) {
   return format(date, "yyyy-MM-dd");
 }
 
+const QUICK_ACTION_PANEL_W = 320;
+const QUICK_ACTION_PANEL_H = 420;
+
 export function DoctorCalendar({
   doctorId,
   mode = "doctor",
@@ -753,7 +757,7 @@ export function DoctorCalendar({
   const isMobile = useIsMobile();
   const queryClient = useQueryClient();
   const calendarShellRef = useRef<HTMLDivElement | null>(null);
-  const lastMouseDownPos = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const lastMousePos = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const resolvedDefaultDuration = supportedSlotDurations.includes(
     defaultDuration as (typeof supportedSlotDurations)[number],
   )
@@ -1710,16 +1714,16 @@ export function DoctorCalendar({
       availabilityTarget?: AvailabilitySelectionTarget | null;
     },
   ) => {
-    const PANEL_W = 320;
-    const PANEL_H = 400;
     const vw = window.innerWidth;
     const vh = window.innerHeight;
-    const x = lastMouseDownPos.current.x;
-    const y = lastMouseDownPos.current.y;
+    const x = lastMousePos.current.x;
+    const y = lastMousePos.current.y;
+    const left = x + QUICK_ACTION_PANEL_W + 20 < vw ? x + 12 : x - QUICK_ACTION_PANEL_W - 12;
+    const top = y + QUICK_ACTION_PANEL_H + 20 < vh ? y + 8 : y - QUICK_ACTION_PANEL_H - 8;
 
     setPanelPosition({
-      left: Math.max(8, x + PANEL_W + 16 < vw ? x + 12 : x - PANEL_W - 12),
-      top: Math.max(8, y + PANEL_H + 16 < vh ? y + 8 : y - PANEL_H - 8),
+      top: Math.max(8, Math.min(top, vh - QUICK_ACTION_PANEL_H - 8)),
+      left: Math.max(8, Math.min(left, vw - QUICK_ACTION_PANEL_W - 8)),
     });
 
     setContextMenuState({ open: false, x: 0, y: 0 });
@@ -1740,6 +1744,15 @@ export function DoctorCalendar({
       availabilityTarget: config.availabilityTarget ?? null,
     });
   };
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      lastMousePos.current = { x: e.clientX, y: e.clientY };
+    };
+
+    document.addEventListener("mousemove", handler);
+    return () => document.removeEventListener("mousemove", handler);
+  }, []);
 
   useEffect(() => {
     if (!quickActionSlot?.open) {
@@ -2133,9 +2146,7 @@ export function DoctorCalendar({
 
   const handleMobileSlotTap = (
     slotStart: Date,
-    currentTarget: HTMLElement | null,
     sourceTarget: EventTarget | null,
-    e: React.MouseEvent,
   ) => {
     if (!isMobile || (resolvedView !== Views.DAY && resolvedView !== Views.WEEK)) {
       return;
@@ -2147,43 +2158,17 @@ export function DoctorCalendar({
       return;
     }
 
-    const anchorRect = currentTarget?.getBoundingClientRect();
-    const PANEL_W = 320;
-    const PANEL_H = 400;
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    const x = e.clientX;
-    const y = e.clientY;
-
-    const left = x + PANEL_W + 16 < vw
-      ? x + 12
-      : x - PANEL_W - 12;
-
-    const top = y + PANEL_H + 16 < vh
-      ? y + 8
-      : y - PANEL_H - 8;
-
-    setPanelPosition({
-      top: Math.max(8, top),
-      left: Math.max(8, left),
-    });
-
     handleSlotSelection({
       action: "select",
       start: slotStart,
       end: addMinutes(slotStart, resolvedDefaultDuration),
       slots: [slotStart],
-      bounds: anchorRect ?? undefined,
-      box: anchorRect ?? undefined,
     } as SlotInfo);
   };
 
   return (
     <div
       ref={calendarShellRef}
-      onMouseDown={(e) => {
-        lastMouseDownPos.current = { x: e.clientX, y: e.clientY };
-      }}
       className="scheduler-calendar-shell flex h-full min-h-0 flex-col overflow-hidden rounded-[34px] border border-border/60 bg-card/95 shadow-soft"
     >
       {mode === "staff" ? (
@@ -2287,7 +2272,7 @@ export function DoctorCalendar({
                     clientX: number;
                     clientY: number;
                   }) => {
-                    handleMobileSlotTap(date, event.currentTarget, event.target, event);
+                        handleMobileSlotTap(date, event.target);
                   },
                 }
               : {}),
@@ -2321,61 +2306,38 @@ export function DoctorCalendar({
         dayLayoutAlgorithm="no-overlap"
       />
 
-      {quickActionSlot?.open && !isMobile ? (
-        <div
-          data-quick-slot-panel
-          className="z-50 hidden rounded-[24px] border border-border/70 bg-popover/95 p-4 text-popover-foreground shadow-card outline-none backdrop-blur-xl lg:block"
-          style={{
-            position: "fixed",
-            top: panelPosition.top,
-            left: panelPosition.left,
-            width: 320,
-            zIndex: 9999,
-          }}
-        >
-          <div className="space-y-4">
-            <div className="flex items-start justify-between gap-3">
-              <div className="space-y-1">
-                <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
-                  {quickActionSlot.kind === "available"
-                    ? "Secili musait aralik"
-                    : quickActionSlot.kind === "blocked"
-                      ? "Secili istisna"
-                      : "Secili aralik"}
-                </p>
-                <h3 className="text-lg font-display font-semibold text-foreground">
-                  {doctorName}
-                </h3>
-                {specializationName ? (
-                  <p className="text-sm text-muted-foreground">
-                    {specializationName}
-                  </p>
-                ) : null}
-              </div>
-              <Badge
-                variant="outline"
-                className={cn("rounded-full", quickActionBadge.className)}
-              >
-                {quickActionBadge.label}
-              </Badge>
-            </div>
-
-            <div className="rounded-[20px] border border-border/70 bg-background/80 p-3">
-              <div className="space-y-2 text-sm">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-muted-foreground">Tarih</span>
-                  <span className="text-right font-medium text-foreground">
-                    {quickActionSlot.dateLabel}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-muted-foreground">Saat</span>
-                  <span className="font-medium text-foreground">
-                    {quickActionSlot.timeLabel}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-muted-foreground">Durum</span>
+      {quickActionSlot?.open && !isMobile && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              data-quick-slot-panel
+              className="z-50 rounded-[24px] border border-border/70 bg-popover/95 p-4 text-popover-foreground shadow-card outline-none backdrop-blur-xl"
+              style={{
+                position: "fixed",
+                top: panelPosition.top,
+                left: panelPosition.left,
+                width: QUICK_ACTION_PANEL_W,
+                zIndex: 9999,
+              }}
+            >
+              <div className="space-y-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                      {quickActionSlot.kind === "available"
+                        ? "Secili musait aralik"
+                        : quickActionSlot.kind === "blocked"
+                          ? "Secili istisna"
+                          : "Secili aralik"}
+                    </p>
+                    <h3 className="text-lg font-display font-semibold text-foreground">
+                      {doctorName}
+                    </h3>
+                    {specializationName ? (
+                      <p className="text-sm text-muted-foreground">
+                        {specializationName}
+                      </p>
+                    ) : null}
+                  </div>
                   <Badge
                     variant="outline"
                     className={cn("rounded-full", quickActionBadge.className)}
@@ -2383,103 +2345,129 @@ export function DoctorCalendar({
                     {quickActionBadge.label}
                   </Badge>
                 </div>
+
+                <div className="rounded-[20px] border border-border/70 bg-background/80 p-3">
+                  <div className="space-y-2 text-sm">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-muted-foreground">Tarih</span>
+                      <span className="text-right font-medium text-foreground">
+                        {quickActionSlot.dateLabel}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-muted-foreground">Saat</span>
+                      <span className="font-medium text-foreground">
+                        {quickActionSlot.timeLabel}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-muted-foreground">Durum</span>
+                      <Badge
+                        variant="outline"
+                        className={cn("rounded-full", quickActionBadge.className)}
+                      >
+                        {quickActionBadge.label}
+                      </Badge>
+                    </div>
+                  </div>
+                </div>
+
+                <p className="text-xs text-muted-foreground">
+                  {quickActionSlot.kind === "available"
+                    ? "Bu panel secili musait aralik icin hizli aksiyon sunar. Mevcut musaitlige tasan secimler duzenleme formuna kapsamli prefill ile gider."
+                    : quickActionSlot.kind === "blocked"
+                      ? "Bu aralikta gunluk istisna vardir. Duzenleme ve kaldirma istisna kaydi uzerinden yapilir."
+                      : "Bu aralik takvimde musaitlik disi gorunur. Musaitlik ekleme ayri panelde acilir."}
+                </p>
+
+                <div className="grid gap-2">
+                  {quickActionSlot.kind === "available" ? (
+                    <>
+                      <Button
+                        type="button"
+                        className="justify-start rounded-xl"
+                        onClick={handleQuickActionOpenAppointmentComposer}
+                      >
+                        <UserPlus className="mr-2 h-4 w-4" />
+                        Randevu olustur
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="justify-start rounded-xl border-border/70 bg-background/70"
+                        onClick={handleQuickActionOpenAvailabilityEditor}
+                      >
+                        <Pencil className="mr-2 h-4 w-4" />
+                        {availabilityQuickActionLabel}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="justify-start rounded-xl border-border/70 bg-background/70"
+                        onClick={handleQuickActionBlockTime}
+                      >
+                        <CircleOff className="mr-2 h-4 w-4" />
+                        Bu araliga blok istisnasi ekle
+                      </Button>
+                    </>
+                  ) : null}
+
+                  {quickActionSlot.kind === "unavailable" ? (
+                    <>
+                      <Button
+                        type="button"
+                        className="justify-start rounded-xl"
+                        onClick={handleQuickActionOpenAvailabilityEditor}
+                      >
+                        <Pencil className="mr-2 h-4 w-4" />
+                        {availabilityQuickActionLabel}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="justify-start rounded-xl border-border/70 bg-background/70"
+                        onClick={handleQuickActionBlockTime}
+                      >
+                        <CircleOff className="mr-2 h-4 w-4" />
+                        Bu araliga blok istisnasi ekle
+                      </Button>
+                    </>
+                  ) : null}
+
+                  {quickActionSlot.kind === "blocked" ? (
+                    <>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="justify-start rounded-xl border-border/70 bg-background/70"
+                        onClick={handleQuickActionEditOverride}
+                      >
+                        <Pencil className="mr-2 h-4 w-4" />
+                        Istisnayi panelde duzenle
+                      </Button>
+                      <Button
+                        type="button"
+                        variant={quickActionCanRemoveDirectly ? "destructive" : "outline"}
+                        className={cn(
+                          "justify-start rounded-xl",
+                          !quickActionCanRemoveDirectly &&
+                            "border-border/70 bg-background/70",
+                        )}
+                        onClick={handleQuickActionRemoveOverride}
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        {quickActionCanRemoveDirectly
+                          ? "Istisnayi kaldir"
+                          : "Istisnayi panelde gozden gecir"}
+                      </Button>
+                    </>
+                  ) : null}
+                </div>
               </div>
-            </div>
-
-            <p className="text-xs text-muted-foreground">
-              {quickActionSlot.kind === "available"
-                ? "Bu panel secili musait aralik icin hizli aksiyon sunar. Mevcut musaitlige tasan secimler duzenleme formuna kapsamli prefill ile gider."
-                : quickActionSlot.kind === "blocked"
-                  ? "Bu aralikta gunluk istisna vardir. Duzenleme ve kaldirma istisna kaydi uzerinden yapilir."
-                  : "Bu aralik takvimde musaitlik disi gorunur. Musaitlik ekleme ayri panelde acilir."}
-            </p>
-
-            <div className="grid gap-2">
-              {quickActionSlot.kind === "available" ? (
-                <>
-                  <Button
-                    type="button"
-                    className="justify-start rounded-xl"
-                    onClick={handleQuickActionOpenAppointmentComposer}
-                  >
-                    <UserPlus className="mr-2 h-4 w-4" />
-                    Randevu olustur
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="justify-start rounded-xl border-border/70 bg-background/70"
-                    onClick={handleQuickActionOpenAvailabilityEditor}
-                  >
-                    <Pencil className="mr-2 h-4 w-4" />
-                    {availabilityQuickActionLabel}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="justify-start rounded-xl border-border/70 bg-background/70"
-                    onClick={handleQuickActionBlockTime}
-                  >
-                    <CircleOff className="mr-2 h-4 w-4" />
-                    Bu araliga blok istisnasi ekle
-                  </Button>
-                </>
-              ) : null}
-
-              {quickActionSlot.kind === "unavailable" ? (
-                <>
-                  <Button
-                    type="button"
-                    className="justify-start rounded-xl"
-                    onClick={handleQuickActionOpenAvailabilityEditor}
-                  >
-                    <Pencil className="mr-2 h-4 w-4" />
-                    {availabilityQuickActionLabel}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="justify-start rounded-xl border-border/70 bg-background/70"
-                    onClick={handleQuickActionBlockTime}
-                  >
-                    <CircleOff className="mr-2 h-4 w-4" />
-                    Bu araliga blok istisnasi ekle
-                  </Button>
-                </>
-              ) : null}
-
-              {quickActionSlot.kind === "blocked" ? (
-                <>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="justify-start rounded-xl border-border/70 bg-background/70"
-                    onClick={handleQuickActionEditOverride}
-                  >
-                    <Pencil className="mr-2 h-4 w-4" />
-                    Istisnayi panelde duzenle
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={quickActionCanRemoveDirectly ? "destructive" : "outline"}
-                    className={cn(
-                      "justify-start rounded-xl",
-                      !quickActionCanRemoveDirectly &&
-                        "border-border/70 bg-background/70",
-                    )}
-                    onClick={handleQuickActionRemoveOverride}
-                  >
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    {quickActionCanRemoveDirectly
-                      ? "Istisnayi kaldir"
-                      : "Istisnayi panelde gozden gecir"}
-                  </Button>
-                </>
-              ) : null}
-            </div>
-          </div>
-        </div>
-      ) : null}
+            </div>,
+            document.body,
+          )
+        : null}
 
       <Drawer
         open={Boolean(quickActionSlot?.open) && isMobile}

@@ -39,3 +39,4 @@ graphify-out/
 .graphify*.json
 scripts/graphify.cmd
 *.ps1
+.graphifyignore
