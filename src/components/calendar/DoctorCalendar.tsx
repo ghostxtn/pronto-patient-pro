@@ -958,10 +958,12 @@ function CalendarEventContent({
 
   if (event.type === "draft") {
     return (
-      <div className="scheduler-event-content-stack">
-        <span className="scheduler-event-meta">Taslak</span>
-        <span className="scheduler-event-title">{timeRange}</span>
-        <span className="scheduler-event-subtitle">
+      <div className="flex h-full flex-col justify-start gap-0.5 overflow-hidden">
+        <span style={{ fontSize: "10px", opacity: 0.7, fontWeight: 400 }}>Taslak</span>
+        <span style={{ fontSize: "12px", fontWeight: 600, color: "rgba(99, 102, 241, 0.9)" }}>
+          {timeRange}
+        </span>
+        <span style={{ fontSize: "10px", opacity: 0.6 }}>
           {formatDurationLabel(event.resource.durationMinutes)}
         </span>
       </div>
