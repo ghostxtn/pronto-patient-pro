@@ -10,6 +10,7 @@ export default function AuthCallback() {
     const requiresOtp = searchParams.get("requiresOtp") === "true";
     const flowToken = searchParams.get("flowToken");
     const email = searchParams.get("email");
+    const oauthCode = searchParams.get("code");
     const accessToken = searchParams.get("accessToken");
     const refreshToken = searchParams.get("refreshToken");
     const role = searchParams.get("role") || "patient";
@@ -28,6 +29,27 @@ export default function AuthCallback() {
         nextUrl.searchParams.set("email", email);
       }
       window.location.replace(nextUrl.toString());
+      return;
+    }
+
+    if (oauthCode) {
+      fetch(`${import.meta.env.VITE_API_URL || "/api"}/auth/exchange-code`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: oauthCode }),
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.accessToken && data.refreshToken) {
+            setTokens(data.accessToken, data.refreshToken);
+            window.location.replace(getDefaultRouteByRole(data.role || "patient"));
+          } else {
+            window.location.replace("/auth");
+          }
+        })
+        .catch(() => {
+          window.location.replace("/auth");
+        });
       return;
     }
 

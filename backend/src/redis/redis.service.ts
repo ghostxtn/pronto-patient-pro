@@ -1,5 +1,6 @@
 import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { createHash } from 'crypto';
 import Redis from 'ioredis';
 
 @Injectable()
@@ -16,11 +17,18 @@ export class RedisService implements OnModuleDestroy {
     token: string,
     ttlSeconds: number,
   ): Promise<void> {
-    await this.client.set(`refresh:${userId}`, token, 'EX', ttlSeconds);
+    await this.client.set(
+      `refresh:${userId}`,
+      this.hashToken(token),
+      'EX',
+      ttlSeconds,
+    );
   }
 
-  async getRefreshToken(userId: string): Promise<string | null> {
-    return this.client.get(`refresh:${userId}`);
+  async compareRefreshToken(userId: string, token: string): Promise<boolean> {
+    const stored = await this.client.get(`refresh:${userId}`);
+    if (!stored) return false;
+    return stored === this.hashToken(token);
   }
 
   async deleteRefreshToken(userId: string): Promise<void> {
@@ -37,6 +45,10 @@ export class RedisService implements OnModuleDestroy {
 
   async deleteValue(key: string): Promise<void> {
     await this.client.del(key);
+  }
+
+  private hashToken(token: string): string {
+    return createHash('sha256').update(token).digest('hex');
   }
 
   async onModuleDestroy(): Promise<void> {

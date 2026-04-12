@@ -215,7 +215,7 @@ export class AppointmentsService {
     );
   }
 
-  async findById(id: string, clinicId: string) {
+  async findById(id: string, clinicId: string, userId?: string, role?: string) {
     const [appointment] = await this.db
       .select()
       .from(appointments)
@@ -224,6 +224,23 @@ export class AppointmentsService {
 
     if (!appointment) {
       throw new NotFoundException('Appointment not found');
+    }
+
+    if (role === 'patient' && userId) {
+      const [patient] = await this.db
+        .select()
+        .from(patients)
+        .where(
+          and(
+            eq(patients.user_id, userId),
+            eq(patients.clinic_id, clinicId),
+          ),
+        )
+        .limit(1);
+
+      if (!patient || appointment.patient_id !== patient.id) {
+        throw new ForbiddenException('Access denied');
+      }
     }
 
     return appointment;

@@ -10,6 +10,7 @@ import {
   Query,
   Req,
 } from '@nestjs/common';
+import { Audit } from '../common/decorators/audit.decorator';
 import { Public } from '../common/decorators/public.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { TenantRequest } from '../common/interfaces/tenant-request.interface';
@@ -25,6 +26,7 @@ import { DoctorsService } from './doctors.service';
 export class DoctorsController {
   constructor(private readonly doctorsService: DoctorsService) {}
 
+  @Audit('CREATE_DOCTOR', 'doctor')
   @Post()
   @Roles('owner', 'admin')
   create(
@@ -76,6 +78,7 @@ export class DoctorsController {
     return this.doctorsService.findById(id, user.clinicId);
   }
 
+  @Audit('UPDATE_DOCTOR', 'doctor')
   @Patch(':id')
   @Roles('owner', 'admin')
   update(
@@ -96,6 +99,7 @@ export class DoctorsController {
     return this.doctorsService.adminUpdateDoctor(id, dto, user.clinicId);
   }
 
+  @Audit('UPDATE_DOCTOR_STATUS', 'doctor')
   @Patch(':id/status')
   @Roles('admin')
   adminSetDoctorStatus(
@@ -106,6 +110,7 @@ export class DoctorsController {
     return this.doctorsService.adminSetDoctorStatus(id, dto, user.clinicId);
   }
 
+  @Audit('DELETE_DOCTOR', 'doctor')
   @Delete(':id')
   @Roles('owner', 'admin')
   softDelete(

@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { EmailModule } from '../email/email.module';
+import { PatientsModule } from '../patients/patients.module';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { GoogleStrategy } from './strategies/google.strategy';
@@ -18,6 +19,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
       }),
     }),
     EmailModule,
+    PatientsModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
   ],
   controllers: [AuthController],

@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Inject,
   Injectable,
   NotFoundException,
@@ -7,7 +8,7 @@ import {
 import { existsSync, readFileSync, unlinkSync } from 'fs';
 import { unlink } from 'fs/promises';
 import { and, eq } from 'drizzle-orm';
-import { appointmentFiles, users } from '../database/schema';
+import { appointmentFiles, appointments, patients, users } from '../database/schema';
 import { validateImageMagicBytes } from '../common/utils/magic-bytes.util';
 
 @Injectable()
@@ -89,7 +90,7 @@ export class StorageService {
       );
   }
 
-  async getFileById(fileId: string, clinicId: string) {
+  async getFileById(fileId: string, clinicId: string, userId?: string, role?: string) {
     const [file] = await this.db
       .select()
       .from(appointmentFiles)
@@ -100,6 +101,34 @@ export class StorageService {
 
     if (!file) {
       throw new NotFoundException('File not found');
+    }
+
+    if (role === 'patient' && userId) {
+      const [appointment] = await this.db
+        .select()
+        .from(appointments)
+        .where(
+          and(
+            eq(appointments.id, file.appointment_id),
+            eq(appointments.clinic_id, clinicId),
+          ),
+        )
+        .limit(1);
+
+      const [patient] = await this.db
+        .select()
+        .from(patients)
+        .where(
+          and(
+            eq(patients.user_id, userId),
+            eq(patients.clinic_id, clinicId),
+          ),
+        )
+        .limit(1);
+
+      if (!appointment || !patient || appointment.patient_id !== patient.id) {
+        throw new ForbiddenException('Access denied');
+      }
     }
 
     return file;

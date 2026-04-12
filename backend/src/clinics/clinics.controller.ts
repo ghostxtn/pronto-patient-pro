@@ -17,6 +17,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { Audit } from '../common/decorators/audit.decorator';
 import { Public } from '../common/decorators/public.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -62,12 +63,14 @@ export class ClinicsController {
     return this.clinicsService.findById(id);
   }
 
+  @Audit('UPDATE_CLINIC', 'clinic')
   @Patch(':id')
   @Roles('owner', 'admin')
   update(@Param('id') id: string, @Body() dto: UpdateClinicDto) {
     return this.clinicsService.update(id, dto);
   }
 
+  @Audit('UPDATE_CLINIC_LOGO', 'clinic')
   @Patch(':id/logo')
   @UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
   @Roles('owner')

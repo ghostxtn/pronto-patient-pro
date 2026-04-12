@@ -133,3 +133,8 @@ Running `npm run db:seed` also updates the existing demo users below to these pa
 - Admin: `admin@yeniklinik.local` / `Admin123!`
 - Doctor: `doctor@yeniklinik.local` / `Doctor123!`
 - Patient: `patient@yeniklinik.local` / `Patient123!`
+
+Rol	E-posta Adresi
+👤 User	db7fe.user@inbox.testmail.app
+🩺 Doktor	db7fe.doctor@inbox.testmail.app
+🛠️ Staff	db7fe.staff@inbox.testmail.app
