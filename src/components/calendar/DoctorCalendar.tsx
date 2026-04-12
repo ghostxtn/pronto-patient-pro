@@ -127,11 +127,46 @@ const calendarMessages = {
   showMore: (total: number) => `+${total} daha`,
 };
 
-const STATUS_COLORS: Record<string, string> = {
-  pending: "#d4943a",
-  confirmed: "#4f8fe6",
-  completed: "#64748b",
-  cancelled: "#dc2626",
+type AppointmentVisualStatus =
+  | "pending"
+  | "confirmed"
+  | "completed"
+  | "cancelled"
+  | "blocked";
+
+const APPOINTMENT_STATUS_STYLES: Record<
+  AppointmentVisualStatus,
+  {
+    background: string;
+    text: string;
+    accent: string;
+  }
+> = {
+  pending: {
+    background: "#FEF9C3",
+    text: "#854D0E",
+    accent: "#CA8A04",
+  },
+  confirmed: {
+    background: "#DBEAFE",
+    text: "#1E40AF",
+    accent: "#2563EB",
+  },
+  completed: {
+    background: "#DCFCE7",
+    text: "#166534",
+    accent: "#16A34A",
+  },
+  cancelled: {
+    background: "#F3F4F6",
+    text: "#6B7280",
+    accent: "#9CA3AF",
+  },
+  blocked: {
+    background: "#FEE2E2",
+    text: "#991B1B",
+    accent: "#DC2626",
+  },
 };
 
 const OVERRIDE_COLORS: Record<string, string> = {
@@ -769,7 +804,21 @@ function getPatientName(patient: PatientLookupRecord) {
 function formatCalendarHeaderDay(date: Date) {
   return format(date, "EEE", { locale: tr })
     .replace(".", "")
-    .toLocaleLowerCase("tr-TR");
+    .toLocaleUpperCase("tr-TR");
+}
+
+function normalizeAppointmentStatus(status?: string): AppointmentVisualStatus {
+  const normalized = (status ?? "").toLowerCase();
+
+  if (normalized === "canceled") {
+    return "cancelled";
+  }
+
+  if (normalized in APPOINTMENT_STATUS_STYLES) {
+    return normalized as AppointmentVisualStatus;
+  }
+
+  return "confirmed";
 }
 
 const CustomToolbar = ({
@@ -922,17 +971,11 @@ function CalendarEventContent({
   if (view === Views.AGENDA) {
     const eventStatus =
       event.type === "appointment"
-        ? ((event.resource as Appointment | undefined)?.status ?? "").toLowerCase()
-        : "";
+        ? normalizeAppointmentStatus((event.resource as Appointment | undefined)?.status)
+        : null;
     const agendaToneClass =
       event.type === "appointment"
-        ? eventStatus === "pending"
-          ? "scheduler-agenda-event-appointment-pending"
-          : eventStatus === "completed"
-            ? "scheduler-agenda-event-appointment-completed"
-            : eventStatus === "cancelled" || eventStatus === "canceled"
-              ? "scheduler-agenda-event-appointment-cancelled"
-              : "scheduler-agenda-event-appointment"
+        ? `scheduler-agenda-event-appointment-${eventStatus ?? "confirmed"}`
         : event.type === "blackout"
           ? "scheduler-agenda-event-blackout"
           : "scheduler-agenda-event-custom-hours";
@@ -952,33 +995,17 @@ function CalendarEventContent({
     );
   }
 
+  const accentDot =
+    event.type === "appointment" ? (
+      <span className="scheduler-event-accent-dot" aria-hidden="true" />
+    ) : null;
+
   return (
     <div className="scheduler-event-content-stack">
-      <span
-        className="scheduler-event-meta"
-        style={{
-          fontSize: "0.72rem",
-          fontWeight: 600,
-          opacity: 1,
-          whiteSpace: "nowrap",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-        }}
-      >
-        {timeRange}
-      </span>
-      <span
-        className="scheduler-event-title"
-        style={{
-          fontSize: "0.78rem",
-          fontWeight: 600,
-          opacity: 1,
-          whiteSpace: "nowrap",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-        }}
-      >
-        {title}
+      <span className="scheduler-event-meta">{timeRange}</span>
+      <span className="scheduler-event-title-row">
+        {accentDot}
+        <span className="scheduler-event-title">{title}</span>
       </span>
     </div>
   );
@@ -1904,13 +1931,9 @@ export function DoctorCalendar({
       "scheduler-event",
       event.type === "appointment" && "scheduler-event-appointment",
       event.type === "appointment" &&
-        ((event.resource as Appointment | undefined)?.status ?? "").toLowerCase() ===
-          "pending" &&
-        "scheduler-event-appointment-pending",
-      event.type === "appointment" &&
-        ((event.resource as Appointment | undefined)?.status ?? "").toLowerCase() ===
-          "completed" &&
-        "scheduler-event-appointment-completed",
+        `scheduler-event-appointment-${normalizeAppointmentStatus(
+          (event.resource as Appointment | undefined)?.status,
+        )}`,
       event.type === "appointment" &&
         selectedAppointmentId === event.id &&
         "scheduler-event-appointment-selected",
@@ -1929,9 +1952,9 @@ export function DoctorCalendar({
       return {
         className: "scheduler-event scheduler-event-availability-surface",
         style: {
-          backgroundColor: "rgba(187, 247, 208, 0.78)",
-          borderLeft: "3px solid #16a34a",
-          borderRadius: 0,
+          backgroundColor: "rgba(34, 197, 94, 0.09)",
+          border: "1px solid rgba(34, 197, 94, 0.18)",
+          borderRadius: "4px",
           left: 0,
           right: 0,
           width: "100%",
@@ -1975,18 +1998,20 @@ export function DoctorCalendar({
     }
 
     if (event.type === "appointment") {
-      const raw = (event.resource as Appointment | undefined)?.status ?? "";
-      const status = raw.toLowerCase() === "canceled" ? "cancelled" : raw.toLowerCase();
-      console.log("appointment status raw:", raw, "lowercased:", status);
-      const color = STATUS_COLORS[status] ?? STATUS_COLORS.confirmed;
+      const status = normalizeAppointmentStatus(
+        (event.resource as Appointment | undefined)?.status,
+      );
+      const tone = APPOINTMENT_STATUS_STYLES[status];
 
       return {
         className: getSchedulerEventClassName(event),
         style: {
-          "--scheduler-event-color": color,
-          background: `linear-gradient(${color}47, ${color}47), white`,
-          boxShadow: `inset 3px 0 0 0 ${color}, 0 1px 3px rgba(0,0,0,0.15)`,
-          color,
+          "--scheduler-event-background": tone.background,
+          "--scheduler-event-foreground": tone.text,
+          "--scheduler-event-accent": tone.accent,
+          backgroundColor: tone.background,
+          color: tone.text,
+          border: "1px solid rgba(0, 0, 0, 0.08)",
           borderRadius: "6px",
         } as CSSProperties,
       };
