@@ -113,10 +113,15 @@ export class StorageController {
   @Audit('DOWNLOAD_FILE', 'file')
   async downloadFile(
     @Param('fileId') fileId: string,
-    @CurrentUser() user: { clinicId: string },
+    @CurrentUser() user: { clinicId: string; userId: string; role: string },
     @Res() response: Response,
   ) {
-    const file = await this.storageService.getFileById(fileId, user.clinicId);
+    const file = await this.storageService.getFileById(
+      fileId,
+      user.clinicId,
+      user.userId,
+      user.role,
+    );
     return response.download(file.file_path, file.file_name);
   }
 

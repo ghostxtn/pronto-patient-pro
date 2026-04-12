@@ -234,6 +234,63 @@ POST/GET /api/storage/appointments/:id/files
 - `src/components/landing/LandingFooter.tsx` koyu footer gradient yerine açık mavi-yeşil gradient ve koyu metin kullanıyor; logo custom SVG.
 - `src/App.tsx` içinde route transition için `AnimatePresence` kullanılıyor; landing/auth geçişleri motion wrapper ile animasyonlu.
 
+### Branding And UI Work (2026-04-11)
+- Yeni reusable hook: `src/hooks/useClinicBranding.ts`
+  - Authenticated alanlarda (`AppLayout`) klinik adı + logo tek yerden çekiliyor
+  - Query key: `["clinic-branding", user?.clinic_id]`
+  - `updated_at` bazlı cache-busting ile logo URL üretiliyor
+- Public sayfalarda branding auth bağımlı değil:
+  - `src/components/landing/LandingNav.tsx`
+  - `src/components/landing/HeroSection.tsx`
+  - `src/pages/Auth.tsx`
+  - Bu üçü `useClinicBranding` yerine `useHomepagePreviewData(lang)` kullanıyor; logout sonrası logo kaybolma problemi böyle çözüldü
+- Logo / clinic name entegrasyonu yapıldı:
+  - `src/components/AppLayout.tsx` — header logo + clinic name, logo tıklayınca `/`
+  - `src/components/landing/LandingNav.tsx` — public nav brand alanı
+  - `src/components/landing/HeroSection.tsx` — hero logo row
+  - `src/components/landing/LandingFooter.tsx` — `updated_at` bazlı cache-busting
+  - `src/pages/Auth.tsx` — sol panel ve sağ auth kartı brand alanları public preview verisiyle çalışıyor
+- Logo upload sonrası invalidation:
+  - `src/pages/admin/ClinicSettings.tsx`
+  - Query invalidation artık hem `["clinic", clinicId]` hem `["clinic-branding", clinicId]`
+
+### Gökyüzü Design System Rollout
+- Admin / doctor / staff ekranları aynı görsel dilde hizalandı:
+  - Ana renkler: `#4f8fe6`, `#2f75ca`, `#65a98f`, `#b5d1cc`, `#eaf5ff`, `#f4f8fd`
+  - Başlık fontu: `Manrope`
+  - Body / yardımcı metin: `Inter`
+- Restyle yapılan ekranlar:
+  - `src/pages/admin/AdminDashboard.tsx`
+  - `src/pages/admin/ManageDoctors.tsx`
+  - `src/pages/admin/ManageStaff.tsx`
+  - `src/pages/admin/ManagePatients.tsx`
+  - `src/pages/admin/ManageAppointments.tsx`
+  - `src/pages/doctor/DoctorDashboard.tsx`
+  - `src/pages/doctor/DoctorAppointments.tsx`
+  - `src/pages/doctor/DoctorPatients.tsx`
+  - `src/pages/doctor/DoctorPatientDetail.tsx`
+  - `src/pages/staff/StaffDashboard.tsx`
+- Ortak pattern:
+  - Sayfa wrapper: `rounded-[28px] bg-[#f4f8fd] p-1`
+  - Surface: beyaz `Card` + `border-[#b5d1cc]` + yumuşak mavi shadow
+  - Badge renkleri token yerine açık hex tabanlı Gökyüzü durum renkleri
+  - Stat kartlarında gradient yerine düz icon surface + `TrendingUp`
+
+### Scroll Fix Notes
+- Daha önce admin listelerinde uygulanan scroll fix doctor/staff alanlarına da taşındı
+- Kart/list düzeni olan sayfalarda dış liste container’ına `maxHeight` + `overflowY: auto` eklendi:
+  - `src/pages/doctor/DoctorAppointments.tsx`
+  - `src/pages/doctor/DoctorPatients.tsx`
+  - `src/pages/staff/StaffDashboard.tsx` içindeki `doctorAvailabilitySummary`
+- Bu ekranlarda `overflow-x-auto` table wrapper yoktu; fix kart/list container seviyesinde yapıldı
+
+### Verification And Git
+- Son değişiklikler boyunca tekrar tekrar `npx tsc --noEmit` çalıştırıldı; sonuç temizdi
+- Çalışmalar `general-fixes` branch’ine pushlandı
+- Commitler:
+  - `397d201` — `general fixes`
+  - `c4f7c30` — `include remaining changes`
+
 ---
 
 ## DTO Naming Rules (IMPORTANT)
@@ -383,8 +440,8 @@ agenda → date → +30 days
 
 ## Production Gaps (TODO)
 
-- [ ] Email notifications (critical) — appointment confirmation/cancellation/reminders
-- [ ] Rate limiting (critical) — brute force protection on API
-- [ ] Patient screens — review and improve
-- [ ] UI polish — overall design improvements
+- [x] Email notifications (critical) — appointment confirmation/cancellation/reminders
+- [x] Rate limiting (critical) — brute force protection on API
+- [x] Patient screens — review and improve
+- [x] UI polish — overall design improvements
 - [ ] KVKK data retention cron job — pending legal consultation

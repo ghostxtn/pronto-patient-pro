@@ -14,6 +14,7 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { AppointmentsService } from './appointments.service';
 import { CreateAppointmentNoteDto } from './dto/create-appointment-note.dto';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
+import { UpdateAppointmentNoteDto } from './dto/update-appointment-note.dto';
 import { UpdateAppointmentDto } from './dto/update-appointment.dto';
 import { UpdateStatusDto } from './dto/update-status.dto';
 
@@ -66,8 +67,16 @@ export class AppointmentsController {
 
   @Get(':id')
   @Audit('VIEW_APPOINTMENT', 'appointment')
-  findById(@Param('id') id: string, @CurrentUser() user: { clinicId: string }) {
-    return this.appointmentsService.findById(id, user.clinicId);
+  findById(
+    @Param('id') id: string,
+    @CurrentUser() user: { clinicId: string; userId: string; role: string },
+  ) {
+    return this.appointmentsService.findById(
+      id,
+      user.clinicId,
+      user.userId,
+      user.role,
+    );
   }
 
   @Patch(':id')
@@ -136,7 +145,7 @@ export class AppointmentsController {
   @Roles('doctor')
   updateNote(
     @Param('noteId') noteId: string,
-    @Body() dto: Partial<CreateAppointmentNoteDto>,
+    @Body() dto: UpdateAppointmentNoteDto,
     @CurrentUser() user: { clinicId: string },
   ) {
     return this.appointmentsService.updateNote(noteId, dto, user.clinicId);

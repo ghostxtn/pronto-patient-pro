@@ -20,6 +20,7 @@ import { RegisterDto } from './dto/register.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { VerifyAuthOtpDto } from './dto/verify-auth-otp.dto';
 import { AuditService } from '../audit/audit.service';
+import { PatientsService } from '../patients/patients.service';
 import { users, patients, trustedDevices } from '../database/schema';
 
 interface RequestContext {
@@ -27,6 +28,7 @@ interface RequestContext {
   requestId?: string;
   userAgent?: string;
   trustedDeviceToken?: string;
+  trustDevice?: boolean;
 }
 
 type OtpFlowPurpose = 'login' | 'register' | 'google';
@@ -62,6 +64,7 @@ export class AuthService {
     private readonly configService: ConfigService,
     private readonly auditService: AuditService,
     private readonly emailService: EmailService,
+    private readonly patientsService: PatientsService,
   ) {}
 
   async register(dto: RegisterDto, clinicId: string, ctx?: RequestContext) {
@@ -104,6 +107,10 @@ export class AuthService {
 
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
+    }
+
+    if (!user.is_active) {
+      throw new UnauthorizedException('Account is disabled');
     }
 
     if (user.locked_until && user.locked_until > new Date()) {
@@ -187,6 +194,10 @@ export class AuthService {
       };
     }
 
+    if (this.configService.get('NODE_ENV') === 'development') {
+      return this.issueTokensForUser(user);
+    }
+
     return this.createOtpChallenge(
       {
         purpose: 'login',
@@ -210,29 +221,42 @@ export class AuthService {
       throw new UnauthorizedException('Verification code expired');
     }
 
-    if (this.hashOtpCode(dto.code) !== flow.codeHash) {
-      const attemptsRemaining = flow.attemptsRemaining - 1;
+    if (
+      this.configService.get('NODE_ENV') === 'development' &&
+      dto.code === '000000'
+    ) {
+      // skip OTP validation in dev mode
+    } else {
+      if (this.hashOtpCode(dto.code) !== flow.codeHash) {
+        const attemptsRemaining = flow.attemptsRemaining - 1;
 
-      if (attemptsRemaining <= 0) {
-        await this.redisService.deleteValue(this.getOtpKey(dto.flowToken));
-        throw new UnauthorizedException('Too many invalid verification attempts');
+        if (attemptsRemaining <= 0) {
+          await this.redisService.deleteValue(this.getOtpKey(dto.flowToken));
+          throw new UnauthorizedException('Too many invalid verification attempts');
+        }
+
+        await this.saveOtpFlow(dto.flowToken, {
+          ...flow,
+          attemptsRemaining,
+        });
+
+        throw new UnauthorizedException('Invalid verification code');
       }
-
-      await this.saveOtpFlow(dto.flowToken, {
-        ...flow,
-        attemptsRemaining,
-      });
-
-      throw new UnauthorizedException('Invalid verification code');
     }
 
     await this.redisService.deleteValue(this.getOtpKey(dto.flowToken));
 
     if (flow.purpose === 'register') {
-      return this.completeRegistrationFlow(flow, ctx);
+      return this.completeRegistrationFlow(flow, {
+        ...ctx,
+        trustDevice: dto.trustDevice,
+      });
     }
 
-    return this.completeExistingUserFlow(flow, ctx);
+    return this.completeExistingUserFlow(flow, {
+      ...ctx,
+      trustDevice: dto.trustDevice,
+    });
   }
 
   async resendOtp(dto: ResendAuthOtpDto, clinicId: string, ctx?: RequestContext) {
@@ -392,8 +416,11 @@ export class AuthService {
       throw new UnauthorizedException('Invalid refresh token');
     }
 
-    const storedToken = await this.redisService.getRefreshToken(payload.sub);
-    if (storedToken !== token) {
+    const isValid = await this.redisService.compareRefreshToken(
+      payload.sub,
+      token,
+    );
+    if (!isValid) {
       throw new UnauthorizedException('Invalid refresh token');
     }
 
@@ -678,21 +705,28 @@ export class AuthService {
       })
       .returning();
 
-    await this.db.insert(patients).values({
-      clinic_id: flow.clinicId,
-      user_id: user.id,
-      first_name: user.first_name,
-      last_name: user.last_name,
-      email: user.email,
-    });
+    await this.patientsService.create(
+      {
+        firstName: user.first_name,
+        lastName: user.last_name,
+        email: user.email,
+      },
+      flow.clinicId,
+    );
+
+    if (this.configService.get('NODE_ENV') === 'development') {
+      return this.issueTokensForUser(user);
+    }
 
     const authResult = await this.issueTokensForUser(user);
-    const trustedDeviceToken = await this.issueTrustedDeviceToken(
-      user.id,
-      user.clinic_id,
-      ctx?.userAgent,
-      ctx?.trustedDeviceToken,
-    );
+    const trustedDeviceToken = ctx?.trustDevice
+      ? await this.issueTrustedDeviceToken(
+          user.id,
+          user.clinic_id,
+          ctx?.userAgent,
+          ctx?.trustedDeviceToken,
+        )
+      : undefined;
 
     this.auditService.log({
       clinicId: flow.clinicId,
@@ -742,12 +776,14 @@ export class AuthService {
     }
 
     const authResult = await this.issueTokensForUser(user);
-    const trustedDeviceToken = await this.issueTrustedDeviceToken(
-      user.id,
-      user.clinic_id,
-      ctx?.userAgent,
-      ctx?.trustedDeviceToken,
-    );
+    const trustedDeviceToken = ctx?.trustDevice
+      ? await this.issueTrustedDeviceToken(
+          user.id,
+          user.clinic_id,
+          ctx?.userAgent,
+          ctx?.trustedDeviceToken,
+        )
+      : undefined;
 
     this.auditService.log({
       clinicId: flow.clinicId,
@@ -787,6 +823,33 @@ export class AuthService {
         avatar_url: user.avatar_url,
       },
     };
+  }
+
+  async generateOAuthCode(payload: {
+    accessToken: string;
+    refreshToken: string;
+    role: string;
+  }): Promise<string> {
+    const code = randomUUID();
+    await this.redisService.setValue(
+      `oauth_code:${code}`,
+      JSON.stringify(payload),
+      30,
+    );
+    return code;
+  }
+
+  async exchangeOAuthCode(code: string): Promise<{
+    accessToken: string;
+    refreshToken: string;
+    role: string;
+  }> {
+    const raw = await this.redisService.getValue(`oauth_code:${code}`);
+    if (!raw) {
+      throw new UnauthorizedException('Invalid or expired code');
+    }
+    await this.redisService.deleteValue(`oauth_code:${code}`);
+    return JSON.parse(raw);
   }
 
   private async saveOtpFlow(flowToken: string, payload: OtpFlowPayload) {
@@ -1083,16 +1146,14 @@ export class AuthService {
     }
 
     try {
-      const [patient] = await this.db
-        .insert(patients)
-        .values({
-          clinic_id: clinicId,
-          user_id: user.id,
-          first_name: user.first_name,
-          last_name: user.last_name,
+      const patient = await this.patientsService.create(
+        {
+          firstName: user.first_name,
+          lastName: user.last_name,
           email: user.email,
-        })
-        .returning();
+        },
+        clinicId,
+      );
 
       console.log('[auth][googleLogin] patient profile created', {
         patientId: patient.id,

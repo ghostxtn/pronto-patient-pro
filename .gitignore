@@ -31,6 +31,8 @@ redis_data/
 uploads_data/
 bun.lock
 bun.lockb
+playwright.config.ts
+playwright-fixture.ts
 .codex/
 AGENTS.md
 graphify-out/

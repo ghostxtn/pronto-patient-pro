@@ -12,6 +12,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { Request, Response } from 'express';
 import { ConfigService } from '@nestjs/config';
 import { Throttle } from '@nestjs/throttler';
+import { Audit } from '../common/decorators/audit.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Public } from '../common/decorators/public.decorator';
 import { TenantRequest } from '../common/interfaces/tenant-request.interface';
@@ -20,6 +21,7 @@ import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { ResendAuthOtpDto } from './dto/resend-auth-otp.dto';
 import { RegisterDto } from './dto/register.dto';
+import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { VerifyAuthOtpDto } from './dto/verify-auth-otp.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -80,8 +82,8 @@ export class AuthController {
   @Post('refresh')
   @Public()
   @HttpCode(200)
-  refresh(@Body() body: { refreshToken: string }) {
-    return this.authService.refreshToken(body.refreshToken);
+  refresh(@Body() dto: RefreshTokenDto) {
+    return this.authService.refreshToken(dto.refreshToken);
   }
 
   @Post('verify-otp')
@@ -159,6 +161,7 @@ export class AuthController {
     });
   }
 
+  @Audit('LOGOUT', 'auth')
   @Post('logout')
   @UseGuards(JwtAuthGuard)
   @HttpCode(200)
@@ -177,10 +180,17 @@ export class AuthController {
   @UseGuards(AuthGuard('google'))
   googleAuth(): void {}
 
+  @Post('exchange-code')
+  @Public()
+  @HttpCode(200)
+  async exchangeCode(@Body() body: { code: string }) {
+    return this.authService.exchangeOAuthCode(body.code);
+  }
+
   @Get('google/callback')
   @Public()
   @UseGuards(AuthGuard('google'))
-  googleCallback(@Req() req: TenantRequest, @Res() res: Response) {
+  async googleCallback(@Req() req: TenantRequest, @Res() res: Response) {
     console.log('[auth][googleCallback] start', {
       clinicId: req.tenant?.clinicId,
       hasUser: Boolean(req.user),
@@ -218,8 +228,14 @@ export class AuthController {
 
     this.applyTrustedDeviceCookie(res, trustedDeviceToken);
 
+    const code = await this.authService.generateOAuthCode({
+      accessToken: accessToken || '',
+      refreshToken: refreshToken || '',
+      role: user?.role || 'patient',
+    });
+
     return res.redirect(
-      `${frontendUrl}/auth/callback?accessToken=${encodeURIComponent(accessToken || '')}&refreshToken=${encodeURIComponent(refreshToken || '')}&role=${encodeURIComponent(user?.role || 'patient')}`,
+      `${frontendUrl}/auth/callback?code=${encodeURIComponent(code)}`,
     );
   }
 

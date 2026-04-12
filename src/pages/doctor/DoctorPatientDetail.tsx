@@ -189,7 +189,7 @@ export default function DoctorPatientDetail() {
 
   const { data: appointmentsResult, isLoading: isAppointmentsLoading } = useQuery<AppointmentResponse[]>({
     queryKey: ["doctor-patient-appointments", id],
-    queryFn: async () => api.appointments.list({ patient_id: id! }) as AppointmentResponse[],
+    queryFn: async () => api.appointments.list({ patient_id: id! }) as unknown as AppointmentResponse[],
     enabled: !!id,
   });
 

@@ -8,6 +8,7 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
+import { Audit } from '../common/decorators/audit.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CreateAdminUserDto } from './dto/create-admin-user.dto';
@@ -34,6 +35,7 @@ export class StaffController {
     return this.staffService.findAllByClinic(user.clinicId, { search, status });
   }
 
+  @Audit('CREATE_USER', 'user')
   @Post()
   createUser(
     @Body() dto: CreateAdminUserDto,
@@ -47,6 +49,7 @@ export class StaffController {
     return this.staffService.create(dto, user.clinicId);
   }
 
+  @Audit('UPDATE_USER', 'user')
   @Patch(':id')
   update(
     @Param('id') id: string,
@@ -56,6 +59,7 @@ export class StaffController {
     return this.staffService.update(id, dto, user.clinicId);
   }
 
+  @Audit('UPDATE_USER_STATUS', 'user')
   @Patch(':id/status')
   setStatus(
     @Param('id') id: string,
@@ -65,6 +69,7 @@ export class StaffController {
     return this.staffService.setStatus(id, dto, user.clinicId);
   }
 
+  @Audit('DELETE_USER', 'user')
   @Delete(':id')
   remove(@Param('id') id: string, @CurrentUser() user: { clinicId: string }) {
     return this.staffService.remove(id, user.clinicId);
