@@ -130,13 +130,13 @@ const calendarMessages = {
 const STATUS_COLORS: Record<string, string> = {
   pending: "#d4943a",
   confirmed: "#4f8fe6",
-  completed: "#65a98f",
-  cancelled: "#5a7a8a",
+  completed: "#64748b",
+  cancelled: "#dc2626",
 };
 
 const OVERRIDE_COLORS: Record<string, string> = {
-  custom_hours: "#c0392b",
-  blackout: "#8b8fa3",
+  custom_hours: "#ea580c",
+  blackout: "#ea580c",
 };
 
 interface DoctorCalendarProps {
@@ -930,7 +930,9 @@ function CalendarEventContent({
           ? "scheduler-agenda-event-appointment-pending"
           : eventStatus === "completed"
             ? "scheduler-agenda-event-appointment-completed"
-          : "scheduler-agenda-event-appointment"
+            : eventStatus === "cancelled" || eventStatus === "canceled"
+              ? "scheduler-agenda-event-appointment-cancelled"
+              : "scheduler-agenda-event-appointment"
         : event.type === "blackout"
           ? "scheduler-agenda-event-blackout"
           : "scheduler-agenda-event-custom-hours";
@@ -1927,7 +1929,7 @@ export function DoctorCalendar({
       return {
         className: "scheduler-event scheduler-event-availability-surface",
         style: {
-          backgroundColor: "rgba(220, 252, 231, 0.55)",
+          backgroundColor: "rgba(187, 247, 208, 0.78)",
           borderLeft: "3px solid #16a34a",
           borderRadius: 0,
           left: 0,
@@ -1997,15 +1999,14 @@ export function DoctorCalendar({
         className: getSchedulerEventClassName(event),
         style: {
           "--scheduler-event-color": color,
-          backgroundColor:
-            event.type === "custom_hours" ? "rgba(192, 57, 43, 0.18)" : `${color}33`,
+          backgroundColor: "rgba(234, 88, 12, 0.15)",
           borderLeft:
-            event.type === "custom_hours" ? "3px solid #c0392b" : undefined,
+            event.type === "custom_hours" ? "3px solid #ea580c" : undefined,
           boxShadow:
             event.type === "custom_hours"
               ? "0 1px 3px rgba(0,0,0,0.15)"
               : `inset 3px 0 0 0 ${color}, 0 1px 3px rgba(0,0,0,0.15)`,
-          color: event.type === "custom_hours" ? "#c0392b" : color,
+          color: "#ea580c",
           borderRadius: "6px",
         } as CSSProperties,
       };

@@ -685,9 +685,15 @@
   }
 
   .scheduler-agenda-event-appointment-completed {
-    border-color: #16a34a;
-    background-color: #dcfce7;
-    color: #166534;
+    border-color: #94a3b8;
+    background-color: #f1f5f9;
+    color: #334155;
+  }
+
+  .scheduler-agenda-event-appointment-cancelled {
+    border-color: #f87171;
+    background-color: #fef2f2;
+    color: #991b1b;
   }
 
   .scheduler-agenda-event-appointment .scheduler-agenda-event-label {
@@ -706,9 +712,9 @@
   }
 
   .scheduler-agenda-event-blackout {
-    border-color: hsl(220 18% 74%);
-    background-color: hsl(220 24% 95%);
-    color: hsl(220 26% 28%);
+    border-color: #fb923c;
+    background-color: #fff7ed;
+    color: #9a3412;
   }
 
   .scheduler-agenda-event-blackout .scheduler-agenda-event-label {
@@ -717,9 +723,9 @@
   }
 
   .scheduler-agenda-event-custom-hours {
-    border-color: hsl(0 28% 82%);
-    background-color: hsl(0 42% 96%);
-    color: hsl(0 38% 34%);
+    border-color: #fb923c;
+    background-color: #fff7ed;
+    color: #9a3412;
   }
 
   .scheduler-agenda-event-custom-hours .scheduler-agenda-event-label {
@@ -769,8 +775,8 @@
 
   .scheduler-event-appointment-completed,
   .scheduler-calendar-shell .rbc-event.scheduler-event-appointment-completed {
-    color: var(--scheduler-event-color, #65a98f) !important;
-    border-left: 3px solid #15803d !important;
+    color: var(--scheduler-event-color, #64748b) !important;
+    border-left: 3px solid #64748b !important;
   }
 
   .scheduler-event-appointment .scheduler-event-meta,
@@ -796,7 +802,7 @@
   }
 
   .scheduler-calendar-shell .rbc-event.scheduler-event-appointment-completed.rbc-selected {
-    background-color: var(--scheduler-event-color, #65a98f) !important;
+    background-color: var(--scheduler-event-color, #64748b) !important;
     color: #ffffff !important;
   }
 
@@ -814,17 +820,17 @@
 
   .scheduler-event-blackout,
   .scheduler-calendar-shell .rbc-event.override {
-    background: #8b8fa333 !important;
-    color: var(--scheduler-event-color, #8b8fa3) !important;
+    background: rgba(234, 88, 12, 0.15) !important;
+    color: var(--scheduler-event-color, #ea580c) !important;
     border: none !important;
   }
 
   .scheduler-event-custom-hours,
   .scheduler-calendar-shell .rbc-event.custom_hours {
-    background-color: rgba(192, 57, 43, 0.18) !important;
-    color: #c0392b !important;
+    background-color: rgba(234, 88, 12, 0.15) !important;
+    color: #ea580c !important;
     border: none !important;
-    border-left: 3px solid #c0392b !important;
+    border-left: 3px solid #ea580c !important;
     opacity: 1;
     border-radius: 6px;
     overflow: hidden;
@@ -869,7 +875,7 @@
     padding: 0 !important;
     pointer-events: none !important;
     z-index: 0 !important;
-    background: rgba(220, 252, 231, 0.55) !important;
+    background: rgba(187, 247, 208, 0.78) !important;
     opacity: 1 !important;
     min-height: 0;
     overflow: hidden;
