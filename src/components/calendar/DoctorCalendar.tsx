@@ -1984,7 +1984,7 @@ export function DoctorCalendar({
         className: getSchedulerEventClassName(event),
         style: {
           "--scheduler-event-color": color,
-          backgroundColor: `${color}47`,
+          background: `linear-gradient(${color}47, ${color}47), white`,
           boxShadow: `inset 3px 0 0 0 ${color}, 0 1px 3px rgba(0,0,0,0.15)`,
           color,
           borderRadius: "6px",
@@ -1999,7 +1999,8 @@ export function DoctorCalendar({
         className: getSchedulerEventClassName(event),
         style: {
           "--scheduler-event-color": color,
-          backgroundColor: "rgba(234, 88, 12, 0.15)",
+          background:
+            "linear-gradient(rgba(234, 88, 12, 0.15), rgba(234, 88, 12, 0.15)), white",
           borderLeft:
             event.type === "custom_hours" ? "3px solid #ea580c" : undefined,
           boxShadow:
