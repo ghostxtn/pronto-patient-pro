@@ -840,15 +840,13 @@
 
   .scheduler-event-custom-hours,
   .scheduler-calendar-shell .rbc-event.custom_hours {
-    background-color: rgba(234, 88, 12, 0.15) !important;
-    color: #ea580c !important;
-    border: none !important;
-    border-left: 3px solid #ea580c !important;
+    background-color: #FED7AA !important;
+    color: #9A3412 !important;
+    border: 1px solid rgba(0, 0, 0, 0.08) !important;
     opacity: 1;
     border-radius: 6px;
     overflow: hidden;
     box-sizing: border-box;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
   }
 
   .scheduler-event-override-selected,

@@ -2026,12 +2026,6 @@ export function DoctorCalendar({
           "--scheduler-event-color": color,
           background:
             "linear-gradient(rgba(234, 88, 12, 0.15), rgba(234, 88, 12, 0.15)), white",
-          borderLeft:
-            event.type === "custom_hours" ? "3px solid #ea580c" : undefined,
-          boxShadow:
-            event.type === "custom_hours"
-              ? "0 1px 3px rgba(0,0,0,0.15)"
-              : `inset 3px 0 0 0 ${color}, 0 1px 3px rgba(0,0,0,0.15)`,
           color: "#ea580c",
           borderRadius: "6px",
         } as CSSProperties,
