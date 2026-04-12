@@ -1,7 +1,7 @@
 fast open with precommands :
 
 docker compose down
-docker compose up -d --build
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
 $env:VITE_PROXY_TARGET="http://localhost"
 npm run dev
 
@@ -59,9 +59,14 @@ Recommended flow for a fresh database
    - `npm install`
    - `npm run backend:install`
 3. Start the Docker services:
-   - `docker compose up -d`
+   - `npm run dev:up`    # starts all services + opens postgres:5432 for migrations
+   - `npm run dev:down`  # stops all services
+   > ⚠️ Production deploy: use `npm run prod:up` — postgres port is NOT exposed
+   - Before first startup on a fresh machine, make sure the Postgres init script is executable:
+     - `chmod +x postgres/init/01_audit_user.sh`
 4. Apply database migrations:
    - `npm run db:migrate`
+   - Migrations that run from the host require `docker-compose.dev.yml` to be active so PostgreSQL is exposed on `5432`
 5. Seed the minimum tenant data:
    - `npm run db:seed`
 
@@ -71,9 +76,35 @@ Useful commands
 - `npm run db:migrate`: apply committed SQL migrations to the database.
 - `npm run db:push`: push the current schema directly to the database without generating a migration.
 - `npm run db:seed`: create or update the default clinics, owner/admin/doctor/staff/patient accounts, and specializations for local development.
-- `docker compose up -d`: start the Docker services, including the backend container.
+- `npm run dev:up`: start the Docker services for local development, including host Postgres access on `5432`.
+- `npm run dev:down`: stop the local development Docker services.
 
 If a teammate pulls new backend schema changes later, they should run `npm run db:migrate` again.
+
+Audit logging DB notes
+
+- `.env` must include `AUDIT_DB_PASSWORD` because Docker creates the `audit_user` role during Postgres initialization.
+- The API uses `AUDIT_DATABASE_URL` for `AuditService`, separate from the main `DATABASE_URL`.
+- `postgres/init/01_audit_user.sh` only creates the `audit_user` role and grants database/schema access.
+- Table-level `audit_logs` grants are applied by migration `backend/drizzle/0016_audit_user_grants.sql`.
+- If you need the init script to re-run locally, you must recreate the Postgres volume.
+
+Postgres port note
+
+- `docker-compose.yml` does not expose PostgreSQL directly.
+- Host Postgres access lives in `docker-compose.dev.yml` only.
+- For local Drizzle migrations and direct DB access from the host, start Compose with both files:
+  - `npm run dev:up`
+- To stop the local stack again:
+  - `npm run dev:down`
+- Production deploy:
+  - `npm run prod:up`
+- Do not use `docker-compose.dev.yml` in production.
+
+Drizzle env note
+
+- `backend/drizzle.config.ts` no longer loads `dotenv` itself.
+- Drizzle commands rely on `node --env-file=../.env ...`, so run them through the existing package scripts.
 
 Migration quick decision guide
 
@@ -91,7 +122,7 @@ This means the database schema exists, but Drizzle migration history is missing 
 Repair steps
 
 1. Make sure the Docker services are running:
-   - `docker compose up -d`
+   - `npm run dev:up`
 2. Apply the baseline repair script:
    - `Get-Content .\backend\drizzle\baseline_existing_db.sql -Raw | docker compose exec -T postgres psql -U clinic_user -d clinic_db`
 3. Apply any remaining committed migrations:
