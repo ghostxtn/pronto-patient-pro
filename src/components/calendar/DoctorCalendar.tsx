@@ -33,6 +33,7 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  Expand,
   Loader2,
   Plus,
   Pencil,
@@ -85,6 +86,7 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import {
@@ -258,7 +260,12 @@ interface AvailabilityWindow {
   slotIds: string[];
 }
 
-type SlotStatus = "available" | "partial" | "unavailable" | "conflict";
+type SlotStatus =
+  | "available"
+  | "overflow"
+  | "gap"
+  | "unavailable"
+  | "conflict";
 
 type SchedulerEvent =
   | CalendarEvent
@@ -276,8 +283,14 @@ const toolbarViewLabels = {
 } as const;
 
 const toolbarViews = [Views.WEEK, Views.DAY, Views.MONTH, Views.AGENDA] as const;
-const quarterHourTimes = Array.from({ length: 96 }, (_, index) =>
-  minutesToTime(index * 15),
+const QUICK_ACTION_TIME_MINUTES_START = 6 * 60;
+const QUICK_ACTION_TIME_MINUTES_END = 23 * 60 + 45;
+const quarterHourTimes = Array.from(
+  {
+    length:
+      (QUICK_ACTION_TIME_MINUTES_END - QUICK_ACTION_TIME_MINUTES_START) / 15 + 1,
+  },
+  (_, index) => minutesToTime(QUICK_ACTION_TIME_MINUTES_START + index * 15),
 );
 
 const dayLabels: Record<number, string> = {
@@ -476,9 +489,17 @@ function computeSlotStatus(
     return "unavailable";
   }
 
+  const overlappingAvailabilityRanges = mergedAvailabilityRanges.filter(
+    (range) => range.start < selectedRange.end && range.end > selectedRange.start,
+  );
+
+  if (overlappingAvailabilityRanges.length === 0) {
+    return "unavailable";
+  }
+
   let coveredMinutes = 0;
 
-  for (const range of mergedAvailabilityRanges) {
+  for (const range of overlappingAvailabilityRanges) {
     const overlapStart = Math.max(range.start, selectedRange.start);
     const overlapEnd = Math.min(range.end, selectedRange.end);
     if (overlapEnd > overlapStart) {
@@ -486,11 +507,19 @@ function computeSlotStatus(
     }
   }
 
-  if (coveredMinutes <= 0) {
-    return "unavailable";
+  const isStartWithinAvailability = overlappingAvailabilityRanges.some(
+    (range) =>
+      selectedRange.start >= range.start && selectedRange.start < range.end,
+  );
+  const isEndWithinAvailability = overlappingAvailabilityRanges.some(
+    (range) => selectedRange.end > range.start && selectedRange.end <= range.end,
+  );
+
+  if (!isStartWithinAvailability || !isEndWithinAvailability) {
+    return "overflow";
   }
 
-  return coveredMinutes >= selectedDuration ? "available" : "partial";
+  return coveredMinutes >= selectedDuration ? "available" : "gap";
 }
 
 function getSupportedSlotDuration(
@@ -1913,6 +1942,32 @@ export function DoctorCalendar({
     }
   }, [quickActionSlot]);
 
+  useEffect(() => {
+    if (
+      !quickActionSlot?.open ||
+      (quickActionPicker !== "start" && quickActionPicker !== "end")
+    ) {
+      return;
+    }
+
+    const selectedTime =
+      quickActionPicker === "start"
+        ? format(quickActionSlot.start, "HH:mm")
+        : format(quickActionSlot.end, "HH:mm");
+
+    const frameId = window.requestAnimationFrame(() => {
+      const selectedOption = quickActionPanelRef.current?.querySelector<HTMLElement>(
+        `[data-quick-action-time-list="${quickActionPicker}"] [data-quick-action-time-value="${selectedTime}"]`,
+      );
+
+      selectedOption?.scrollIntoView({
+        block: "center",
+      });
+    });
+
+    return () => window.cancelAnimationFrame(frameId);
+  }, [quickActionPicker, quickActionSlot]);
+
   useLayoutEffect(() => {
     if (!quickActionSlot?.open || isMobile) {
       return;
@@ -2032,6 +2087,30 @@ export function DoctorCalendar({
   const isError = isAvailabilityError || isCalendarError;
   const error = availabilityError ?? calendarError;
 
+  const quickActionSlotStatus = useMemo<SlotStatus | null>(() => {
+    if (!quickActionSlot) {
+      return null;
+    }
+
+    return computeSlotStatus(
+      quickActionSlot.start,
+      format(quickActionSlot.start, "HH:mm"),
+      format(quickActionSlot.end, "HH:mm"),
+      availabilitySlots,
+      data?.appointments ?? [],
+    );
+  }, [availabilitySlots, data?.appointments, quickActionSlot]);
+
+  const quickActionEndTimeOptions = useMemo(() => {
+    if (!quickActionSlot) {
+      return quarterHourTimes;
+    }
+
+    const startMinutes = timeToMinutes(format(quickActionSlot.start, "HH:mm"));
+
+    return quarterHourTimes.filter((timeValue) => timeToMinutes(timeValue) > startMinutes);
+  }, [quickActionSlot]);
+
   if (isLoading) {
     return (
       <div className="space-y-4">
@@ -2055,94 +2134,43 @@ export function DoctorCalendar({
   const surfaceContextTitle =
     doctorName ?? (mode === "staff" ? "Doktor takvimi" : "Kendi takviminiz");
 
-  const quickActionSlotStatus = useMemo<SlotStatus | null>(() => {
-    if (!quickActionSlot || quickActionSlot.kind === "blocked") {
-      return null;
-    }
-
-    return computeSlotStatus(
-      quickActionSlot.start,
-      format(quickActionSlot.start, "HH:mm"),
-      format(quickActionSlot.end, "HH:mm"),
-      availabilitySlots,
-      data?.appointments ?? [],
-    );
-  }, [availabilitySlots, data?.appointments, quickActionSlot]);
-
   const quickActionBadge =
-    quickActionSlot?.kind === "blocked"
+    quickActionSlotStatus === "available" || quickActionSlotStatus === "gap"
       ? {
-          label:
-            quickActionSlot.override?.type === "blackout"
-              ? "Kapali gun"
-              : "Istisna uygulanmis",
+          label: "Musait zaman",
           className:
-            quickActionSlot.override?.type === "blackout"
-              ? "border-destructive/25 bg-destructive/10 text-destructive"
-              : "border-warning/30 bg-warning/10 text-warning",
+            "border-emerald-500/25 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
         }
-      : quickActionSlotStatus === "available"
+      : quickActionSlotStatus === "overflow"
         ? {
-            label: "Musait zaman",
+            label: "Sinir disi",
             className:
-              "border-emerald-500/25 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+              "border-amber-500/25 bg-amber-500/10 text-amber-700 dark:text-amber-300",
           }
-        : quickActionSlotStatus === "partial"
+        : quickActionSlotStatus === "conflict"
           ? {
-              label: "Kismen musait",
+              label: "Cakisma var",
               className:
-                "border-amber-500/25 bg-amber-500/10 text-amber-700 dark:text-amber-300",
+                "border-destructive/25 bg-destructive/10 text-destructive",
             }
-          : quickActionSlotStatus === "conflict"
-            ? {
-                label: "Cakisma var",
-                className:
-                  "border-destructive/25 bg-destructive/10 text-destructive",
-              }
-            : {
-                label: "Musait degil",
-                className: "border-border/70 bg-muted/60 text-muted-foreground",
-              };
+          : {
+              label: "Musait degil",
+              className: "border-border/70 bg-muted/60 text-muted-foreground",
+            };
 
   const quickActionWarningMessage =
-    quickActionSlot?.kind === "blocked"
-      ? null
-      : quickActionSlotStatus === "partial"
-        ? "Secilen araligin bir kismi musaitlik disinda"
-        : quickActionSlotStatus === "conflict"
-          ? "Bu saatte randevu mevcut"
-          : quickActionSlotStatus === "unavailable"
-            ? "Bu aralikta musaitlik tanimli degil"
-            : null;
+    quickActionSlotStatus === "overflow"
+      ? "Secim musaitlik sinirinin disina tasiyor"
+      : quickActionSlotStatus === "conflict"
+        ? "Bu saatte randevu mevcut"
+        : quickActionSlotStatus === "unavailable"
+          ? "Bu aralikta musaitlik tanimli degil"
+          : null;
 
-  const isQuickActionEditable = Boolean(
-    quickActionSlot && quickActionSlot.kind !== "blocked",
-  );
+  const isQuickActionEditable = Boolean(quickActionSlot);
   const quickActionDatePillLabel = quickActionSlot
     ? format(quickActionSlot.start, "EEE, d MMMM", { locale: tr })
     : "";
-
-  const quickActionCanRemoveDirectly =
-    quickActionSlot?.kind === "blocked" && quickActionSlot.override
-      ? quickActionSlot.override.type === "blackout" ||
-        !quickActionSlot.override.start_time ||
-        !quickActionSlot.override.end_time ||
-        (() => {
-          const overrideRange = normalizeMinuteRange(
-            timeToMinutes(quickActionSlot.override?.start_time ?? "00:00"),
-            timeToMinutes(quickActionSlot.override?.end_time ?? "00:00"),
-          );
-          const selectedRange = normalizeMinuteRange(
-            timeToMinutes(format(quickActionSlot.start, "HH:mm")),
-            timeToMinutes(format(quickActionSlot.end, "HH:mm")),
-          );
-
-          return (
-            overrideRange.start === selectedRange.start &&
-            overrideRange.end === selectedRange.end
-          );
-        })()
-      : false;
 
   const canBlockSelectedRange =
     mode === "staff" &&
@@ -2189,6 +2217,14 @@ export function DoctorCalendar({
       return false;
     }
 
+    const nextMinutes = timeToMinutes(value);
+    if (
+      nextMinutes < QUICK_ACTION_TIME_MINUTES_START ||
+      nextMinutes > QUICK_ACTION_TIME_MINUTES_END
+    ) {
+      return false;
+    }
+
     const currentDuration = Math.max(
       15,
       differenceInMinutes(quickActionSlot.end, quickActionSlot.start),
@@ -2196,7 +2232,14 @@ export function DoctorCalendar({
 
     if (field === "start") {
       const nextStart = withTime(quickActionSlot.start, value);
-      const nextEnd = addMinutes(nextStart, currentDuration);
+      const latestAllowedEnd = withTime(
+        quickActionSlot.start,
+        minutesToTime(QUICK_ACTION_TIME_MINUTES_END),
+      );
+      const nextEndCandidate = addMinutes(nextStart, currentDuration);
+      const nextEnd =
+        nextEndCandidate > latestAllowedEnd ? latestAllowedEnd : nextEndCandidate;
+
       if (toApiDate(nextEnd) !== toApiDate(nextStart) || nextEnd <= nextStart) {
         return false;
       }
@@ -2265,24 +2308,29 @@ export function DoctorCalendar({
     setAppointmentComposer(nextComposer);
   };
 
-  const handleQuickActionOpenAvailabilityEditor = () => {
+  const handleQuickActionOpenAvailabilityEditor = (options?: {
+    startTime?: string;
+    endTime?: string;
+  }) => {
     if (!quickActionSlot) {
       return;
     }
 
     const availabilityTarget = quickActionSlot.availabilityTarget;
+    const defaultStartTime =
+      availabilityTarget?.shouldPrefillExpand || !availabilityTarget?.primarySlot
+        ? format(availabilityTarget?.prefillStart ?? quickActionSlot.start, "HH:mm")
+        : undefined;
+    const defaultEndTime =
+      availabilityTarget?.shouldPrefillExpand || !availabilityTarget?.primarySlot
+        ? format(availabilityTarget?.prefillEnd ?? quickActionSlot.end, "HH:mm")
+        : undefined;
     const nextModalState = {
       open: true as const,
       mode: availabilityTarget?.primarySlot ? ("edit" as const) : ("create" as const),
       dayOfWeek: availabilityTarget?.primarySlot?.day_of_week ?? quickActionSlot.dayOfWeek,
-      startTime:
-        availabilityTarget?.shouldPrefillExpand || !availabilityTarget?.primarySlot
-          ? format(availabilityTarget?.prefillStart ?? quickActionSlot.start, "HH:mm")
-          : undefined,
-      endTime:
-        availabilityTarget?.shouldPrefillExpand || !availabilityTarget?.primarySlot
-          ? format(availabilityTarget?.prefillEnd ?? quickActionSlot.end, "HH:mm")
-          : undefined,
+      startTime: options?.startTime ?? defaultStartTime,
+      endTime: options?.endTime ?? defaultEndTime,
       slotDuration: availabilityTarget?.slotDuration,
       slot: availabilityTarget?.primarySlot ?? undefined,
     };
@@ -2290,6 +2338,19 @@ export function DoctorCalendar({
     resetCalendarActiveState();
     setAvailabilityModal({
       ...nextModalState,
+    });
+  };
+
+  const handleQuickActionExpandAvailability = () => {
+    const primarySlot = quickActionSlot?.availabilityTarget?.primarySlot;
+    if (!quickActionSlot || !primarySlot) {
+      handleQuickActionOpenAvailabilityEditor();
+      return;
+    }
+
+    handleQuickActionOpenAvailabilityEditor({
+      startTime: primarySlot.start_time,
+      endTime: format(quickActionSlot.end, "HH:mm"),
     });
   };
 
@@ -2304,57 +2365,6 @@ export function DoctorCalendar({
       mode: "edit",
       override: quickActionSlot.override,
     });
-  };
-
-  const handleQuickActionRemoveOverride = () => {
-    if (!quickActionSlot?.override) {
-      return;
-    }
-
-    const override = quickActionSlot.override;
-
-    if (override.type === "custom_hours") {
-      if (!override.start_time || !override.end_time) {
-        resetCalendarActiveState();
-        setOverrideToDelete(override);
-        return;
-      }
-
-      const overrideRange = normalizeMinuteRange(
-        timeToMinutes(override.start_time),
-        timeToMinutes(override.end_time),
-      );
-
-      const selectedRange = normalizeMinuteRange(
-        timeToMinutes(format(quickActionSlot.start, "HH:mm")),
-        timeToMinutes(format(quickActionSlot.end, "HH:mm")),
-      );
-
-      const exactMatch =
-        overrideRange.start === selectedRange.start &&
-        overrideRange.end === selectedRange.end;
-
-      if (exactMatch) {
-        resetCalendarActiveState();
-        setOverrideToDelete(override);
-        return;
-      }
-
-      toast.info(
-        "Kismi blok acma bu surumde desteklenmiyor. Istisnayi duzenleme ekranindan degistirin.",
-      );
-
-      resetCalendarActiveState();
-      setOverrideModal({
-        open: true,
-        mode: "edit",
-        override,
-      });
-      return;
-    }
-
-    resetCalendarActiveState();
-    setOverrideToDelete(override);
   };
 
   const handleQuickActionBlockTime = () => {
@@ -2403,21 +2413,6 @@ export function DoctorCalendar({
             <Pencil className="h-4 w-4" />
             Istisnayi panelde duzenle
           </Button>
-          <Button
-            type="button"
-            variant={quickActionCanRemoveDirectly ? "destructive" : "outline"}
-            className={cn(
-              buttonClassName,
-              "justify-center",
-              !quickActionCanRemoveDirectly && "border-border/70 bg-background/70",
-            )}
-            onClick={handleQuickActionRemoveOverride}
-          >
-            <Trash2 className="h-4 w-4" />
-            {quickActionCanRemoveDirectly
-              ? "Istisnayi kaldir"
-              : "Istisnayi panelde gozden gecir"}
-          </Button>
         </div>
       );
     }
@@ -2440,6 +2435,33 @@ export function DoctorCalendar({
       );
     }
 
+    if (quickActionSlotStatus === "overflow") {
+      return (
+        <div className="grid gap-2">
+          <Button
+            type="button"
+            className={cn(
+              buttonClassName,
+              "justify-center bg-emerald-600 text-white hover:bg-emerald-700",
+            )}
+            onClick={handleQuickActionExpandAvailability}
+          >
+            <Expand className="h-4 w-4" />
+            Musaitligi genislet
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            className={cn(buttonClassName, "justify-center")}
+            disabled
+          >
+            <UserPlus className="h-4 w-4" />
+            Randevu olustur
+          </Button>
+        </div>
+      );
+    }
+
     if (quickActionSlotStatus === "conflict") {
       return (
         <div className="grid gap-2">
@@ -2452,15 +2474,24 @@ export function DoctorCalendar({
             <UserPlus className="h-4 w-4" />
             Randevu olustur
           </Button>
-          <Button
-            type="button"
-            variant="outline"
-            className={cn(buttonClassName, "justify-center")}
-            onClick={handleQuickActionBlockTime}
-          >
-            <Ban className="h-4 w-4" />
-            Blok istisnasi ekle
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="block w-full">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className={cn(buttonClassName, "justify-center")}
+                  disabled
+                >
+                  <Ban className="h-4 w-4" />
+                  Blok istisnasi ekle
+                </Button>
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>
+              Once cakisan randevuyu cozun
+            </TooltipContent>
+          </Tooltip>
         </div>
       );
     }
@@ -2841,11 +2872,15 @@ export function DoctorCalendar({
                             placeholder="HH:mm"
                             className="h-9 rounded-lg border-border/50 bg-muted/30 text-sm"
                           />
-                          <div className="mt-2 max-h-44 overflow-y-auto pr-1">
+                          <div
+                            className="mt-2 max-h-44 overflow-y-auto pr-1"
+                            data-quick-action-time-list="start"
+                          >
                             {quarterHourTimes.map((timeValue) => (
                               <button
                                 key={timeValue}
                                 type="button"
+                                data-quick-action-time-value={timeValue}
                                 className={cn(
                                   "flex w-full items-center rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-muted",
                                   format(quickActionSlot.start, "HH:mm") === timeValue &&
@@ -2881,11 +2916,15 @@ export function DoctorCalendar({
                             placeholder="HH:mm"
                             className="h-9 rounded-lg border-border/50 bg-muted/30 text-sm"
                           />
-                          <div className="mt-2 max-h-44 overflow-y-auto pr-1">
-                            {quarterHourTimes.map((timeValue) => (
+                          <div
+                            className="mt-2 max-h-44 overflow-y-auto pr-1"
+                            data-quick-action-time-list="end"
+                          >
+                            {quickActionEndTimeOptions.map((timeValue) => (
                               <button
                                 key={timeValue}
                                 type="button"
+                                data-quick-action-time-value={timeValue}
                                 className={cn(
                                   "flex w-full items-center rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-muted",
                                   format(quickActionSlot.end, "HH:mm") === timeValue &&
