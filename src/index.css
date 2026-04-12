@@ -729,7 +729,7 @@
     font-size: 11px;
     font-weight: 500;
     line-height: 1.2;
-    color: rgba(255, 255, 255, 0.85);
+    color: currentColor;
     text-transform: none;
     letter-spacing: 0;
     opacity: 1;
@@ -739,30 +739,30 @@
     @apply truncate leading-snug;
     font-size: 12px;
     font-weight: 600;
-    color: #ffffff;
+    color: currentColor;
   }
 
   .scheduler-event-subtitle {
     font-size: 11px;
     font-weight: 500;
-    color: rgba(255, 255, 255, 0.85);
+    color: currentColor;
   }
 
   .scheduler-event-appointment,
   .scheduler-calendar-shell .rbc-event.appointment {
-    color: #ffffff !important;
+    color: var(--scheduler-event-color, #ffffff) !important;
     border: none !important;
   }
 
   .scheduler-event-appointment-pending,
   .scheduler-calendar-shell .rbc-event.scheduler-event-appointment-pending {
-    color: #ffffff !important;
+    color: var(--scheduler-event-color, #d4943a) !important;
     border-left: 3px solid #d97706 !important;
   }
 
   .scheduler-event-appointment-completed,
   .scheduler-calendar-shell .rbc-event.scheduler-event-appointment-completed {
-    color: #ffffff !important;
+    color: var(--scheduler-event-color, #65a98f) !important;
     border-left: 3px solid #15803d !important;
   }
 
@@ -772,24 +772,24 @@
   .scheduler-calendar-shell .rbc-event.appointment .scheduler-event-meta,
   .scheduler-calendar-shell .rbc-event.appointment .scheduler-event-title,
   .scheduler-calendar-shell .rbc-event.appointment .scheduler-event-subtitle {
-    color: hsl(0 0% 100%) !important;
+    color: currentColor !important;
   }
 
   .scheduler-event-appointment-selected,
   .scheduler-calendar-shell .rbc-event.scheduler-event-appointment.rbc-selected,
   .scheduler-calendar-shell .rbc-event.appointment.rbc-selected {
     color: #ffffff !important;
-    background-color: #185fc2 !important;
+    background-color: var(--scheduler-event-color, #185fc2) !important;
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.22);
   }
 
   .scheduler-calendar-shell .rbc-event.scheduler-event-appointment-pending.rbc-selected {
-    background-color: #d97706 !important;
+    background-color: var(--scheduler-event-color, #d4943a) !important;
     color: #ffffff !important;
   }
 
   .scheduler-calendar-shell .rbc-event.scheduler-event-appointment-completed.rbc-selected {
-    background-color: #15803d !important;
+    background-color: var(--scheduler-event-color, #65a98f) !important;
     color: #ffffff !important;
   }
 
@@ -807,15 +807,15 @@
 
   .scheduler-event-blackout,
   .scheduler-calendar-shell .rbc-event.override {
-    background: #374151 !important;
-    color: #ffffff !important;
+    background: #8b8fa333 !important;
+    color: var(--scheduler-event-color, #8b8fa3) !important;
     border: none !important;
   }
 
   .scheduler-event-custom-hours,
   .scheduler-calendar-shell .rbc-event.custom_hours {
-    background: #dc2626 !important;
-    color: #ffffff !important;
+    background: #6366f133 !important;
+    color: var(--scheduler-event-color, #6366f1) !important;
     border: none !important;
     opacity: 1;
     border-radius: 6px;
@@ -837,13 +837,13 @@
   .scheduler-calendar-shell .rbc-event.scheduler-event-blackout.rbc-selected,
   .scheduler-calendar-shell .rbc-event.override.rbc-selected {
     color: #ffffff !important;
-    background-color: #1f2937 !important;
+    background-color: #8b8fa3 !important;
   }
 
   .scheduler-calendar-shell .rbc-event.scheduler-event-custom-hours.rbc-selected,
   .scheduler-calendar-shell .rbc-event.custom_hours.rbc-selected {
     color: #ffffff !important;
-    background-color: #b91c1c !important;
+    background-color: #4f46e5 !important;
     overflow: hidden;
     box-sizing: border-box;
   }
@@ -919,9 +919,11 @@
   .scheduler-calendar-shell .rbc-slot-selection,
   .rbc-slot-selection {
     z-index: 10 !important;
-    border-radius: 4px !important;
-    background-color: rgba(79, 143, 230, 0.2) !important;
-    border: 1px solid rgba(79, 143, 230, 0.5) !important;
+    border-radius: 12px !important;
+    background-color: rgba(79, 143, 230, 0.10) !important;
+    border: 1.5px solid rgba(79, 143, 230, 0.35) !important;
+    margin: 0 2px !important;
+    box-sizing: border-box !important;
     overflow: visible !important;
     box-shadow: none;
   }

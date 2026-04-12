@@ -48,14 +48,17 @@ export default function DoctorSchedule() {
   }, [doctorRecord, error, isError, isLoading, user?.id, user?.role]);
 
   return (
-    <AppLayout mainClassName="flex min-h-0 overflow-hidden pt-3 pb-4 sm:pt-4 sm:pb-6">
+    <AppLayout
+      mainWidth="full"
+      mainClassName="flex min-h-0 w-full overflow-hidden px-2 pt-3 pb-4 sm:px-3 sm:pt-4 sm:pb-6"
+    >
       <motion.div
         initial="hidden"
         animate="visible"
-        className="flex min-h-0 flex-1 flex-col overflow-hidden"
+        className="flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden"
       >
         {doctorRecord ? (
-          <div className="min-h-0 flex-1 overflow-hidden">
+          <div className="min-h-0 w-full min-w-0 flex-1 overflow-hidden">
             <DoctorCalendar
               doctorId={doctorRecord.id}
               mode="doctor"

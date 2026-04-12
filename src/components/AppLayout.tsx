@@ -28,9 +28,14 @@ import { cn } from "@/lib/utils";
 interface AppLayoutProps {
   children: React.ReactNode;
   mainClassName?: string;
+  mainWidth?: "container" | "full";
 }
 
-export default function AppLayout({ children, mainClassName }: AppLayoutProps) {
+export default function AppLayout({
+  children,
+  mainClassName,
+  mainWidth = "container",
+}: AppLayoutProps) {
   const { user, logout } = useAuth();
   const { t } = useLanguage();
   const location = useLocation();
@@ -217,7 +222,8 @@ export default function AppLayout({ children, mainClassName }: AppLayoutProps) {
 
       <main
         className={cn(
-          "container flex-1 py-6",
+          "flex-1 py-6",
+          mainWidth === "container" ? "container" : "w-full max-w-none",
           isStaffDoctorsPage && "min-h-0 overflow-hidden",
           mainClassName,
         )}

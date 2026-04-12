@@ -16,6 +16,13 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
+const STATUS_COLORS: Record<string, string> = {
+  pending: "#d4943a",
+  confirmed: "#4f8fe6",
+  completed: "#65a98f",
+  cancelled: "#5a7a8a",
+};
+
 export interface AppointmentDetailSheetProps {
   appointment: Appointment | null;
   open: boolean;
@@ -51,10 +58,10 @@ export function AppointmentDetailSheet({
   }, [appointment?.id, open]);
 
   const statusConfig: Record<string, { color: string; icon: React.ElementType; label: string }> = {
-    pending: { color: "bg-warning/10 text-warning border-warning/20", icon: AlertCircle, label: t.pending },
-    confirmed: { color: "bg-success/10 text-success border-success/20", icon: CheckCircle2, label: t.confirmed },
-    completed: { color: "bg-primary/10 text-primary border-primary/20", icon: CheckCircle2, label: t.completed },
-    cancelled: { color: "bg-destructive/10 text-destructive border-destructive/20", icon: XCircle, label: t.cancelled },
+    pending: { color: STATUS_COLORS.pending, icon: AlertCircle, label: t.pending },
+    confirmed: { color: STATUS_COLORS.confirmed, icon: CheckCircle2, label: t.confirmed },
+    completed: { color: STATUS_COLORS.completed, icon: CheckCircle2, label: t.completed },
+    cancelled: { color: STATUS_COLORS.cancelled, icon: XCircle, label: t.cancelled },
   };
 
   const { data: clinicalNotes, isLoading: isClinicalNotesLoading } = useQuery<ClinicalNote[]>({
@@ -102,7 +109,8 @@ export function AppointmentDetailSheet({
     appointment?.patient.fullName
     ?? [appointment?.patient.firstName, appointment?.patient.lastName].filter(Boolean).join(" ").trim()
   ) || t.patient;
-  const status = appointment ? statusConfig[appointment.status] : null;
+  const statusKey = appointment?.status === "canceled" ? "cancelled" : appointment?.status;
+  const status = statusKey ? statusConfig[statusKey] : null;
   const StatusIcon = status?.icon;
 
   return (
@@ -114,7 +122,15 @@ export function AppointmentDetailSheet({
               <DialogTitle className="font-display">{t.appointmentDetails}</DialogTitle>
               <DialogDescription asChild>
                 <div>
-                  <Badge className={cn("mt-2 rounded-full border", status.color)} variant="outline">
+                  <Badge
+                    className={cn("mt-2 rounded-full border")}
+                    variant="outline"
+                    style={{
+                      backgroundColor: `${status.color}26`,
+                      borderColor: `${status.color}26`,
+                      color: status.color,
+                    }}
+                  >
                     <StatusIcon className="mr-1 h-3 w-3" /> {status.label}
                   </Badge>
                 </div>

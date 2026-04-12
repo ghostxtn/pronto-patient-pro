@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -125,6 +125,18 @@ const calendarMessages = {
   event: "Etkinlik",
   noEventsInRange: "Bu aralikta etkinlik yok",
   showMore: (total: number) => `+${total} daha`,
+};
+
+const STATUS_COLORS: Record<string, string> = {
+  pending: "#d4943a",
+  confirmed: "#4f8fe6",
+  completed: "#65a98f",
+  cancelled: "#5a7a8a",
+};
+
+const OVERRIDE_COLORS: Record<string, string> = {
+  custom_hours: "#6366f1",
+  blackout: "#8b8fa3",
 };
 
 interface DoctorCalendarProps {
@@ -320,11 +332,11 @@ function getOverrideBadge(type: AvailabilityOverride["type"]) {
   return type === "blackout"
     ? {
         label: "Kapali gun",
-        className: "border-destructive/20 bg-destructive/10 text-destructive",
+        color: OVERRIDE_COLORS.blackout,
       }
     : {
         label: "Bloklu zaman",
-        className: "border-warning/30 bg-warning/10 text-warning",
+        color: OVERRIDE_COLORS.custom_hours,
       };
 }
 
@@ -860,8 +872,32 @@ function CalendarEventContent({
 
   return (
     <div className="scheduler-event-content-stack">
-      <span className="scheduler-event-meta">{timeRange}</span>
-      <span className="scheduler-event-title">{title}</span>
+      <span
+        className="scheduler-event-meta"
+        style={{
+          fontSize: "0.72rem",
+          fontWeight: 600,
+          opacity: 1,
+          whiteSpace: "nowrap",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+        }}
+      >
+        {timeRange}
+      </span>
+      <span
+        className="scheduler-event-title"
+        style={{
+          fontSize: "0.78rem",
+          fontWeight: 600,
+          opacity: 1,
+          whiteSpace: "nowrap",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+        }}
+      >
+        {title}
+      </span>
     </div>
   );
 }
@@ -1742,32 +1778,34 @@ export function DoctorCalendar({
 
     if (event.type === "appointment") {
       const raw = (event.resource as Appointment | undefined)?.status ?? "";
-      const status = raw.toLowerCase();
+      const status = raw.toLowerCase() === "canceled" ? "cancelled" : raw.toLowerCase();
       console.log("appointment status raw:", raw, "lowercased:", status);
-
-      let bg = "#4f8fe6";
-      let border = "#2f75ca";
-
-      if (status === "pending") {
-        bg = "#d4943a";
-        border = "#b8782a";
-      } else if (status === "completed") {
-        bg = "#65a98f";
-        border = "#4a8a72";
-      } else if (status === "cancelled" || status === "canceled") {
-        bg = "#5a7a8a";
-        border = "#3d5a6a";
-      }
+      const color = STATUS_COLORS[status] ?? STATUS_COLORS.confirmed;
 
       return {
         className: getSchedulerEventClassName(event),
         style: {
-          backgroundColor: bg,
-          borderLeft: `3px solid ${border}`,
-          color: "#ffffff",
+          "--scheduler-event-color": color,
+          backgroundColor: `${color}47`,
+          boxShadow: `inset 3px 0 0 0 ${color}, 0 1px 3px rgba(0,0,0,0.15)`,
+          color,
           borderRadius: "6px",
-          boxShadow: "0 1px 3px rgba(0,0,0,0.15)",
-        },
+        } as CSSProperties,
+      };
+    }
+
+    if (event.type === "blackout" || event.type === "custom_hours") {
+      const color = OVERRIDE_COLORS[event.type];
+
+      return {
+        className: getSchedulerEventClassName(event),
+        style: {
+          "--scheduler-event-color": color,
+          backgroundColor: `${color}33`,
+          boxShadow: `inset 3px 0 0 0 ${color}, 0 1px 3px rgba(0,0,0,0.15)`,
+          color,
+          borderRadius: "6px",
+        } as CSSProperties,
       };
     }
 
@@ -2520,6 +2558,10 @@ export function DoctorCalendar({
   };
 
   const handleSlotSelection = (slotInfo: SlotInfo) => {
+    if (slotInfo.action === "click" || slotInfo.action === "doubleClick") {
+      return;
+    }
+
     resetCalendarActiveState();
 
     if (resolvedView === Views.MONTH) {
@@ -3517,7 +3559,14 @@ export function DoctorCalendar({
                               })}
                             </div>
                             <div className="flex items-center gap-2">
-                              <Badge variant="outline" className={badge.className}>
+                              <Badge
+                                variant="outline"
+                                style={{
+                                  backgroundColor: `${badge.color}26`,
+                                  borderColor: `${badge.color}26`,
+                                  color: badge.color,
+                                }}
+                              >
                                 {badge.label}
                               </Badge>
                               {override.type === "custom_hours" &&
