@@ -1105,6 +1105,10 @@ export function DoctorCalendar({
   const calendarShellRef = useRef<HTMLDivElement | null>(null);
   const quickActionPanelRef = useRef<HTMLDivElement | null>(null);
   const hasAutoScrolledToCurrentTimeRef = useRef(false);
+  // When the quick-action panel triggers a calendar navigation, we set
+  // this flag so the resolvedCurrentDate reset effect knows to skip the
+  // panel-close logic for that one render cycle.
+  const quickActionNavigatingRef = useRef(false);
   const resolvedDefaultDuration = supportedSlotDurations.includes(
     defaultDuration as (typeof supportedSlotDurations)[number],
   )
@@ -2263,6 +2267,13 @@ export function DoctorCalendar({
   });
 
   useEffect(() => {
+    // If the calendar was navigated from inside the quick-action panel
+    // (e.g. the user picked a date in the date picker), skip the reset
+    // for this one cycle so the panel stays open.
+    if (quickActionNavigatingRef.current) {
+      quickActionNavigatingRef.current = false;
+      return;
+    }
     setQuickActionSlot(null);
     setQuickActionAnchorRect(null);
     setQuickActionPicker(null);
@@ -2691,6 +2702,18 @@ export function DoctorCalendar({
 
     const nextStart = withTime(nextDate, format(quickActionSlot.start, "HH:mm"));
     const nextEnd = withTime(nextDate, format(quickActionSlot.end, "HH:mm"));
+
+    // If the selected date is outside the currently visible range, navigate
+    // the calendar to show it. Set the guard ref first so the reset effect
+    // does not close the panel when resolvedCurrentDate changes.
+    const isOutsideVisibleRange =
+      nextStart < rangeStart || nextStart >= rangeEnd;
+
+    if (isOutsideVisibleRange) {
+      quickActionNavigatingRef.current = true;
+      setCalendarDate(nextDate);
+    }
+
     updateQuickActionRange(nextStart, nextEnd);
     setQuickActionPicker(null);
   };
