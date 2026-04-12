@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -33,19 +33,19 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  CircleOff,
   Loader2,
+  Plus,
   Pencil,
   Search,
   Settings2,
   Trash2,
   UserPlus,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { AvailabilityModal } from "@/components/calendar/AvailabilityModal";
 import { OverrideModal } from "@/components/calendar/OverrideModal";
 import { AppointmentDetailSheet } from "@/components/appointments/AppointmentDetailSheet";
-import { useLanguage } from "@/contexts/LanguageContext";
 import api from "@/services/api";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
@@ -72,6 +72,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Calendar as DatePickerCalendar } from "@/components/ui/calendar";
 import {
   Sheet,
   SheetContent,
@@ -257,6 +258,8 @@ interface AvailabilityWindow {
   slotIds: string[];
 }
 
+type SlotStatus = "available" | "partial" | "unavailable" | "conflict";
+
 type SchedulerEvent =
   | CalendarEvent
   | SchedulerDraftEvent
@@ -273,6 +276,9 @@ const toolbarViewLabels = {
 } as const;
 
 const toolbarViews = [Views.WEEK, Views.DAY, Views.MONTH, Views.AGENDA] as const;
+const quarterHourTimes = Array.from({ length: 96 }, (_, index) =>
+  minutesToTime(index * 15),
+);
 
 const dayLabels: Record<number, string> = {
   0: "Pazar",
@@ -389,6 +395,102 @@ function normalizeMinuteRange(start: number, end: number) {
     start: Math.min(start, end),
     end: Math.max(start, end),
   };
+}
+
+function mergeMinuteRanges(ranges: Array<{ start: number; end: number }>) {
+  const merged: Array<{ start: number; end: number }> = [];
+  const sortedRanges = [...ranges]
+    .filter((range) => range.end > range.start)
+    .sort((left, right) => left.start - right.start);
+
+  for (const range of sortedRanges) {
+    const previous = merged[merged.length - 1];
+    if (!previous || range.start > previous.end) {
+      merged.push({ ...range });
+      continue;
+    }
+
+    if (range.end > previous.end) {
+      previous.end = range.end;
+    }
+  }
+
+  return merged;
+}
+
+function computeSlotStatus(
+  date: Date,
+  startTime: string,
+  endTime: string,
+  availabilitySlots: AvailabilitySlot[],
+  appointments: Appointment[],
+): SlotStatus {
+  const selectedRange = normalizeMinuteRange(
+    timeToMinutes(startTime),
+    timeToMinutes(endTime),
+  );
+  const selectedDuration = selectedRange.end - selectedRange.start;
+
+  if (selectedDuration <= 0) {
+    return "unavailable";
+  }
+
+  const dateKey = toApiDate(date);
+  const hasAppointmentConflict = appointments.some((appointment) => {
+    const status = appointment.status.toLowerCase();
+    if (status === "cancelled" || status === "canceled") {
+      return false;
+    }
+
+    if (appointment.appointment_date !== dateKey) {
+      return false;
+    }
+
+    const appointmentRange = normalizeMinuteRange(
+      timeToMinutes(appointment.start_time),
+      timeToMinutes(appointment.end_time),
+    );
+
+    return (
+      appointmentRange.start < selectedRange.end &&
+      appointmentRange.end > selectedRange.start
+    );
+  });
+
+  if (hasAppointmentConflict) {
+    return "conflict";
+  }
+
+  const mergedAvailabilityRanges = mergeMinuteRanges(
+    availabilitySlots
+      .filter((slot) => slot.is_active && slot.day_of_week === date.getDay())
+      .map((slot) =>
+        normalizeMinuteRange(
+          timeToMinutes(slot.start_time),
+          timeToMinutes(slot.end_time),
+        ),
+      ),
+  );
+
+  if (mergedAvailabilityRanges.length === 0) {
+    return "unavailable";
+  }
+
+  let coveredMinutes = 0;
+
+  for (const range of mergedAvailabilityRanges) {
+    const overlapStart = Math.max(range.start, selectedRange.start);
+    const overlapEnd = Math.min(range.end, selectedRange.end);
+    if (overlapEnd > overlapStart) {
+      coveredMinutes += overlapEnd - overlapStart;
+    }
+  }
+
+  if (coveredMinutes <= 0) {
+    return "unavailable";
+  }
+
+  return coveredMinutes >= selectedDuration ? "available" : "partial";
 }
 
 function getSupportedSlotDuration(
@@ -739,8 +841,8 @@ function toApiDate(date: Date) {
   return format(date, "yyyy-MM-dd");
 }
 
-const QUICK_ACTION_PANEL_W = 320;
-const QUICK_ACTION_PANEL_H = 420;
+const QUICK_ACTION_PANEL_W = 340;
+const QUICK_ACTION_PANEL_MAX_H = 560;
 
 export function DoctorCalendar({
   doctorId,
@@ -753,10 +855,10 @@ export function DoctorCalendar({
   calendarView,
   onCalendarViewChange,
 }: DoctorCalendarProps) {
-  const { t } = useLanguage();
   const isMobile = useIsMobile();
   const queryClient = useQueryClient();
   const calendarShellRef = useRef<HTMLDivElement | null>(null);
+  const quickActionPanelRef = useRef<HTMLDivElement | null>(null);
   const lastMousePos = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const resolvedDefaultDuration = supportedSlotDurations.includes(
     defaultDuration as (typeof supportedSlotDurations)[number],
@@ -806,6 +908,14 @@ export function DoctorCalendar({
   const [quickActionSlot, setQuickActionSlot] = useState<QuickActionState | null>(
     null,
   );
+  const [quickActionPicker, setQuickActionPicker] = useState<
+    "date" | "start" | "end" | null
+  >(null);
+  const [quickActionCalendarMonth, setQuickActionCalendarMonth] = useState<Date>(
+    new Date(),
+  );
+  const [quickActionStartInput, setQuickActionStartInput] = useState("");
+  const [quickActionEndInput, setQuickActionEndInput] = useState("");
   const [panelPosition, setPanelPosition] = useState<{ top: number; left: number }>({
     top: 0,
     left: 0,
@@ -1718,11 +1828,17 @@ export function DoctorCalendar({
     const vh = window.innerHeight;
     const x = lastMousePos.current.x;
     const y = lastMousePos.current.y;
-    const left = x + QUICK_ACTION_PANEL_W + 20 < vw ? x + 12 : x - QUICK_ACTION_PANEL_W - 12;
-    const top = y + QUICK_ACTION_PANEL_H + 20 < vh ? y + 8 : y - QUICK_ACTION_PANEL_H - 8;
+    const left =
+      x + QUICK_ACTION_PANEL_W + 20 < vw
+        ? x + 12
+        : x - QUICK_ACTION_PANEL_W - 12;
+    const top =
+      y + QUICK_ACTION_PANEL_MAX_H + 20 < vh
+        ? y + 8
+        : y - QUICK_ACTION_PANEL_MAX_H - 8;
 
     setPanelPosition({
-      top: Math.max(8, Math.min(top, vh - QUICK_ACTION_PANEL_H - 8)),
+      top: Math.max(8, Math.min(top, vh - QUICK_ACTION_PANEL_MAX_H - 8)),
       left: Math.max(8, Math.min(left, vw - QUICK_ACTION_PANEL_W - 8)),
     });
 
@@ -1783,7 +1899,43 @@ export function DoctorCalendar({
   }, [quickActionSlot]);
 
   useEffect(() => {
+    if (!quickActionSlot?.open) {
+      setQuickActionPicker(null);
+      return;
+    }
+
+    setQuickActionCalendarMonth(startOfMonth(quickActionSlot.start));
+    setQuickActionStartInput(format(quickActionSlot.start, "HH:mm"));
+    setQuickActionEndInput(format(quickActionSlot.end, "HH:mm"));
+
+    if (quickActionSlot.kind === "blocked") {
+      setQuickActionPicker(null);
+    }
+  }, [quickActionSlot]);
+
+  useLayoutEffect(() => {
+    if (!quickActionSlot?.open || isMobile) {
+      return;
+    }
+
+    const panelHeight = quickActionPanelRef.current?.offsetHeight;
+    if (!panelHeight) {
+      return;
+    }
+
+    const vh = window.innerHeight;
+    const nextTop = Math.max(8, Math.min(panelPosition.top, vh - panelHeight - 8));
+
+    if (nextTop !== panelPosition.top) {
+      setPanelPosition((current) =>
+        current.top === nextTop ? current : { ...current, top: nextTop },
+      );
+    }
+  });
+
+  useEffect(() => {
     setQuickActionSlot(null);
+    setQuickActionPicker(null);
     setBlockActionState(null);
     clearCalendarSelection();
     setAppointmentComposer(null);
@@ -1903,27 +2055,72 @@ export function DoctorCalendar({
   const surfaceContextTitle =
     doctorName ?? (mode === "staff" ? "Doktor takvimi" : "Kendi takviminiz");
 
+  const quickActionSlotStatus = useMemo<SlotStatus | null>(() => {
+    if (!quickActionSlot || quickActionSlot.kind === "blocked") {
+      return null;
+    }
+
+    return computeSlotStatus(
+      quickActionSlot.start,
+      format(quickActionSlot.start, "HH:mm"),
+      format(quickActionSlot.end, "HH:mm"),
+      availabilitySlots,
+      data?.appointments ?? [],
+    );
+  }, [availabilitySlots, data?.appointments, quickActionSlot]);
+
   const quickActionBadge =
-    quickActionSlot?.kind === "available"
+    quickActionSlot?.kind === "blocked"
       ? {
-          label: "Musait zaman",
-          className: "border-success/30 bg-success/10 text-success",
+          label:
+            quickActionSlot.override?.type === "blackout"
+              ? "Kapali gun"
+              : "Istisna uygulanmis",
+          className:
+            quickActionSlot.override?.type === "blackout"
+              ? "border-destructive/25 bg-destructive/10 text-destructive"
+              : "border-warning/30 bg-warning/10 text-warning",
         }
-      : quickActionSlot?.kind === "blocked"
+      : quickActionSlotStatus === "available"
         ? {
-            label:
-              quickActionSlot.override?.type === "blackout"
-                ? "Kapali gun"
-                : "Istisna uygulanmis",
+            label: "Musait zaman",
             className:
-              quickActionSlot.override?.type === "blackout"
-                ? "border-destructive/25 bg-destructive/10 text-destructive"
-                : "border-warning/30 bg-warning/10 text-warning",
+              "border-emerald-500/25 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
           }
-        : {
-            label: "Musaitlik disi",
-            className: "border-border/70 bg-muted/50 text-muted-foreground",
-          };
+        : quickActionSlotStatus === "partial"
+          ? {
+              label: "Kismen musait",
+              className:
+                "border-amber-500/25 bg-amber-500/10 text-amber-700 dark:text-amber-300",
+            }
+          : quickActionSlotStatus === "conflict"
+            ? {
+                label: "Cakisma var",
+                className:
+                  "border-destructive/25 bg-destructive/10 text-destructive",
+              }
+            : {
+                label: "Musait degil",
+                className: "border-border/70 bg-muted/60 text-muted-foreground",
+              };
+
+  const quickActionWarningMessage =
+    quickActionSlot?.kind === "blocked"
+      ? null
+      : quickActionSlotStatus === "partial"
+        ? "Secilen araligin bir kismi musaitlik disinda"
+        : quickActionSlotStatus === "conflict"
+          ? "Bu saatte randevu mevcut"
+          : quickActionSlotStatus === "unavailable"
+            ? "Bu aralikta musaitlik tanimli degil"
+            : null;
+
+  const isQuickActionEditable = Boolean(
+    quickActionSlot && quickActionSlot.kind !== "blocked",
+  );
+  const quickActionDatePillLabel = quickActionSlot
+    ? format(quickActionSlot.start, "EEE, d MMMM", { locale: tr })
+    : "";
 
   const quickActionCanRemoveDirectly =
     quickActionSlot?.kind === "blocked" && quickActionSlot.override
@@ -1953,12 +2150,102 @@ export function DoctorCalendar({
     (quickActionSlot.kind === "available" ||
       quickActionSlot.kind === "unavailable");
 
-  const availabilityQuickActionLabel =
-    quickActionSlot?.availabilityTarget?.primarySlot
-      ? quickActionSlot.availabilityTarget.shouldPrefillExpand
-        ? "Musaitligi genislet"
-        : "Musaitligi duzenle"
-      : "Panelde musaitlik ekle";
+  const isValidTimeInput = (value: string) => {
+    const match = /^(\d{2}):(\d{2})$/.exec(value);
+    if (!match) {
+      return false;
+    }
+
+    const hours = Number(match[1]);
+    const minutes = Number(match[2]);
+    return hours >= 0 && hours < 24 && minutes >= 0 && minutes < 60;
+  };
+
+  const updateQuickActionRange = (nextStart: Date, nextEnd: Date) => {
+    setQuickActionSlot((current) => {
+      if (!current) {
+        return current;
+      }
+
+      const nextBlockingOverride = getBlockingOverrideForRange(nextStart, nextEnd);
+      const nextAvailabilityTarget = getAvailabilityContextForRange(nextStart, nextEnd);
+
+      return {
+        ...current,
+        kind: nextBlockingOverride ? "blocked" : nextAvailabilityTarget ? "available" : "unavailable",
+        start: nextStart,
+        end: nextEnd,
+        dayOfWeek: nextStart.getDay(),
+        dateLabel: format(nextStart, "d MMMM yyyy, EEEE", { locale: tr }),
+        timeLabel: `${format(nextStart, "HH:mm")} - ${format(nextEnd, "HH:mm")}`,
+        override: nextBlockingOverride ?? null,
+        availabilityTarget: nextAvailabilityTarget,
+      };
+    });
+  };
+
+  const commitQuickActionTime = (field: "start" | "end", value: string) => {
+    if (!quickActionSlot || !isValidTimeInput(value)) {
+      return false;
+    }
+
+    const currentDuration = Math.max(
+      15,
+      differenceInMinutes(quickActionSlot.end, quickActionSlot.start),
+    );
+
+    if (field === "start") {
+      const nextStart = withTime(quickActionSlot.start, value);
+      const nextEnd = addMinutes(nextStart, currentDuration);
+      if (toApiDate(nextEnd) !== toApiDate(nextStart) || nextEnd <= nextStart) {
+        return false;
+      }
+
+      updateQuickActionRange(nextStart, nextEnd);
+      return true;
+    }
+
+    const nextEnd = withTime(quickActionSlot.end, value);
+    if (toApiDate(nextEnd) !== toApiDate(quickActionSlot.start) || nextEnd <= quickActionSlot.start) {
+      return false;
+    }
+
+    updateQuickActionRange(quickActionSlot.start, nextEnd);
+    return true;
+  };
+
+  const handleQuickActionDateSelect = (nextDate: Date | undefined) => {
+    if (!quickActionSlot || !nextDate) {
+      return;
+    }
+
+    const nextStart = withTime(nextDate, format(quickActionSlot.start, "HH:mm"));
+    const nextEnd = withTime(nextDate, format(quickActionSlot.end, "HH:mm"));
+    updateQuickActionRange(nextStart, nextEnd);
+    setQuickActionPicker(null);
+  };
+
+  const handleQuickActionTimeOptionSelect = (
+    field: "start" | "end",
+    value: string,
+  ) => {
+    const didCommit = commitQuickActionTime(field, value);
+    if (!didCommit) {
+      return;
+    }
+
+    setQuickActionPicker(null);
+  };
+
+  const handleQuickActionTimeInputCommit = (field: "start" | "end") => {
+    const value = field === "start" ? quickActionStartInput : quickActionEndInput;
+    const didCommit = commitQuickActionTime(field, value);
+
+    if (!didCommit && quickActionSlot) {
+      setQuickActionStartInput(format(quickActionSlot.start, "HH:mm"));
+      setQuickActionEndInput(format(quickActionSlot.end, "HH:mm"));
+    }
+  };
 
   const handleQuickActionOpenAppointmentComposer = () => {
     if (!quickActionSlot || quickActionSlot.kind !== "available") {
@@ -2087,6 +2374,120 @@ export function DoctorCalendar({
     setBlockActionState(nextBlockActionState);
   };
 
+  const renderQuickActionWarning = () => {
+    if (!quickActionWarningMessage) {
+      return null;
+    }
+
+    return (
+      <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+        {quickActionWarningMessage}
+      </div>
+    );
+  };
+
+  const renderQuickActionActions = (buttonClassName = "h-11 w-full rounded-xl font-medium") => {
+    if (!quickActionSlot) {
+      return null;
+    }
+
+    if (quickActionSlot.kind === "blocked") {
+      return (
+        <div className="grid gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            className={cn(buttonClassName, "justify-center")}
+            onClick={handleQuickActionEditOverride}
+          >
+            <Pencil className="h-4 w-4" />
+            Istisnayi panelde duzenle
+          </Button>
+          <Button
+            type="button"
+            variant={quickActionCanRemoveDirectly ? "destructive" : "outline"}
+            className={cn(
+              buttonClassName,
+              "justify-center",
+              !quickActionCanRemoveDirectly && "border-border/70 bg-background/70",
+            )}
+            onClick={handleQuickActionRemoveOverride}
+          >
+            <Trash2 className="h-4 w-4" />
+            {quickActionCanRemoveDirectly
+              ? "Istisnayi kaldir"
+              : "Istisnayi panelde gozden gecir"}
+          </Button>
+        </div>
+      );
+    }
+
+    if (quickActionSlotStatus === "unavailable") {
+      return (
+        <div className="grid gap-2">
+          <Button
+            type="button"
+            className={cn(
+              buttonClassName,
+              "justify-center bg-emerald-600 text-white hover:bg-emerald-700",
+            )}
+            onClick={handleQuickActionOpenAvailabilityEditor}
+          >
+            <Plus className="h-4 w-4" />
+            Musaitlik ekle
+          </Button>
+        </div>
+      );
+    }
+
+    if (quickActionSlotStatus === "conflict") {
+      return (
+        <div className="grid gap-2">
+          <Button
+            type="button"
+            className={cn(buttonClassName, "justify-center")}
+            disabled
+            onClick={handleQuickActionOpenAppointmentComposer}
+          >
+            <UserPlus className="h-4 w-4" />
+            Randevu olustur
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            className={cn(buttonClassName, "justify-center")}
+            onClick={handleQuickActionBlockTime}
+          >
+            <Ban className="h-4 w-4" />
+            Blok istisnasi ekle
+          </Button>
+        </div>
+      );
+    }
+
+    return (
+      <div className="grid gap-2">
+        <Button
+          type="button"
+          className={cn(buttonClassName, "justify-center")}
+          onClick={handleQuickActionOpenAppointmentComposer}
+        >
+          <UserPlus className="h-4 w-4" />
+          Randevu olustur
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          className={cn(buttonClassName, "justify-center")}
+          onClick={handleQuickActionBlockTime}
+        >
+          <Ban className="h-4 w-4" />
+          Blok istisnasi ekle
+        </Button>
+      </div>
+    );
+  };
+
   const handleSlotSelection = (slotInfo: SlotInfo) => {
     resetCalendarActiveState();
 
@@ -2104,11 +2505,6 @@ export function DoctorCalendar({
         override: slotState.blockingOverride,
         availabilityTarget: slotState.availabilityTarget,
       });
-      return;
-    }
-
-    if (slotState.hasAppointmentConflict) {
-      setQuickActionSlot(null);
       return;
     }
 
@@ -2309,160 +2705,223 @@ export function DoctorCalendar({
       {quickActionSlot?.open && !isMobile && typeof document !== "undefined"
         ? createPortal(
             <div
+              ref={quickActionPanelRef}
               data-quick-slot-panel
-              className="z-50 rounded-[24px] border border-border/70 bg-popover/95 p-4 text-popover-foreground shadow-card outline-none backdrop-blur-xl"
+              className="z-50 max-h-[560px] overflow-y-auto rounded-[20px] border border-border/70 bg-popover/95 p-5 text-popover-foreground shadow-card outline-none backdrop-blur-xl transition-all duration-200"
               style={{
                 position: "fixed",
                 top: panelPosition.top,
                 left: panelPosition.left,
                 width: QUICK_ACTION_PANEL_W,
+                maxHeight: QUICK_ACTION_PANEL_MAX_H,
                 zIndex: 9999,
               }}
             >
-              <div className="space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="space-y-1">
-                    <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
-                      {quickActionSlot.kind === "available"
-                        ? "Secili musait aralik"
-                        : quickActionSlot.kind === "blocked"
-                          ? "Secili istisna"
-                          : "Secili aralik"}
-                    </p>
-                    <h3 className="text-lg font-display font-semibold text-foreground">
-                      {doctorName}
-                    </h3>
-                    {specializationName ? (
-                      <p className="text-sm text-muted-foreground">
-                        {specializationName}
-                      </p>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="absolute right-3 top-3 h-8 w-8 rounded-full"
+                onClick={() => setQuickActionSlot(null)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+
+              <div className="space-y-4 pr-8">
+                <div className="space-y-1">
+                  <h3 className="text-base font-semibold text-foreground">{doctorName}</h3>
+                  {specializationName ? (
+                    <p className="text-sm text-muted-foreground">{specializationName}</p>
+                  ) : null}
+                </div>
+
+                {isQuickActionEditable ? (
+                  <div className="grid grid-cols-[minmax(0,1fr)_88px_auto_88px] items-start gap-2">
+                    <button
+                      type="button"
+                      className="flex min-w-0 items-center justify-between gap-2 rounded-lg border border-border/40 bg-muted/60 px-3 py-1.5 text-sm font-medium transition-colors hover:bg-muted"
+                      onClick={() =>
+                        setQuickActionPicker((current) =>
+                          current === "date" ? null : "date",
+                        )
+                      }
+                    >
+                      <span className="truncate">{quickActionDatePillLabel}</span>
+                      <ChevronDown
+                        className={cn(
+                          "h-4 w-4 shrink-0 transition-transform",
+                          quickActionPicker === "date" && "rotate-180",
+                        )}
+                      />
+                    </button>
+
+                    <button
+                      type="button"
+                      className="rounded-lg border border-border/40 bg-muted/60 px-3 py-1.5 text-sm font-medium transition-colors hover:bg-muted"
+                      onClick={() =>
+                        setQuickActionPicker((current) =>
+                          current === "start" ? null : "start",
+                        )
+                      }
+                    >
+                      {format(quickActionSlot.start, "HH:mm")}
+                    </button>
+
+                    <div className="flex h-[38px] items-center justify-center text-sm font-medium text-muted-foreground">
+                      -
+                    </div>
+
+                    <button
+                      type="button"
+                      className="rounded-lg border border-border/40 bg-muted/60 px-3 py-1.5 text-sm font-medium transition-colors hover:bg-muted"
+                      onClick={() =>
+                        setQuickActionPicker((current) =>
+                          current === "end" ? null : "end",
+                        )
+                      }
+                    >
+                      {format(quickActionSlot.end, "HH:mm")}
+                    </button>
+
+                    {quickActionPicker === "date" ? (
+                      <div className="col-span-4 animate-in fade-in-0 zoom-in-95 duration-150">
+                        <div className="rounded-xl border border-border/50 bg-background/90 p-2 shadow-sm">
+                          <DatePickerCalendar
+                            mode="single"
+                            selected={quickActionSlot.start}
+                            month={quickActionCalendarMonth}
+                            onMonthChange={setQuickActionCalendarMonth}
+                            onSelect={handleQuickActionDateSelect}
+                            fixedWeeks
+                            locale={tr}
+                            weekStartsOn={1}
+                            className="p-0"
+                            classNames={{
+                              months: "w-full",
+                              month: "w-full space-y-3",
+                              caption: "relative flex items-center justify-center pb-1 pt-1",
+                              caption_label: "text-sm font-semibold",
+                              nav: "flex items-center gap-1",
+                              nav_button:
+                                "h-7 w-7 rounded-full border border-border/50 bg-background/80 p-0 opacity-100 hover:bg-muted",
+                              nav_button_previous: "absolute left-0",
+                              nav_button_next: "absolute right-0",
+                              table: "w-full border-collapse",
+                              head_row: "flex w-full justify-between",
+                              head_cell:
+                                "w-9 text-center text-[11px] font-medium text-muted-foreground",
+                              row: "mt-1 flex w-full justify-between",
+                              cell: "h-9 w-9 p-0 text-center text-sm",
+                              day: "h-9 w-9 rounded-full p-0 text-sm font-medium transition-colors hover:bg-muted",
+                              day_today:
+                                "rounded-full bg-sky-500 text-white hover:bg-sky-500 hover:text-white",
+                              day_selected:
+                                "rounded-full bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground",
+                            }}
+                          />
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {quickActionPicker === "start" ? (
+                      <div className="col-start-2 col-span-3 animate-in fade-in-0 zoom-in-95 duration-150">
+                        <div className="w-[196px] rounded-xl border border-border/50 bg-background/95 p-2 shadow-sm">
+                          <Input
+                            value={quickActionStartInput}
+                            onChange={(event) => setQuickActionStartInput(event.target.value)}
+                            onBlur={() => handleQuickActionTimeInputCommit("start")}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter") {
+                                event.preventDefault();
+                                handleQuickActionTimeInputCommit("start");
+                              }
+                            }}
+                            inputMode="numeric"
+                            maxLength={5}
+                            placeholder="HH:mm"
+                            className="h-9 rounded-lg border-border/50 bg-muted/30 text-sm"
+                          />
+                          <div className="mt-2 max-h-44 overflow-y-auto pr-1">
+                            {quarterHourTimes.map((timeValue) => (
+                              <button
+                                key={timeValue}
+                                type="button"
+                                className={cn(
+                                  "flex w-full items-center rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-muted",
+                                  format(quickActionSlot.start, "HH:mm") === timeValue &&
+                                    "bg-primary text-primary-foreground hover:bg-primary",
+                                )}
+                                onClick={() =>
+                                  handleQuickActionTimeOptionSelect("start", timeValue)
+                                }
+                              >
+                                {timeValue}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {quickActionPicker === "end" ? (
+                      <div className="col-start-3 col-span-2 flex justify-end animate-in fade-in-0 zoom-in-95 duration-150">
+                        <div className="w-[196px] rounded-xl border border-border/50 bg-background/95 p-2 shadow-sm">
+                          <Input
+                            value={quickActionEndInput}
+                            onChange={(event) => setQuickActionEndInput(event.target.value)}
+                            onBlur={() => handleQuickActionTimeInputCommit("end")}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter") {
+                                event.preventDefault();
+                                handleQuickActionTimeInputCommit("end");
+                              }
+                            }}
+                            inputMode="numeric"
+                            maxLength={5}
+                            placeholder="HH:mm"
+                            className="h-9 rounded-lg border-border/50 bg-muted/30 text-sm"
+                          />
+                          <div className="mt-2 max-h-44 overflow-y-auto pr-1">
+                            {quarterHourTimes.map((timeValue) => (
+                              <button
+                                key={timeValue}
+                                type="button"
+                                className={cn(
+                                  "flex w-full items-center rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-muted",
+                                  format(quickActionSlot.end, "HH:mm") === timeValue &&
+                                    "bg-primary text-primary-foreground hover:bg-primary",
+                                )}
+                                onClick={() =>
+                                  handleQuickActionTimeOptionSelect("end", timeValue)
+                                }
+                              >
+                                {timeValue}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
                     ) : null}
                   </div>
-                  <Badge
-                    variant="outline"
-                    className={cn("rounded-full", quickActionBadge.className)}
-                  >
-                    {quickActionBadge.label}
-                  </Badge>
-                </div>
-
-                <div className="rounded-[20px] border border-border/70 bg-background/80 p-3">
-                  <div className="space-y-2 text-sm">
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="text-muted-foreground">Tarih</span>
-                      <span className="text-right font-medium text-foreground">
-                        {quickActionSlot.dateLabel}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="text-muted-foreground">Saat</span>
-                      <span className="font-medium text-foreground">
-                        {quickActionSlot.timeLabel}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="text-muted-foreground">Durum</span>
-                      <Badge
-                        variant="outline"
-                        className={cn("rounded-full", quickActionBadge.className)}
-                      >
-                        {quickActionBadge.label}
-                      </Badge>
+                ) : (
+                  <div className="rounded-xl border border-border/50 bg-background/80 p-3 text-sm">
+                    <div className="font-medium text-foreground">{quickActionSlot.dateLabel}</div>
+                    <div className="mt-1 text-muted-foreground">
+                      {quickActionSlot.timeLabel}
                     </div>
                   </div>
-                </div>
+                )}
 
-                <p className="text-xs text-muted-foreground">
-                  {quickActionSlot.kind === "available"
-                    ? "Bu panel secili musait aralik icin hizli aksiyon sunar. Mevcut musaitlige tasan secimler duzenleme formuna kapsamli prefill ile gider."
-                    : quickActionSlot.kind === "blocked"
-                      ? "Bu aralikta gunluk istisna vardir. Duzenleme ve kaldirma istisna kaydi uzerinden yapilir."
-                      : "Bu aralik takvimde musaitlik disi gorunur. Musaitlik ekleme ayri panelde acilir."}
-                </p>
+                <Badge
+                  variant="outline"
+                  className={cn("inline-flex rounded-full px-3 py-1", quickActionBadge.className)}
+                >
+                  {quickActionBadge.label}
+                </Badge>
 
-                <div className="grid gap-2">
-                  {quickActionSlot.kind === "available" ? (
-                    <>
-                      <Button
-                        type="button"
-                        className="justify-start rounded-xl"
-                        onClick={handleQuickActionOpenAppointmentComposer}
-                      >
-                        <UserPlus className="mr-2 h-4 w-4" />
-                        Randevu olustur
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="justify-start rounded-xl border-border/70 bg-background/70"
-                        onClick={handleQuickActionOpenAvailabilityEditor}
-                      >
-                        <Pencil className="mr-2 h-4 w-4" />
-                        {availabilityQuickActionLabel}
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="justify-start rounded-xl border-border/70 bg-background/70"
-                        onClick={handleQuickActionBlockTime}
-                      >
-                        <CircleOff className="mr-2 h-4 w-4" />
-                        Bu araliga blok istisnasi ekle
-                      </Button>
-                    </>
-                  ) : null}
+                {renderQuickActionWarning()}
 
-                  {quickActionSlot.kind === "unavailable" ? (
-                    <>
-                      <Button
-                        type="button"
-                        className="justify-start rounded-xl"
-                        onClick={handleQuickActionOpenAvailabilityEditor}
-                      >
-                        <Pencil className="mr-2 h-4 w-4" />
-                        {availabilityQuickActionLabel}
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="justify-start rounded-xl border-border/70 bg-background/70"
-                        onClick={handleQuickActionBlockTime}
-                      >
-                        <CircleOff className="mr-2 h-4 w-4" />
-                        Bu araliga blok istisnasi ekle
-                      </Button>
-                    </>
-                  ) : null}
-
-                  {quickActionSlot.kind === "blocked" ? (
-                    <>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="justify-start rounded-xl border-border/70 bg-background/70"
-                        onClick={handleQuickActionEditOverride}
-                      >
-                        <Pencil className="mr-2 h-4 w-4" />
-                        Istisnayi panelde duzenle
-                      </Button>
-                      <Button
-                        type="button"
-                        variant={quickActionCanRemoveDirectly ? "destructive" : "outline"}
-                        className={cn(
-                          "justify-start rounded-xl",
-                          !quickActionCanRemoveDirectly &&
-                            "border-border/70 bg-background/70",
-                        )}
-                        onClick={handleQuickActionRemoveOverride}
-                      >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        {quickActionCanRemoveDirectly
-                          ? "Istisnayi kaldir"
-                          : "Istisnayi panelde gozden gecir"}
-                      </Button>
-                    </>
-                  ) : null}
-                </div>
+                {renderQuickActionActions()}
               </div>
             </div>,
             document.body,
@@ -2480,14 +2939,12 @@ export function DoctorCalendar({
         <DrawerContent className="rounded-t-[28px]">
           <DrawerHeader>
             <DrawerTitle>
-              {quickActionSlot?.kind === "available"
-                ? "Secili musait aralik"
-                : quickActionSlot?.kind === "blocked"
-                  ? "Secili istisna"
-                  : "Secili aralik"}
+              {quickActionSlot?.kind === "blocked"
+                ? "Secili istisna"
+                : "Secili aralik"}
             </DrawerTitle>
             <DrawerDescription>
-              Secilen aralik ayrintisi burada acilir. Musaitlik duzenleme ayri paneldedir.
+              Secilen tarih ve saat araligi icin hizli aksiyonlar burada acilir.
             </DrawerDescription>
           </DrawerHeader>
 
@@ -2525,97 +2982,9 @@ export function DoctorCalendar({
                 </div>
               </div>
 
-              <p className="text-xs text-muted-foreground">
-                {quickActionSlot.kind === "available"
-                  ? "Bu panel secili musait aralik icin hizli aksiyon sunar. Mevcut musaitlige tasan secimler duzenleme formuna kapsamli prefill ile gider."
-                  : quickActionSlot.kind === "blocked"
-                    ? "Bu aralikta gunluk istisna vardir. Duzenleme ve kaldirma istisna kaydi uzerinden yapilir."
-                    : "Bu aralik takvimde musaitlik disi gorunur. Musaitlik ekleme ayri panelde acilir."}
-              </p>
+              {renderQuickActionWarning()}
 
-              <div className="grid gap-2">
-                {quickActionSlot.kind === "available" ? (
-                  <>
-                    <Button
-                      type="button"
-                      className="rounded-xl"
-                      onClick={handleQuickActionOpenAppointmentComposer}
-                    >
-                      <UserPlus className="mr-2 h-4 w-4" />
-                      Randevu olustur
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="rounded-xl"
-                      onClick={handleQuickActionOpenAvailabilityEditor}
-                    >
-                      <Pencil className="mr-2 h-4 w-4" />
-                      {availabilityQuickActionLabel}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="rounded-xl"
-                      onClick={handleQuickActionBlockTime}
-                    >
-                      <Ban className="mr-2 h-4 w-4" />
-                      Bu araliga blok istisnasi ekle
-                    </Button>
-                  </>
-                ) : null}
-
-                {quickActionSlot.kind === "unavailable" ? (
-                  <>
-                    <Button
-                      type="button"
-                      className="rounded-xl"
-                      onClick={handleQuickActionOpenAvailabilityEditor}
-                    >
-                      <Pencil className="mr-2 h-4 w-4" />
-                      {availabilityQuickActionLabel}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="rounded-xl"
-                      onClick={handleQuickActionBlockTime}
-                    >
-                      <Ban className="mr-2 h-4 w-4" />
-                      Bu araliga blok istisnasi ekle
-                    </Button>
-                  </>
-                ) : null}
-
-                {quickActionSlot.kind === "blocked" ? (
-                  <>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="rounded-xl"
-                      onClick={handleQuickActionEditOverride}
-                    >
-                      <Pencil className="mr-2 h-4 w-4" />
-                      Istisnayi panelde duzenle
-                    </Button>
-                    <Button
-                      type="button"
-                      variant={quickActionCanRemoveDirectly ? "destructive" : "outline"}
-                      className={cn(
-                        "rounded-xl",
-                        !quickActionCanRemoveDirectly &&
-                          "border-border/70 bg-background/70",
-                      )}
-                      onClick={handleQuickActionRemoveOverride}
-                    >
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      {quickActionCanRemoveDirectly
-                        ? "Istisnayi kaldir"
-                        : "Istisnayi panelde gozden gecir"}
-                    </Button>
-                  </>
-                ) : null}
-              </div>
+              {renderQuickActionActions("h-11 w-full rounded-xl font-medium")}
             </div>
           ) : null}
         </DrawerContent>
