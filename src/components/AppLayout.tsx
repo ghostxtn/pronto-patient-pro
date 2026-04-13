@@ -26,7 +26,17 @@ import { getDefaultRouteByRole } from "@/lib/auth-routing";
 import { hasActiveDoctorProfile } from "@/lib/doctor-access";
 import { cn } from "@/lib/utils";
 
-export default function AppLayout({ children }: { children: React.ReactNode }) {
+interface AppLayoutProps {
+  children: React.ReactNode;
+  mainClassName?: string;
+  mainWidth?: "container" | "full";
+}
+
+export default function AppLayout({
+  children,
+  mainClassName,
+  mainWidth = "container",
+}: AppLayoutProps) {
   const { user, logout } = useAuth();
   const { t } = useLanguage();
   const location = useLocation();
@@ -107,10 +117,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   const isActiveLink = (path: string) =>
     location.pathname === path || location.pathname.startsWith(`${path}/`);
+  const isStaffDoctorsPage = location.pathname.startsWith("/staff/doctors");
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="glass-strong border-b sticky top-0 z-50">
+    <div
+      className={cn(
+        "flex min-h-screen flex-col bg-background",
+        isStaffDoctorsPage && "h-dvh min-h-0 overflow-hidden",
+      )}
+    >
+      <header className="glass-strong sticky top-0 z-50 shrink-0 border-b">
         <div className="container flex h-16 items-center justify-between">
           <div className="flex items-center gap-3">
             <Link to="/" className="flex items-center gap-2">
@@ -214,7 +230,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         )}
       </AnimatePresence>
 
-      <main className="container py-6">{children}</main>
+      <main
+        className={cn(
+          "flex-1 py-6",
+          mainWidth === "container" ? "container" : "w-full max-w-none",
+          isStaffDoctorsPage && "min-h-0 overflow-hidden",
+          mainClassName,
+        )}
+      >
+        {children}
+      </main>
     </div>
   );
 }

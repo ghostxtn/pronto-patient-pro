@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { createPortal } from "react-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Calendar as BigCalendar,
@@ -29,21 +30,23 @@ import {
 import { tr } from "date-fns/locale";
 import {
   Ban,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
-  CircleOff,
+  Expand,
   Loader2,
+  Plus,
   Pencil,
   Search,
   Settings2,
   Trash2,
   UserPlus,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { AvailabilityModal } from "@/components/calendar/AvailabilityModal";
 import { OverrideModal } from "@/components/calendar/OverrideModal";
 import { AppointmentDetailSheet } from "@/components/appointments/AppointmentDetailSheet";
-import { useLanguage } from "@/contexts/LanguageContext";
 import api from "@/services/api";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
@@ -70,6 +73,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Calendar as DatePickerCalendar } from "@/components/ui/calendar";
 import {
   Sheet,
   SheetContent,
@@ -82,6 +86,7 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import {
@@ -122,6 +127,53 @@ const calendarMessages = {
   showMore: (total: number) => `+${total} daha`,
 };
 
+type AppointmentVisualStatus =
+  | "pending"
+  | "confirmed"
+  | "completed"
+  | "cancelled"
+  | "blocked";
+
+const APPOINTMENT_STATUS_STYLES: Record<
+  AppointmentVisualStatus,
+  {
+    background: string;
+    text: string;
+    accent: string;
+  }
+> = {
+  pending: {
+    background: "#FEF9C3",
+    text: "#854D0E",
+    accent: "#CA8A04",
+  },
+  confirmed: {
+    background: "#DBEAFE",
+    text: "#1E40AF",
+    accent: "#2563EB",
+  },
+  completed: {
+    background: "#DCFCE7",
+    text: "#166534",
+    accent: "#16A34A",
+  },
+  cancelled: {
+    background: "#E5E7EB",
+    text: "#6B7280",
+    accent: "#9CA3AF",
+  },
+  blocked: {
+    background: "#FEE2E2",
+    text: "#991B1B",
+    accent: "#DC2626",
+  },
+};
+
+const OVERRIDE_COLORS: Record<string, string> = {
+  custom_hours: "#ea580c",
+  blackout: "#ea580c",
+};
+
 interface DoctorCalendarProps {
   doctorId: string;
   mode?: "staff" | "doctor";
@@ -152,6 +204,8 @@ interface CalendarAppointmentResponse {
 
 interface CustomToolbarProps extends ToolbarProps<SchedulerEvent, object> {
   onManageAvailability: () => void;
+  calendarTitle: string;
+  specializationName?: string;
 }
 
 interface CalendarHeaderProps {
@@ -182,12 +236,6 @@ interface QuickActionState {
   dayOfWeek: number;
   dateLabel: string;
   timeLabel: string;
-  anchor: {
-    left: number;
-    right: number;
-    top: number;
-    bottom: number;
-  };
   override: AvailabilityOverride | null;
   availabilityTarget: AvailabilitySelectionTarget | null;
 }
@@ -206,6 +254,15 @@ interface AppointmentComposerState {
   end: Date;
   dateLabel: string;
   timeLabel: string;
+}
+
+interface QuickActionAnchorRect {
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
+  width: number;
+  height: number;
 }
 
 interface PatientLookupRecord {
@@ -259,6 +316,13 @@ interface AvailabilityWindow {
   slotIds: string[];
 }
 
+type SlotStatus =
+  | "available"
+  | "overflow"
+  | "gap"
+  | "unavailable"
+  | "conflict";
+
 type SchedulerEvent =
   | CalendarEvent
   | SchedulerDraftEvent
@@ -275,6 +339,19 @@ const toolbarViewLabels = {
 } as const;
 
 const toolbarViews = [Views.WEEK, Views.DAY, Views.MONTH, Views.AGENDA] as const;
+const QUICK_ACTION_TIME_MINUTES_START = 6 * 60;
+const QUICK_ACTION_TIME_MINUTES_END = 23 * 60 + 45;
+const CALENDAR_START_HOUR = 6;
+const CALENDAR_END_HOUR = 23;
+const CALENDAR_START_MINUTES = CALENDAR_START_HOUR * 60;
+const CALENDAR_END_MINUTES = CALENDAR_END_HOUR * 60;
+const quarterHourTimes = Array.from(
+  {
+    length:
+      (QUICK_ACTION_TIME_MINUTES_END - QUICK_ACTION_TIME_MINUTES_START) / 15 + 1,
+  },
+  (_, index) => minutesToTime(QUICK_ACTION_TIME_MINUTES_START + index * 15),
+);
 
 const dayLabels: Record<number, string> = {
   0: "Pazar",
@@ -303,11 +380,11 @@ function getOverrideBadge(type: AvailabilityOverride["type"]) {
   return type === "blackout"
     ? {
         label: "Kapali gun",
-        className: "border-destructive/20 bg-destructive/10 text-destructive",
+        color: OVERRIDE_COLORS.blackout,
       }
     : {
         label: "Bloklu zaman",
-        className: "border-warning/30 bg-warning/10 text-warning",
+        color: OVERRIDE_COLORS.custom_hours,
       };
 }
 
@@ -348,6 +425,21 @@ function getRollingWeekRange(date: Date) {
 function timeToMinutes(time: string) {
   const [hours, minutes] = time.slice(0, 5).split(":").map(Number);
   return hours * 60 + minutes;
+}
+
+function formatDuration(diffMinutes: number): string {
+  const hours = Math.floor(diffMinutes / 60);
+  const mins = diffMinutes % 60;
+
+  if (hours === 0) {
+    return `(${mins} dk.)`;
+  }
+
+  if (mins === 0) {
+    return `(${hours} sa.)`;
+  }
+
+  return `(${hours} sa. ${mins} dk.)`;
 }
 
 function minutesToTime(totalMinutes: number) {
@@ -391,6 +483,118 @@ function normalizeMinuteRange(start: number, end: number) {
     start: Math.min(start, end),
     end: Math.max(start, end),
   };
+}
+
+function mergeMinuteRanges(ranges: Array<{ start: number; end: number }>) {
+  const merged: Array<{ start: number; end: number }> = [];
+  const sortedRanges = [...ranges]
+    .filter((range) => range.end > range.start)
+    .sort((left, right) => left.start - right.start);
+
+  for (const range of sortedRanges) {
+    const previous = merged[merged.length - 1];
+    if (!previous || range.start > previous.end) {
+      merged.push({ ...range });
+      continue;
+    }
+
+    if (range.end > previous.end) {
+      previous.end = range.end;
+    }
+  }
+
+  return merged;
+}
+
+function computeSlotStatus(
+  date: Date,
+  startTime: string,
+  endTime: string,
+  availabilitySlots: AvailabilitySlot[],
+  appointments: Appointment[],
+): SlotStatus {
+  const selectedRange = normalizeMinuteRange(
+    timeToMinutes(startTime),
+    timeToMinutes(endTime),
+  );
+  const selectedDuration = selectedRange.end - selectedRange.start;
+
+  if (selectedDuration <= 0) {
+    return "unavailable";
+  }
+
+  const dateKey = toApiDate(date);
+  const hasAppointmentConflict = appointments.some((appointment) => {
+    const status = appointment.status.toLowerCase();
+    if (status === "cancelled" || status === "canceled") {
+      return false;
+    }
+
+    if (appointment.appointment_date !== dateKey) {
+      return false;
+    }
+
+    const appointmentRange = normalizeMinuteRange(
+      timeToMinutes(appointment.start_time),
+      timeToMinutes(appointment.end_time),
+    );
+
+    return (
+      appointmentRange.start < selectedRange.end &&
+      appointmentRange.end > selectedRange.start
+    );
+  });
+
+  if (hasAppointmentConflict) {
+    return "conflict";
+  }
+
+  const mergedAvailabilityRanges = mergeMinuteRanges(
+    availabilitySlots
+      .filter((slot) => slot.is_active && slot.day_of_week === date.getDay())
+      .map((slot) =>
+        normalizeMinuteRange(
+          timeToMinutes(slot.start_time),
+          timeToMinutes(slot.end_time),
+        ),
+      ),
+  );
+
+  if (mergedAvailabilityRanges.length === 0) {
+    return "unavailable";
+  }
+
+  const overlappingAvailabilityRanges = mergedAvailabilityRanges.filter(
+    (range) => range.start < selectedRange.end && range.end > selectedRange.start,
+  );
+
+  if (overlappingAvailabilityRanges.length === 0) {
+    return "unavailable";
+  }
+
+  let coveredMinutes = 0;
+
+  for (const range of overlappingAvailabilityRanges) {
+    const overlapStart = Math.max(range.start, selectedRange.start);
+    const overlapEnd = Math.min(range.end, selectedRange.end);
+    if (overlapEnd > overlapStart) {
+      coveredMinutes += overlapEnd - overlapStart;
+    }
+  }
+
+  const isStartWithinAvailability = overlappingAvailabilityRanges.some(
+    (range) =>
+      selectedRange.start >= range.start && selectedRange.start < range.end,
+  );
+  const isEndWithinAvailability = overlappingAvailabilityRanges.some(
+    (range) => selectedRange.end > range.start && selectedRange.end <= range.end,
+  );
+
+  if (!isStartWithinAvailability || !isEndWithinAvailability) {
+    return "overflow";
+  }
+
+  return coveredMinutes >= selectedDuration ? "available" : "gap";
 }
 
 function getSupportedSlotDuration(
@@ -475,7 +679,7 @@ function formatToolbarRangeLabel(date: Date, view: View) {
   }
 
   if (view === Views.DAY) {
-    return format(date, "EEEE, d MMMM yyyy", { locale: tr });
+    return format(date, "d MMMM yyyy, EEEE", { locale: tr });
   }
 
   if (view === Views.MONTH) {
@@ -518,69 +722,60 @@ const RollingWeekView = Object.assign(
   },
 );
 
-function getToolbarSubtitle(view: View) {
-  switch (view) {
-    case Views.WEEK:
-      return "Haftalik gorunum";
-    case Views.DAY:
-      return "Gunluk odak";
-    case Views.MONTH:
-      return "Aylik plan";
-    default:
-      return "Ajanda gorunumu";
-  }
+function getCalendarScrollContainer(calendarShell: HTMLElement | null) {
+  return calendarShell?.querySelector(".rbc-time-content") as HTMLElement | null;
 }
 
-function getQuickActionPosition(
-  anchor: QuickActionState["anchor"],
-  calendarBounds?: DOMRect | null,
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
+}
+
+function getMinutesSinceMidnight(date: Date) {
+  return date.getHours() * 60 + date.getMinutes();
+}
+
+function getTimeGridDaySlots(scrollContainer: HTMLElement) {
+  return Array.from(scrollContainer.children).filter(
+    (child): child is HTMLElement =>
+      child instanceof HTMLElement && child.classList.contains("rbc-day-slot"),
+  );
+}
+
+function getTodayTimeColumn(
+  calendarShell: HTMLElement,
+  scrollContainer: HTMLElement,
+  view: View,
+  currentDate: Date,
 ) {
-  const panelWidth = 320;
-  const panelHeight = 360;
-  const gutter = 12;
-  const calendarInset = 8;
-  const viewportWidth = window.innerWidth;
-  const viewportHeight = window.innerHeight;
-  const calendarLeft = calendarBounds ? calendarBounds.left + calendarInset : gutter;
-  const calendarRight = calendarBounds
-    ? calendarBounds.right - calendarInset
-    : viewportWidth - gutter;
-  const calendarTop = calendarBounds ? calendarBounds.top + calendarInset : gutter;
-  const calendarBottom = calendarBounds
-    ? calendarBounds.bottom - calendarInset
-    : viewportHeight - gutter;
-  const minLeft = Math.max(gutter, calendarLeft);
-  const maxLeft = Math.min(
-    viewportWidth - panelWidth - gutter,
-    calendarRight - panelWidth,
+  const daySlots = getTimeGridDaySlots(scrollContainer);
+
+  if (daySlots.length === 0) {
+    return null;
+  }
+
+  if (view === Views.DAY) {
+    return isToday(currentDate) ? daySlots[0] : null;
+  }
+
+  if (view !== Views.WEEK) {
+    return null;
+  }
+
+  const headerCells = Array.from(
+    calendarShell.querySelectorAll(".rbc-time-header-content .rbc-header"),
+  ).filter((cell): cell is HTMLElement => cell instanceof HTMLElement);
+  const backgroundCells = Array.from(calendarShell.querySelectorAll(".rbc-day-bg")).filter(
+    (cell): cell is HTMLElement => cell instanceof HTMLElement,
   );
-  const anchorMidY = anchor.top + (anchor.bottom - anchor.top) / 2;
-  const preferredRight = anchor.right + 10;
-  const preferredLeft = anchor.left - panelWidth - 10;
-  const canPlaceRight =
-    preferredRight + panelWidth <= Math.min(calendarRight, viewportWidth - gutter);
-  const canPlaceLeft = preferredLeft >= Math.max(gutter, calendarLeft);
+  const todayIndex = [headerCells, backgroundCells]
+    .map((cells) => cells.findIndex((cell) => cell.classList.contains("rbc-today")))
+    .find((index) => index !== -1);
 
-  let left = canPlaceRight
-    ? preferredRight
-    : canPlaceLeft
-      ? preferredLeft
-      : Math.min(
-          Math.max(anchor.left - panelWidth / 2, minLeft),
-          Math.max(minLeft, maxLeft),
-        );
+  if (todayIndex === undefined || todayIndex < 0) {
+    return null;
+  }
 
-  let top = anchorMidY - panelHeight / 2;
-  const minTop = Math.max(gutter, calendarTop);
-  const maxTop = Math.min(
-    viewportHeight - panelHeight - gutter,
-    calendarBottom - panelHeight,
-  );
-
-  top = Math.min(Math.max(top, minTop), Math.max(minTop, maxTop));
-  left = Math.min(Math.max(left, minLeft), Math.max(minLeft, maxLeft));
-
-  return { left, top, width: panelWidth };
+  return daySlots[todayIndex] ?? null;
 }
 
 function splitFullName(fullName: string) {
@@ -606,6 +801,26 @@ function getPatientName(patient: PatientLookupRecord) {
     .trim();
 }
 
+function formatCalendarHeaderDay(date: Date) {
+  return format(date, "EEE", { locale: tr })
+    .replace(".", "")
+    .toLocaleUpperCase("tr-TR");
+}
+
+function normalizeAppointmentStatus(status?: string): AppointmentVisualStatus {
+  const normalized = (status ?? "").toLowerCase();
+
+  if (normalized === "canceled") {
+    return "cancelled";
+  }
+
+  if (normalized in APPOINTMENT_STATUS_STYLES) {
+    return normalized as AppointmentVisualStatus;
+  }
+
+  return "confirmed";
+}
+
 const CustomToolbar = ({
   date,
   onNavigate,
@@ -615,37 +830,22 @@ const CustomToolbar = ({
 }: CustomToolbarProps) => (
   <div className="scheduler-toolbar-shell">
     <div className="scheduler-toolbar-row">
-      <div className="min-w-0">
-        <p className="scheduler-toolbar-caption">{getToolbarSubtitle(view)}</p>
-        <h3 className="scheduler-toolbar-title">
-          {formatToolbarRangeLabel(date, view)}
-        </h3>
-      </div>
-
-      <div className="scheduler-toolbar-actions">
-        <Button
-          type="button"
-          className="scheduler-toolbar-today-button rounded-full"
-          onClick={() => onNavigate("TODAY")}
-        >
-          Bugun
-        </Button>
-
+      <div className="scheduler-toolbar-primary">
         <div className="scheduler-nav-group">
           <Button
             type="button"
-            variant="outline"
+            variant="ghost"
             size="icon"
-            className="scheduler-toolbar-nav-button rounded-full"
+            className="scheduler-toolbar-nav-button"
             onClick={() => onNavigate("PREV")}
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
           <Button
             type="button"
-            variant="outline"
+            variant="ghost"
             size="icon"
-            className="scheduler-toolbar-nav-button rounded-full"
+            className="scheduler-toolbar-nav-button"
             onClick={() => onNavigate("NEXT")}
           >
             <ChevronRight className="h-4 w-4" />
@@ -654,30 +854,58 @@ const CustomToolbar = ({
 
         <Button
           type="button"
+          variant="ghost"
+          className="scheduler-toolbar-today-button"
+          onClick={() => onNavigate("TODAY")}
+        >
+          Bugun
+        </Button>
+      </div>
+
+      <div className="scheduler-toolbar-title-row">
+        <h3 className="scheduler-toolbar-title">
+          {formatToolbarRangeLabel(date, view)}
+        </h3>
+      </div>
+
+      <div className="scheduler-toolbar-actions">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              type="button"
+              variant="outline"
+              className="scheduler-toolbar-view-button"
+            >
+              {toolbarViewLabels[view]}
+              <ChevronDown className="ml-2 h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-40 rounded-2xl">
+            {toolbarViews.map((toolbarView) => (
+              <DropdownMenuItem
+                key={toolbarView}
+                onClick={() => onView(toolbarView)}
+                className={cn(
+                  "rounded-xl",
+                  view === toolbarView && "bg-accent text-foreground",
+                )}
+              >
+                {toolbarViewLabels[toolbarView]}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        <Button
+          type="button"
           variant="outline"
-          className="scheduler-toolbar-manage-button rounded-full"
+          className="scheduler-toolbar-manage-button"
           onClick={onManageAvailability}
         >
           <Settings2 className="mr-2 h-4 w-4" />
           Musaitlik paneli
         </Button>
       </div>
-    </div>
-
-    <div className="scheduler-view-switch">
-      {toolbarViews.map((toolbarView) => (
-        <button
-          key={toolbarView}
-          onClick={() => onView(toolbarView)}
-          className={cn(
-            "scheduler-view-switch-item",
-            view === toolbarView && "scheduler-view-switch-item-active",
-          )}
-          type="button"
-        >
-          {toolbarViewLabels[toolbarView]}
-        </button>
-      ))}
     </div>
   </div>
 );
@@ -695,7 +923,7 @@ const CalendarHeader = ({ date, onContextMenu }: CalendarHeaderProps) => {
       title="Sag tik: gunluk istisna ekle. Haftalik slotlar panelden duzenlenir."
     >
       <span className="scheduler-week-header-day">
-        {format(date, "EEE", { locale: tr })}
+        {formatCalendarHeaderDay(date)}
       </span>
       <span className="scheduler-week-header-date">
         {format(date, "d", { locale: tr })}
@@ -730,10 +958,12 @@ function CalendarEventContent({
 
   if (event.type === "draft") {
     return (
-      <div className="scheduler-event-content-stack">
-        <span className="scheduler-event-meta">Taslak</span>
-        <span className="scheduler-event-title">{timeRange}</span>
-        <span className="scheduler-event-subtitle">
+      <div className="flex h-full flex-col justify-start gap-0.5 overflow-hidden">
+        <span style={{ fontSize: "10px", opacity: 0.7, fontWeight: 400 }}>Taslak</span>
+        <span style={{ fontSize: "12px", fontWeight: 600, color: "rgba(99, 102, 241, 0.9)" }}>
+          {timeRange}
+        </span>
+        <span style={{ fontSize: "10px", opacity: 0.6 }}>
           {formatDurationLabel(event.resource.durationMinutes)}
         </span>
       </div>
@@ -741,9 +971,13 @@ function CalendarEventContent({
   }
 
   if (view === Views.AGENDA) {
+    const eventStatus =
+      event.type === "appointment"
+        ? normalizeAppointmentStatus((event.resource as Appointment | undefined)?.status)
+        : null;
     const agendaToneClass =
       event.type === "appointment"
-        ? "scheduler-agenda-event-appointment"
+        ? `scheduler-agenda-event-appointment-${eventStatus ?? "confirmed"}`
         : event.type === "blackout"
           ? "scheduler-agenda-event-blackout"
           : "scheduler-agenda-event-custom-hours";
@@ -763,16 +997,127 @@ function CalendarEventContent({
     );
   }
 
+  const accentDot =
+    event.type === "appointment" ? (
+      <span className="scheduler-event-accent-dot" aria-hidden="true" />
+    ) : null;
+
   return (
     <div className="scheduler-event-content-stack">
       <span className="scheduler-event-meta">{timeRange}</span>
-      <span className="scheduler-event-title">{title}</span>
+      <span className="scheduler-event-title-row">
+        {accentDot}
+        <span className="scheduler-event-title">{title}</span>
+      </span>
     </div>
   );
 }
 
 function toApiDate(date: Date) {
   return format(date, "yyyy-MM-dd");
+}
+
+const QUICK_ACTION_PANEL_W = 340;
+const QUICK_ACTION_PANEL_MAX_H = 560;
+const QUICK_ACTION_PANEL_MARGIN = 12;
+
+function createQuickActionAnchorRect(
+  rect: Pick<QuickActionAnchorRect, "top" | "right" | "bottom" | "left">,
+): QuickActionAnchorRect {
+  return {
+    top: rect.top,
+    right: rect.right,
+    bottom: rect.bottom,
+    left: rect.left,
+    width: rect.right - rect.left,
+    height: rect.bottom - rect.top,
+  };
+}
+
+function getQuickActionAnchorRect(slotInfo: SlotInfo): QuickActionAnchorRect | null {
+  const point = slotInfo.box
+    ? {
+        x: slotInfo.box.clientX,
+        y: slotInfo.box.clientY,
+      }
+    : slotInfo.bounds
+      ? {
+          x: (slotInfo.bounds.left + slotInfo.bounds.right) / 2,
+          y: Math.min(
+            slotInfo.bounds.top + 1,
+            Math.max(slotInfo.bounds.top, slotInfo.bounds.bottom - 1),
+          ),
+        }
+      : null;
+
+  if (typeof document !== "undefined" && point) {
+    const slotElement = document
+      .elementsFromPoint(point.x, point.y)
+      .find(
+        (element): element is HTMLElement =>
+          element instanceof HTMLElement &&
+          Boolean(element.closest("[data-scheduler-slot]")),
+      )
+      ?.closest<HTMLElement>("[data-scheduler-slot]");
+
+    if (slotElement) {
+      return createQuickActionAnchorRect(slotElement.getBoundingClientRect());
+    }
+  }
+
+  if (slotInfo.bounds) {
+    return createQuickActionAnchorRect(slotInfo.bounds);
+  }
+
+  if (slotInfo.box) {
+    return createQuickActionAnchorRect({
+      top: slotInfo.box.clientY,
+      right: slotInfo.box.clientX,
+      bottom: slotInfo.box.clientY,
+      left: slotInfo.box.clientX,
+    });
+  }
+
+  return null;
+}
+
+function getQuickActionPanelPosition(
+  rect: QuickActionAnchorRect,
+  panelWidth: number,
+  panelHeight: number,
+) {
+  let left = rect.right + QUICK_ACTION_PANEL_MARGIN;
+  let top = rect.top;
+
+  if (left + panelWidth > window.innerWidth - QUICK_ACTION_PANEL_MARGIN) {
+    left = rect.left - panelWidth - QUICK_ACTION_PANEL_MARGIN;
+  }
+
+  if (top + panelHeight > window.innerHeight - QUICK_ACTION_PANEL_MARGIN) {
+    top = window.innerHeight - panelHeight - QUICK_ACTION_PANEL_MARGIN;
+  }
+
+  if (top < QUICK_ACTION_PANEL_MARGIN) {
+    top = QUICK_ACTION_PANEL_MARGIN;
+  }
+
+  if (left < QUICK_ACTION_PANEL_MARGIN) {
+    left = QUICK_ACTION_PANEL_MARGIN;
+  }
+
+  const maxLeft = Math.max(
+    QUICK_ACTION_PANEL_MARGIN,
+    window.innerWidth - panelWidth - QUICK_ACTION_PANEL_MARGIN,
+  );
+  const maxTop = Math.max(
+    QUICK_ACTION_PANEL_MARGIN,
+    window.innerHeight - panelHeight - QUICK_ACTION_PANEL_MARGIN,
+  );
+
+  return {
+    left: Math.min(left, maxLeft),
+    top: Math.min(top, maxTop),
+  };
 }
 
 export function DoctorCalendar({
@@ -786,10 +1131,15 @@ export function DoctorCalendar({
   calendarView,
   onCalendarViewChange,
 }: DoctorCalendarProps) {
-  const { t } = useLanguage();
   const isMobile = useIsMobile();
   const queryClient = useQueryClient();
   const calendarShellRef = useRef<HTMLDivElement | null>(null);
+  const quickActionPanelRef = useRef<HTMLDivElement | null>(null);
+  const hasAutoScrolledToCurrentTimeRef = useRef(false);
+  // When the quick-action panel triggers a calendar navigation, we set
+  // this flag so the resolvedCurrentDate reset effect knows to skip the
+  // panel-close logic for that one render cycle.
+  const quickActionNavigatingRef = useRef(false);
   const resolvedDefaultDuration = supportedSlotDurations.includes(
     defaultDuration as (typeof supportedSlotDurations)[number],
   )
@@ -838,6 +1188,20 @@ export function DoctorCalendar({
   const [quickActionSlot, setQuickActionSlot] = useState<QuickActionState | null>(
     null,
   );
+  const [quickActionPicker, setQuickActionPicker] = useState<
+    "date" | "start" | "end" | null
+  >(null);
+  const [quickActionCalendarMonth, setQuickActionCalendarMonth] = useState<Date>(
+    new Date(),
+  );
+  const [quickActionStartInput, setQuickActionStartInput] = useState("");
+  const [quickActionEndInput, setQuickActionEndInput] = useState("");
+  const [panelPosition, setPanelPosition] = useState<{ top: number; left: number }>({
+    top: 0,
+    left: 0,
+  });
+  const [quickActionAnchorRect, setQuickActionAnchorRect] =
+    useState<QuickActionAnchorRect | null>(null);
   const [blockActionState, setBlockActionState] = useState<BlockActionState | null>(
     null,
   );
@@ -851,9 +1215,19 @@ export function DoctorCalendar({
   const [manualPatientPhone, setManualPatientPhone] = useState("");
   const [manualPatientNote, setManualPatientNote] = useState("");
   const [appointmentNotes, setAppointmentNotes] = useState("");
+  const [currentTime, setCurrentTime] = useState(() => new Date());
+  const [currentTimeIndicatorStyle, setCurrentTimeIndicatorStyle] =
+    useState<CSSProperties | null>(null);
+  const [currentTimeIndicatorPortalTarget, setCurrentTimeIndicatorPortalTarget] =
+    useState<HTMLElement | null>(null);
 
   const resolvedCurrentDate = calendarDate ?? internalCurrentDate;
   const resolvedView = calendarView ?? internalView;
+
+  const closeQuickActionPanel = () => {
+    setQuickActionSlot(null);
+    setQuickActionAnchorRect(null);
+  };
 
   const setCalendarDate = (nextDate: Date) => {
     onCalendarDateChange?.(nextDate);
@@ -1068,7 +1442,7 @@ export function DoctorCalendar({
     onSuccess: async () => {
       toast.success("Zaman bloklamasi eklendi");
       setBlockActionState(null);
-      setQuickActionSlot(null);
+      closeQuickActionPanel();
       clearCalendarSelection();
       await queryClient.invalidateQueries({
         queryKey: ["availability-overrides", doctorId],
@@ -1129,7 +1503,7 @@ export function DoctorCalendar({
       setManualPatientPhone("");
       setManualPatientNote("");
       setAppointmentNotes("");
-      setQuickActionSlot(null);
+      closeQuickActionPanel();
       clearCalendarSelection();
       await queryClient.invalidateQueries({
         queryKey: ["doctor-calendar", doctorId],
@@ -1427,7 +1801,7 @@ export function DoctorCalendar({
   };
 
   const resetCalendarActiveState = () => {
-    setQuickActionSlot(null);
+    closeQuickActionPanel();
     setAvailabilityDraft(null);
     setBlockActionState(null);
     setContextMenuState({ open: false, x: 0, y: 0 });
@@ -1559,6 +1933,10 @@ export function DoctorCalendar({
       "scheduler-event",
       event.type === "appointment" && "scheduler-event-appointment",
       event.type === "appointment" &&
+        `scheduler-event-appointment-${normalizeAppointmentStatus(
+          (event.resource as Appointment | undefined)?.status,
+        )}`,
+      event.type === "appointment" &&
         selectedAppointmentId === event.id &&
         "scheduler-event-appointment-selected",
       event.type === "blackout" &&
@@ -1576,6 +1954,18 @@ export function DoctorCalendar({
       return {
         className: "scheduler-event scheduler-event-availability-surface",
         style: {
+          backgroundColor: "rgba(148,163,184,0.12)",
+          border: "1px solid rgba(148,163,184,0.20)",
+          borderRadius: "4px",
+          left: 0,
+          right: 0,
+          width: "100%",
+          margin: 0,
+          marginLeft: 0,
+          marginRight: 0,
+          height: "100%",
+          paddingLeft: 0,
+          paddingRight: 0,
           pointerEvents: "none",
           zIndex: 0,
         },
@@ -1586,6 +1976,10 @@ export function DoctorCalendar({
       return {
         className: "scheduler-event scheduler-event-blackout-surface",
         style: {
+          borderRadius: 0,
+          width: "100%",
+          margin: 0,
+          height: "100%",
           pointerEvents: "none",
           zIndex: 1,
         },
@@ -1603,6 +1997,41 @@ export function DoctorCalendar({
 
     if (resolvedView === Views.AGENDA) {
       return {};
+    }
+
+    if (event.type === "appointment") {
+      const status = normalizeAppointmentStatus(
+        (event.resource as Appointment | undefined)?.status,
+      );
+      const tone = APPOINTMENT_STATUS_STYLES[status];
+
+      return {
+        className: getSchedulerEventClassName(event),
+        style: {
+          "--scheduler-event-background": tone.background,
+          "--scheduler-event-foreground": tone.text,
+          "--scheduler-event-accent": tone.accent,
+          backgroundColor: tone.background,
+          color: tone.text,
+          border: "1px solid rgba(0, 0, 0, 0.08)",
+          borderRadius: "6px",
+        } as CSSProperties,
+      };
+    }
+
+    if (event.type === "blackout" || event.type === "custom_hours") {
+      const color = OVERRIDE_COLORS[event.type];
+
+      return {
+        className: getSchedulerEventClassName(event),
+        style: {
+          "--scheduler-event-color": color,
+          background:
+            "linear-gradient(rgba(234, 88, 12, 0.15), rgba(234, 88, 12, 0.15)), white",
+          color: "#ea580c",
+          borderRadius: "6px",
+        } as CSSProperties,
+      };
     }
 
     return {
@@ -1687,13 +2116,17 @@ export function DoctorCalendar({
       availabilityTarget?: AvailabilitySelectionTarget | null;
     },
   ) => {
-    const anchorSource =
-      slotInfo.box ??
-      slotInfo.bounds ??
-      calendarShellRef.current?.getBoundingClientRect();
+    const anchorRect = getQuickActionAnchorRect(slotInfo);
+    setQuickActionAnchorRect(anchorRect);
 
-    if (!anchorSource) {
-      return;
+    if (anchorRect) {
+      setPanelPosition(
+        getQuickActionPanelPosition(
+          anchorRect,
+          QUICK_ACTION_PANEL_W,
+          QUICK_ACTION_PANEL_MAX_H,
+        ),
+      );
     }
 
     setContextMenuState({ open: false, x: 0, y: 0 });
@@ -1710,13 +2143,6 @@ export function DoctorCalendar({
         slotInfo.end,
         "HH:mm",
       )}`,
-      anchor: {
-        left: "left" in anchorSource ? anchorSource.left : anchorSource.x,
-        right: "right" in anchorSource ? anchorSource.right : anchorSource.x,
-        top: "top" in anchorSource ? anchorSource.top : anchorSource.y,
-        bottom:
-          "bottom" in anchorSource ? anchorSource.bottom : anchorSource.y,
-      },
       override: config.override ?? null,
       availabilityTarget: config.availabilityTarget ?? null,
     });
@@ -1730,33 +2156,173 @@ export function DoctorCalendar({
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setQuickActionSlot(null);
+        setQuickActionAnchorRect(null);
       }
     };
 
     const handleClickAway = (event: MouseEvent) => {
-      const target = event.target as HTMLElement | null;
-      if (target?.closest("[data-quick-slot-panel]")) {
+      // event.target can be a Text node when the user clicks directly on a
+      // bare text node inside a button (no wrapping element). Text nodes do
+      // not have .closest(), so we must walk up to the parent Element first.
+      const node = event.target as Node | null;
+      const element: HTMLElement | null =
+        node?.nodeType === Node.TEXT_NODE
+          ? (node.parentElement as HTMLElement | null)
+          : (node as HTMLElement | null);
+
+      if (element?.closest("[data-quick-slot-panel]")) {
         return;
       }
       setQuickActionSlot(null);
+      setQuickActionAnchorRect(null);
+    };
+
+    const handleViewportChange = (event?: Event) => {
+      // If the scroll originated from inside the panel itself, ignore it.
+      // This prevents the time picker expanding from closing the panel.
+      if (event?.type === "scroll") {
+        const target = event.target as Node | null;
+        if (
+          quickActionPanelRef.current &&
+          target instanceof Node &&
+          quickActionPanelRef.current.contains(target)
+        ) {
+          return;
+        }
+      }
+      setQuickActionSlot(null);
+      setQuickActionAnchorRect(null);
+    };
+
+    let resizeTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const handleResize = () => {
+      if (resizeTimer !== null) clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        setQuickActionSlot(null);
+        setQuickActionAnchorRect(null);
+      }, 150);
     };
 
     window.addEventListener("keydown", handleEscape);
     window.addEventListener("mousedown", handleClickAway);
+    window.addEventListener("scroll", handleViewportChange, true);
+    window.addEventListener("resize", handleResize);
 
     return () => {
+      if (resizeTimer !== null) clearTimeout(resizeTimer);
       window.removeEventListener("keydown", handleEscape);
       window.removeEventListener("mousedown", handleClickAway);
+      window.removeEventListener("scroll", handleViewportChange, true);
+      window.removeEventListener("resize", handleResize);
     };
   }, [quickActionSlot]);
 
   useEffect(() => {
+    if (!quickActionSlot?.open) {
+      setQuickActionPicker(null);
+      return;
+    }
+
+    setQuickActionCalendarMonth(startOfMonth(quickActionSlot.start));
+    setQuickActionStartInput(format(quickActionSlot.start, "HH:mm"));
+    setQuickActionEndInput(format(quickActionSlot.end, "HH:mm"));
+
+    if (quickActionSlot.kind === "blocked") {
+      setQuickActionPicker(null);
+    }
+  }, [quickActionSlot]);
+
+  useEffect(() => {
+    if (
+      !quickActionSlot?.open ||
+      (quickActionPicker !== "start" && quickActionPicker !== "end")
+    ) {
+      return;
+    }
+
+    const selectedTime =
+      quickActionPicker === "start"
+        ? format(quickActionSlot.start, "HH:mm")
+        : format(quickActionSlot.end, "HH:mm");
+
+    const frameId = window.requestAnimationFrame(() => {
+      const selectedOption = quickActionPanelRef.current?.querySelector<HTMLElement>(
+        `[data-quick-action-time-list="${quickActionPicker}"] [data-quick-action-time-value="${selectedTime}"]`,
+      );
+
+      selectedOption?.scrollIntoView({
+        block: "center",
+      });
+    });
+
+    return () => window.cancelAnimationFrame(frameId);
+  }, [quickActionPicker, quickActionSlot]);
+
+  useLayoutEffect(() => {
+    if (!quickActionSlot?.open || isMobile || !quickActionAnchorRect) {
+      return;
+    }
+
+    const panelWidth = quickActionPanelRef.current?.offsetWidth ?? QUICK_ACTION_PANEL_W;
+    const panelHeight =
+      quickActionPanelRef.current?.offsetHeight ?? QUICK_ACTION_PANEL_MAX_H;
+    if (!panelWidth || !panelHeight) {
+      return;
+    }
+
+    const nextPosition = getQuickActionPanelPosition(
+      quickActionAnchorRect,
+      panelWidth,
+      panelHeight,
+    );
+
+    if (
+      nextPosition.top !== panelPosition.top ||
+      nextPosition.left !== panelPosition.left
+    ) {
+      setPanelPosition((current) =>
+        current.top === nextPosition.top && current.left === nextPosition.left
+          ? current
+          : nextPosition,
+      );
+    }
+  });
+
+  useEffect(() => {
+    // If the calendar was navigated from inside the quick-action panel
+    // (e.g. the user picked a date in the date picker), skip the reset
+    // for this one cycle so the panel stays open.
+    if (quickActionNavigatingRef.current) {
+      quickActionNavigatingRef.current = false;
+      return;
+    }
     setQuickActionSlot(null);
+    setQuickActionAnchorRect(null);
+    setQuickActionPicker(null);
     setBlockActionState(null);
     clearCalendarSelection();
     setAppointmentComposer(null);
     resetAppointmentComposerForm();
   }, [resolvedCurrentDate, resolvedView, doctorId]);
+
+  useEffect(() => {
+    if (resolvedView !== Views.WEEK && resolvedView !== Views.DAY) {
+      setCurrentTimeIndicatorPortalTarget(null);
+      setCurrentTimeIndicatorStyle(null);
+      return;
+    }
+
+    setCurrentTime(new Date());
+
+    const intervalId = window.setInterval(() => {
+      setCurrentTime(new Date());
+    }, 60_000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [resolvedView]);
 
   useEffect(() => {
     if (!activeDraftPreview || (resolvedView !== Views.WEEK && resolvedView !== Views.DAY)) {
@@ -1767,16 +2333,18 @@ export function DoctorCalendar({
       const draftElement = calendarShellRef.current?.querySelector(
         ".scheduler-event-draft",
       ) as HTMLElement | null;
+      const scrollContainer = getCalendarScrollContainer(calendarShellRef.current);
 
-      if (!draftElement) {
+      if (!draftElement || !scrollContainer) {
         return;
       }
 
-      const topBuffer = 112;
-      const bottomBuffer = 48;
+      const topBuffer = 32;
+      const bottomBuffer = 32;
       const draftRect = draftElement.getBoundingClientRect();
-      const viewportTop = topBuffer;
-      const viewportBottom = window.innerHeight - bottomBuffer;
+      const containerRect = scrollContainer.getBoundingClientRect();
+      const viewportTop = containerRect.top + topBuffer;
+      const viewportBottom = containerRect.bottom - bottomBuffer;
 
       let delta = 0;
       if (draftRect.top < viewportTop) {
@@ -1786,10 +2354,7 @@ export function DoctorCalendar({
       }
 
       if (Math.abs(delta) > 12) {
-        window.scrollTo({
-          top: window.scrollY + delta,
-          behavior: "smooth",
-        });
+        scrollContainer.scrollBy({ top: delta, behavior: "smooth" });
       }
     });
 
@@ -1803,9 +2368,209 @@ export function DoctorCalendar({
     resolvedView,
   ]);
 
+  useEffect(() => {
+    if (hasAutoScrolledToCurrentTimeRef.current) {
+      return;
+    }
+
+    if (isAvailabilityLoading || isCalendarLoading) {
+      return;
+    }
+
+    if (resolvedView !== Views.WEEK && resolvedView !== Views.DAY) {
+      return;
+    }
+
+    let rafId = 0;
+
+    const scrollToCurrentTime = () => {
+      const scrollContainer = getCalendarScrollContainer(calendarShellRef.current);
+      const firstDaySlot = scrollContainer
+        ? getTimeGridDaySlots(scrollContainer)[0] ?? null
+        : null;
+
+      if (!scrollContainer || !firstDaySlot) {
+        return;
+      }
+
+      const totalMinutes = CALENDAR_END_MINUTES - CALENDAR_START_MINUTES;
+      const minutesSinceCalendarStart = clamp(
+        getMinutesSinceMidnight(new Date()) - CALENDAR_START_MINUTES,
+        0,
+        totalMinutes,
+      );
+      const scrollHeight = firstDaySlot.scrollHeight || scrollContainer.scrollHeight;
+      const indicatorTop = (minutesSinceCalendarStart / totalMinutes) * scrollHeight;
+      const targetScrollTop = clamp(
+        indicatorTop - scrollContainer.clientHeight * 0.35,
+        0,
+        Math.max(scrollHeight - scrollContainer.clientHeight, 0),
+      );
+
+      scrollContainer.scrollTop = targetScrollTop;
+      hasAutoScrolledToCurrentTimeRef.current = true;
+    };
+
+    rafId = window.requestAnimationFrame(scrollToCurrentTime);
+
+    return () => {
+      window.cancelAnimationFrame(rafId);
+    };
+  }, [isAvailabilityLoading, isCalendarLoading, resolvedView]);
+
+  useEffect(() => {
+    if (isAvailabilityLoading || isCalendarLoading) {
+      setCurrentTimeIndicatorPortalTarget(null);
+      setCurrentTimeIndicatorStyle(null);
+      return;
+    }
+
+    if (resolvedView !== Views.WEEK && resolvedView !== Views.DAY) {
+      setCurrentTimeIndicatorPortalTarget(null);
+      setCurrentTimeIndicatorStyle(null);
+      return;
+    }
+
+    const calendarShell = calendarShellRef.current;
+
+    if (!calendarShell) {
+      setCurrentTimeIndicatorPortalTarget(null);
+      setCurrentTimeIndicatorStyle(null);
+      return;
+    }
+
+    let rafId = 0;
+
+    const syncCurrentTimeIndicator = () => {
+      const scrollContainer = getCalendarScrollContainer(calendarShell);
+
+      if (!scrollContainer) {
+        setCurrentTimeIndicatorPortalTarget(null);
+        setCurrentTimeIndicatorStyle(null);
+        return;
+      }
+
+      setCurrentTimeIndicatorPortalTarget(scrollContainer);
+
+      const targetColumn = getTodayTimeColumn(
+        calendarShell,
+        scrollContainer,
+        resolvedView,
+        resolvedCurrentDate,
+      );
+      const currentMinutes = getMinutesSinceMidnight(currentTime);
+      const totalMinutes = CALENDAR_END_MINUTES - CALENDAR_START_MINUTES;
+
+      if (
+        !targetColumn ||
+        currentMinutes < CALENDAR_START_MINUTES ||
+        currentMinutes > CALENDAR_END_MINUTES
+      ) {
+        setCurrentTimeIndicatorStyle(null);
+        return;
+      }
+
+      const top =
+        ((currentMinutes - CALENDAR_START_MINUTES) / totalMinutes) *
+        targetColumn.scrollHeight;
+
+      setCurrentTimeIndicatorStyle({
+        left: targetColumn.offsetLeft,
+        width: targetColumn.offsetWidth,
+        top,
+      });
+    };
+
+    const scheduleSync = () => {
+      window.cancelAnimationFrame(rafId);
+      rafId = window.requestAnimationFrame(syncCurrentTimeIndicator);
+    };
+
+    scheduleSync();
+    window.addEventListener("resize", scheduleSync);
+
+    return () => {
+      window.cancelAnimationFrame(rafId);
+      window.removeEventListener("resize", scheduleSync);
+    };
+  }, [
+    currentTime,
+    data?.appointments?.length,
+    isAvailabilityLoading,
+    isCalendarLoading,
+    resolvedCurrentDate,
+    resolvedView,
+  ]);
+
+  useEffect(() => {
+    if (resolvedView !== Views.WEEK && resolvedView !== Views.DAY) {
+      return;
+    }
+
+    const calendarShell = calendarShellRef.current;
+    const scrollContainer = getCalendarScrollContainer(calendarShell);
+
+    if (!calendarShell || !scrollContainer) {
+      return;
+    }
+
+    const forwardWheelToGrid = (event: WheelEvent) => {
+      const target = event.target as HTMLElement | null;
+      const isExcludedTarget =
+        target?.closest(".rbc-toolbar") ||
+        target?.closest(".scheduler-surface-context") ||
+        target?.closest("[data-quick-slot-panel]");
+      const shouldForwardFromFixedChrome =
+        target?.closest(".rbc-time-header") || target?.closest(".rbc-time-gutter");
+
+      if (isExcludedTarget || !shouldForwardFromFixedChrome || event.deltaY === 0) {
+        return;
+      }
+
+      event.preventDefault();
+      scrollContainer.scrollBy({
+        top: event.deltaY,
+        behavior: "auto",
+      });
+    };
+
+    calendarShell.addEventListener("wheel", forwardWheelToGrid, {
+      passive: false,
+      capture: true,
+    });
+
+    return () => {
+      calendarShell.removeEventListener("wheel", forwardWheelToGrid, true);
+    };
+  }, [resolvedView]);
+
   const isLoading = isAvailabilityLoading || isCalendarLoading;
   const isError = isAvailabilityError || isCalendarError;
   const error = availabilityError ?? calendarError;
+
+  const quickActionSlotStatus = useMemo<SlotStatus | null>(() => {
+    if (!quickActionSlot) {
+      return null;
+    }
+
+    return computeSlotStatus(
+      quickActionSlot.start,
+      format(quickActionSlot.start, "HH:mm"),
+      format(quickActionSlot.end, "HH:mm"),
+      availabilitySlots,
+      data?.appointments ?? [],
+    );
+  }, [availabilitySlots, data?.appointments, quickActionSlot]);
+
+  const quickActionEndTimeOptions = useMemo(() => {
+    if (!quickActionSlot) {
+      return quarterHourTimes;
+    }
+
+    const startMinutes = timeToMinutes(format(quickActionSlot.start, "HH:mm"));
+
+    return quarterHourTimes.filter((timeValue) => timeToMinutes(timeValue) > startMinutes);
+  }, [quickActionSlot]);
 
   if (isLoading) {
     return (
@@ -1827,70 +2592,46 @@ export function DoctorCalendar({
     );
   }
 
-  const quickActionPosition =
-    quickActionSlot?.open && !isMobile
-      ? getQuickActionPosition(
-          quickActionSlot.anchor,
-          calendarShellRef.current?.getBoundingClientRect() ?? null,
-        )
-      : null;
-
-  const calendarHeight =
-    resolvedView === Views.MONTH ? 920 : resolvedView === Views.AGENDA ? 760 : 1320;
-
-  const surfaceContextLabel = mode === "staff" ? "Staff scheduler" : "Doctor workspace";
   const surfaceContextTitle =
     doctorName ?? (mode === "staff" ? "Doktor takvimi" : "Kendi takviminiz");
-  const surfaceContextDescription =
-    mode === "staff"
-      ? specializationName
-        ? `${specializationName} takvimi, musaitlik ve randevu akislari tek yuzeyde yonetilir.`
-        : "Secili doktorun musaitlik, istisna ve randevu akislarini bu yuzeyden yonetin."
-      : "Musaitlik, gunluk istisnalar ve randevu akislarini ayni takvim yuzeyinde takip edin.";
 
   const quickActionBadge =
-    quickActionSlot?.kind === "available"
+    quickActionSlotStatus === "available" || quickActionSlotStatus === "gap"
       ? {
           label: "Musait zaman",
-          className: "border-success/30 bg-success/10 text-success",
+          className:
+            "border-emerald-500/25 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
         }
-      : quickActionSlot?.kind === "blocked"
+      : quickActionSlotStatus === "overflow"
         ? {
-            label:
-              quickActionSlot.override?.type === "blackout"
-                ? "Kapali gun"
-                : "Istisna uygulanmis",
+            label: "Sinir disi",
             className:
-              quickActionSlot.override?.type === "blackout"
-                ? "border-destructive/25 bg-destructive/10 text-destructive"
-                : "border-warning/30 bg-warning/10 text-warning",
+              "border-amber-500/25 bg-amber-500/10 text-amber-700 dark:text-amber-300",
           }
-        : {
-            label: "Musaitlik disi",
-            className: "border-border/70 bg-muted/50 text-muted-foreground",
-          };
+        : quickActionSlotStatus === "conflict"
+          ? {
+              label: "Cakisma var",
+              className:
+                "border-destructive/25 bg-destructive/10 text-destructive",
+            }
+          : {
+              label: "Musait degil",
+              className: "border-border/70 bg-muted/60 text-muted-foreground",
+            };
 
-  const quickActionCanRemoveDirectly =
-    quickActionSlot?.kind === "blocked" && quickActionSlot.override
-      ? quickActionSlot.override.type === "blackout" ||
-        !quickActionSlot.override.start_time ||
-        !quickActionSlot.override.end_time ||
-        (() => {
-          const overrideRange = normalizeMinuteRange(
-            timeToMinutes(quickActionSlot.override?.start_time ?? "00:00"),
-            timeToMinutes(quickActionSlot.override?.end_time ?? "00:00"),
-          );
-          const selectedRange = normalizeMinuteRange(
-            timeToMinutes(format(quickActionSlot.start, "HH:mm")),
-            timeToMinutes(format(quickActionSlot.end, "HH:mm")),
-          );
+  const quickActionWarningMessage =
+    quickActionSlotStatus === "overflow"
+      ? "Secim musaitlik sinirinin disina tasiyor"
+      : quickActionSlotStatus === "conflict"
+        ? "Bu saatte randevu mevcut"
+        : quickActionSlotStatus === "unavailable"
+          ? "Bu aralikta musaitlik tanimli degil"
+          : null;
 
-          return (
-            overrideRange.start === selectedRange.start &&
-            overrideRange.end === selectedRange.end
-          );
-        })()
-      : false;
+  const isQuickActionEditable = Boolean(quickActionSlot);
+  const quickActionDatePillLabel = quickActionSlot
+    ? format(quickActionSlot.start, "EEE, d MMMM", { locale: tr })
+    : "";
 
   const canBlockSelectedRange =
     mode === "staff" &&
@@ -1898,12 +2639,129 @@ export function DoctorCalendar({
     (quickActionSlot.kind === "available" ||
       quickActionSlot.kind === "unavailable");
 
-  const availabilityQuickActionLabel =
-    quickActionSlot?.availabilityTarget?.primarySlot
-      ? quickActionSlot.availabilityTarget.shouldPrefillExpand
-        ? "Musaitligi genislet"
-        : "Musaitligi duzenle"
-      : "Panelde musaitlik ekle";
+  const isValidTimeInput = (value: string) => {
+    const match = /^(\d{2}):(\d{2})$/.exec(value);
+    if (!match) {
+      return false;
+    }
+
+    const hours = Number(match[1]);
+    const minutes = Number(match[2]);
+    return hours >= 0 && hours < 24 && minutes >= 0 && minutes < 60;
+  };
+
+  const updateQuickActionRange = (nextStart: Date, nextEnd: Date) => {
+    setQuickActionSlot((current) => {
+      if (!current) {
+        return current;
+      }
+
+      const nextBlockingOverride = getBlockingOverrideForRange(nextStart, nextEnd);
+      const nextAvailabilityTarget = getAvailabilityContextForRange(nextStart, nextEnd);
+
+      return {
+        ...current,
+        kind: nextBlockingOverride ? "blocked" : nextAvailabilityTarget ? "available" : "unavailable",
+        start: nextStart,
+        end: nextEnd,
+        dayOfWeek: nextStart.getDay(),
+        dateLabel: format(nextStart, "d MMMM yyyy, EEEE", { locale: tr }),
+        timeLabel: `${format(nextStart, "HH:mm")} - ${format(nextEnd, "HH:mm")}`,
+        override: nextBlockingOverride ?? null,
+        availabilityTarget: nextAvailabilityTarget,
+      };
+    });
+  };
+
+  const commitQuickActionTime = (field: "start" | "end", value: string) => {
+    if (!quickActionSlot || !isValidTimeInput(value)) {
+      return false;
+    }
+
+    const nextMinutes = timeToMinutes(value);
+    if (
+      nextMinutes < QUICK_ACTION_TIME_MINUTES_START ||
+      nextMinutes > QUICK_ACTION_TIME_MINUTES_END
+    ) {
+      return false;
+    }
+
+    const currentDuration = Math.max(
+      15,
+      differenceInMinutes(quickActionSlot.end, quickActionSlot.start),
+    );
+
+    if (field === "start") {
+      const nextStart = withTime(quickActionSlot.start, value);
+      const latestAllowedEnd = withTime(
+        quickActionSlot.start,
+        minutesToTime(QUICK_ACTION_TIME_MINUTES_END),
+      );
+      const nextEndCandidate = addMinutes(nextStart, currentDuration);
+      const nextEnd =
+        nextEndCandidate > latestAllowedEnd ? latestAllowedEnd : nextEndCandidate;
+
+      if (toApiDate(nextEnd) !== toApiDate(nextStart) || nextEnd <= nextStart) {
+        return false;
+      }
+
+      updateQuickActionRange(nextStart, nextEnd);
+      return true;
+    }
+
+    const nextEnd = withTime(quickActionSlot.end, value);
+    if (toApiDate(nextEnd) !== toApiDate(quickActionSlot.start) || nextEnd <= quickActionSlot.start) {
+      return false;
+    }
+
+    updateQuickActionRange(quickActionSlot.start, nextEnd);
+    return true;
+  };
+
+  const handleQuickActionDateSelect = (nextDate: Date | undefined) => {
+    if (!quickActionSlot || !nextDate) {
+      return;
+    }
+
+    const nextStart = withTime(nextDate, format(quickActionSlot.start, "HH:mm"));
+    const nextEnd = withTime(nextDate, format(quickActionSlot.end, "HH:mm"));
+
+    // If the selected date is outside the currently visible range, navigate
+    // the calendar to show it. Set the guard ref first so the reset effect
+    // does not close the panel when resolvedCurrentDate changes.
+    const isOutsideVisibleRange =
+      nextStart < rangeStart || nextStart >= rangeEnd;
+
+    if (isOutsideVisibleRange) {
+      quickActionNavigatingRef.current = true;
+      setCalendarDate(nextDate);
+    }
+
+    updateQuickActionRange(nextStart, nextEnd);
+    setQuickActionPicker(null);
+  };
+
+  const handleQuickActionTimeOptionSelect = (
+    field: "start" | "end",
+    value: string,
+  ) => {
+    const didCommit = commitQuickActionTime(field, value);
+    if (!didCommit) {
+      return;
+    }
+
+    setQuickActionPicker(null);
+  };
+
+  const handleQuickActionTimeInputCommit = (field: "start" | "end") => {
+    const value = field === "start" ? quickActionStartInput : quickActionEndInput;
+    const didCommit = commitQuickActionTime(field, value);
+
+    if (!didCommit && quickActionSlot) {
+      setQuickActionStartInput(format(quickActionSlot.start, "HH:mm"));
+      setQuickActionEndInput(format(quickActionSlot.end, "HH:mm"));
+    }
+  };
 
   const handleQuickActionOpenAppointmentComposer = () => {
     if (!quickActionSlot || quickActionSlot.kind !== "available") {
@@ -1923,24 +2781,29 @@ export function DoctorCalendar({
     setAppointmentComposer(nextComposer);
   };
 
-  const handleQuickActionOpenAvailabilityEditor = () => {
+  const handleQuickActionOpenAvailabilityEditor = (options?: {
+    startTime?: string;
+    endTime?: string;
+  }) => {
     if (!quickActionSlot) {
       return;
     }
 
     const availabilityTarget = quickActionSlot.availabilityTarget;
+    const defaultStartTime =
+      availabilityTarget?.shouldPrefillExpand || !availabilityTarget?.primarySlot
+        ? format(availabilityTarget?.prefillStart ?? quickActionSlot.start, "HH:mm")
+        : undefined;
+    const defaultEndTime =
+      availabilityTarget?.shouldPrefillExpand || !availabilityTarget?.primarySlot
+        ? format(availabilityTarget?.prefillEnd ?? quickActionSlot.end, "HH:mm")
+        : undefined;
     const nextModalState = {
       open: true as const,
       mode: availabilityTarget?.primarySlot ? ("edit" as const) : ("create" as const),
       dayOfWeek: availabilityTarget?.primarySlot?.day_of_week ?? quickActionSlot.dayOfWeek,
-      startTime:
-        availabilityTarget?.shouldPrefillExpand || !availabilityTarget?.primarySlot
-          ? format(availabilityTarget?.prefillStart ?? quickActionSlot.start, "HH:mm")
-          : undefined,
-      endTime:
-        availabilityTarget?.shouldPrefillExpand || !availabilityTarget?.primarySlot
-          ? format(availabilityTarget?.prefillEnd ?? quickActionSlot.end, "HH:mm")
-          : undefined,
+      startTime: options?.startTime ?? defaultStartTime,
+      endTime: options?.endTime ?? defaultEndTime,
       slotDuration: availabilityTarget?.slotDuration,
       slot: availabilityTarget?.primarySlot ?? undefined,
     };
@@ -1948,6 +2811,19 @@ export function DoctorCalendar({
     resetCalendarActiveState();
     setAvailabilityModal({
       ...nextModalState,
+    });
+  };
+
+  const handleQuickActionExpandAvailability = () => {
+    const primarySlot = quickActionSlot?.availabilityTarget?.primarySlot;
+    if (!quickActionSlot || !primarySlot) {
+      handleQuickActionOpenAvailabilityEditor();
+      return;
+    }
+
+    handleQuickActionOpenAvailabilityEditor({
+      startTime: primarySlot.start_time,
+      endTime: format(quickActionSlot.end, "HH:mm"),
     });
   };
 
@@ -1962,57 +2838,6 @@ export function DoctorCalendar({
       mode: "edit",
       override: quickActionSlot.override,
     });
-  };
-
-  const handleQuickActionRemoveOverride = () => {
-    if (!quickActionSlot?.override) {
-      return;
-    }
-
-    const override = quickActionSlot.override;
-
-    if (override.type === "custom_hours") {
-      if (!override.start_time || !override.end_time) {
-        resetCalendarActiveState();
-        setOverrideToDelete(override);
-        return;
-      }
-
-      const overrideRange = normalizeMinuteRange(
-        timeToMinutes(override.start_time),
-        timeToMinutes(override.end_time),
-      );
-
-      const selectedRange = normalizeMinuteRange(
-        timeToMinutes(format(quickActionSlot.start, "HH:mm")),
-        timeToMinutes(format(quickActionSlot.end, "HH:mm")),
-      );
-
-      const exactMatch =
-        overrideRange.start === selectedRange.start &&
-        overrideRange.end === selectedRange.end;
-
-      if (exactMatch) {
-        resetCalendarActiveState();
-        setOverrideToDelete(override);
-        return;
-      }
-
-      toast.info(
-        "Kismi blok acma bu surumde desteklenmiyor. Istisnayi duzenleme ekranindan degistirin.",
-      );
-
-      resetCalendarActiveState();
-      setOverrideModal({
-        open: true,
-        mode: "edit",
-        override,
-      });
-      return;
-    }
-
-    resetCalendarActiveState();
-    setOverrideToDelete(override);
   };
 
   const handleQuickActionBlockTime = () => {
@@ -2032,7 +2857,146 @@ export function DoctorCalendar({
     setBlockActionState(nextBlockActionState);
   };
 
+  const renderQuickActionWarning = () => {
+    if (!quickActionWarningMessage) {
+      return null;
+    }
+
+    return (
+      <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+        {quickActionWarningMessage}
+      </div>
+    );
+  };
+
+  const renderQuickActionActions = (buttonClassName = "h-11 w-full rounded-xl font-medium") => {
+    if (!quickActionSlot) {
+      return null;
+    }
+
+    if (quickActionSlot.kind === "blocked") {
+      return (
+        <div className="grid gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            className={cn(buttonClassName, "justify-center")}
+            onClick={handleQuickActionEditOverride}
+          >
+            <Pencil className="h-4 w-4" />
+            Istisnayi panelde duzenle
+          </Button>
+        </div>
+      );
+    }
+
+    if (quickActionSlotStatus === "unavailable") {
+      return (
+        <div className="grid gap-2">
+          <Button
+            type="button"
+            className={cn(
+              buttonClassName,
+              "justify-center bg-emerald-600 text-white hover:bg-emerald-700",
+            )}
+            onClick={handleQuickActionOpenAvailabilityEditor}
+          >
+            <Plus className="h-4 w-4" />
+            Musaitlik ekle
+          </Button>
+        </div>
+      );
+    }
+
+    if (quickActionSlotStatus === "overflow") {
+      return (
+        <div className="grid gap-2">
+          <Button
+            type="button"
+            className={cn(
+              buttonClassName,
+              "justify-center bg-emerald-600 text-white hover:bg-emerald-700",
+            )}
+            onClick={handleQuickActionExpandAvailability}
+          >
+            <Expand className="h-4 w-4" />
+            Musaitligi genislet
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            className={cn(buttonClassName, "justify-center")}
+            disabled
+          >
+            <UserPlus className="h-4 w-4" />
+            Randevu olustur
+          </Button>
+        </div>
+      );
+    }
+
+    if (quickActionSlotStatus === "conflict") {
+      return (
+        <div className="grid gap-2">
+          <Button
+            type="button"
+            className={cn(buttonClassName, "justify-center")}
+            disabled
+            onClick={handleQuickActionOpenAppointmentComposer}
+          >
+            <UserPlus className="h-4 w-4" />
+            Randevu olustur
+          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="block w-full">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className={cn(buttonClassName, "justify-center")}
+                  disabled
+                >
+                  <Ban className="h-4 w-4" />
+                  Blok istisnasi ekle
+                </Button>
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>
+              Once cakisan randevuyu cozun
+            </TooltipContent>
+          </Tooltip>
+        </div>
+      );
+    }
+
+    return (
+      <div className="grid gap-2">
+        <Button
+          type="button"
+          className={cn(buttonClassName, "justify-center")}
+          onClick={handleQuickActionOpenAppointmentComposer}
+        >
+          <UserPlus className="h-4 w-4" />
+          Randevu olustur
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          className={cn(buttonClassName, "justify-center")}
+          onClick={handleQuickActionBlockTime}
+        >
+          <Ban className="h-4 w-4" />
+          Blok istisnasi ekle
+        </Button>
+      </div>
+    );
+  };
+
   const handleSlotSelection = (slotInfo: SlotInfo) => {
+    if (slotInfo.action === "click" || slotInfo.action === "doubleClick") {
+      return;
+    }
+
     resetCalendarActiveState();
 
     if (resolvedView === Views.MONTH) {
@@ -2052,11 +3016,6 @@ export function DoctorCalendar({
       return;
     }
 
-    if (slotState.hasAppointmentConflict) {
-      setQuickActionSlot(null);
-      return;
-    }
-
     if (
       mode === "staff" &&
       slotState.kind === "available" &&
@@ -2071,7 +3030,7 @@ export function DoctorCalendar({
     }
 
     if (slotState.isPast) {
-      setQuickActionSlot(null);
+      closeQuickActionPanel();
       return;
     }
 
@@ -2091,7 +3050,6 @@ export function DoctorCalendar({
 
   const handleMobileSlotTap = (
     slotStart: Date,
-    currentTarget: HTMLElement | null,
     sourceTarget: EventTarget | null,
   ) => {
     if (!isMobile || (resolvedView !== Views.DAY && resolvedView !== Views.WEEK)) {
@@ -2104,38 +3062,34 @@ export function DoctorCalendar({
       return;
     }
 
-    const anchorRect = currentTarget?.getBoundingClientRect();
-
     handleSlotSelection({
       action: "select",
       start: slotStart,
       end: addMinutes(slotStart, resolvedDefaultDuration),
       slots: [slotStart],
-      bounds: anchorRect ?? undefined,
-      box: anchorRect ?? undefined,
     } as SlotInfo);
   };
 
   return (
     <div
       ref={calendarShellRef}
-      className="scheduler-calendar-shell overflow-hidden rounded-[34px] border border-border/60 bg-card/95 shadow-soft"
+      className="scheduler-calendar-shell flex h-full min-h-0 flex-col overflow-hidden rounded-[34px] border border-border/60 bg-card/95 shadow-soft"
     >
-      <div className="scheduler-surface-context">
-        <div className="min-w-0">
-          <p className="scheduler-surface-context-label">{surfaceContextLabel}</p>
-          <h2 className="scheduler-surface-context-title">{surfaceContextTitle}</h2>
-          <p className="scheduler-surface-context-description">{surfaceContextDescription}</p>
+      {mode === "staff" ? (
+        <div className="scheduler-surface-context shrink-0">
+          <div className="min-w-0">
+            <h2 className="scheduler-surface-context-title">{surfaceContextTitle}</h2>
+          </div>
+          {specializationName ? (
+            <Badge variant="outline" className="scheduler-surface-context-badge">
+              {specializationName}
+            </Badge>
+          ) : null}
         </div>
-        {specializationName ? (
-          <Badge variant="outline" className="scheduler-surface-context-badge">
-            {specializationName}
-          </Badge>
-        ) : null}
-      </div>
+      ) : null}
 
       <BigCalendar<SchedulerEvent>
-        className="scheduler-calendar"
+        className="scheduler-calendar min-h-0 flex-1 overflow-hidden"
         views={{
           month: true,
           agenda: true,
@@ -2168,6 +3122,8 @@ export function DoctorCalendar({
           toolbar: (toolbarProps) => (
             <CustomToolbar
               {...toolbarProps}
+              calendarTitle={surfaceContextTitle}
+              specializationName={specializationName}
               onManageAvailability={() => {
                 resetCalendarActiveState();
                 setIsAvailabilitySheetOpen(true);
@@ -2191,7 +3147,14 @@ export function DoctorCalendar({
         selected={selectedCalendarEvent ?? undefined}
         startAccessor="start"
         endAccessor="end"
-        style={{ height: calendarHeight }}
+        style={{
+          height: "100%",
+          display: "flex",
+          flexDirection: "column",
+          flex: 1,
+          minHeight: 0,
+          overflow: "hidden",
+        }}
         messages={calendarMessages}
         eventPropGetter={eventPropGetter}
         backgroundEventPropGetter={eventPropGetter}
@@ -2204,14 +3167,17 @@ export function DoctorCalendar({
               "scheduler-slot",
               isPast && "scheduler-slot-past",
             ),
+            "data-scheduler-slot": "true",
             ...(isMobile &&
             (resolvedView === Views.DAY || resolvedView === Views.WEEK)
               ? {
                   onClick: (event: {
                     currentTarget: HTMLElement;
                     target: EventTarget | null;
+                    clientX: number;
+                    clientY: number;
                   }) => {
-                    handleMobileSlotTap(date, event.currentTarget, event.target);
+                        handleMobileSlotTap(date, event.target);
                   },
                 }
               : {}),
@@ -2232,6 +3198,7 @@ export function DoctorCalendar({
           setCalendarView(Views.DAY);
         }}
         getDrilldownView={() => Views.DAY}
+        onSelecting={() => true}
         onSelectSlot={handleSlotSelection}
         onSelectEvent={handleSelectEvent}
         selectable={!isMobile || resolvedView === Views.MONTH}
@@ -2239,165 +3206,276 @@ export function DoctorCalendar({
         culture="tr"
         step={resolvedDefaultDuration}
         timeslots={2}
-        min={setMinutes(setHours(new Date(), 6), 0)}
-        max={setMinutes(setHours(new Date(), 23), 0)}
+        min={setMinutes(setHours(new Date(), CALENDAR_START_HOUR), 0)}
+        max={setMinutes(setHours(new Date(), CALENDAR_END_HOUR), 0)}
         drilldownView={Views.DAY}
         dayLayoutAlgorithm="no-overlap"
       />
 
-      {quickActionSlot?.open && quickActionPosition ? (
-        <div
-          data-quick-slot-panel
-          className="fixed z-50 hidden rounded-[24px] border border-border/70 bg-popover/95 p-4 text-popover-foreground shadow-card outline-none backdrop-blur-xl lg:block"
-          style={quickActionPosition}
-        >
-          <div className="space-y-4">
-            <div className="flex items-start justify-between gap-3">
-              <div className="space-y-1">
-                <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
-                  {quickActionSlot.kind === "available"
-                    ? "Secili musait aralik"
-                    : quickActionSlot.kind === "blocked"
-                      ? "Secili istisna"
-                      : "Secili aralik"}
-                </p>
-                <h3 className="text-lg font-display font-semibold text-foreground">
-                  {doctorName}
-                </h3>
-                {specializationName ? (
-                  <p className="text-sm text-muted-foreground">
-                    {specializationName}
-                  </p>
-                ) : null}
-              </div>
-              <Badge
-                variant="outline"
-                className={cn("rounded-full", quickActionBadge.className)}
+      {currentTimeIndicatorPortalTarget && currentTimeIndicatorStyle
+        ? createPortal(
+            <div
+              aria-hidden="true"
+              className="scheduler-current-time-indicator"
+              style={currentTimeIndicatorStyle}
+            />,
+            currentTimeIndicatorPortalTarget,
+          )
+        : null}
+
+      {quickActionSlot?.open && !isMobile && typeof document !== "undefined"
+        ? createPortal(
+            <div
+              ref={quickActionPanelRef}
+              data-quick-slot-panel
+              className="z-50 max-h-[560px] overflow-y-auto rounded-[20px] border border-border/70 bg-popover/95 p-5 text-popover-foreground shadow-card outline-none backdrop-blur-xl transition-all duration-200"
+              onMouseDown={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                position: "fixed",
+                top: panelPosition.top,
+                left: panelPosition.left,
+                width: QUICK_ACTION_PANEL_W,
+                maxHeight: QUICK_ACTION_PANEL_MAX_H,
+                zIndex: 9999,
+              }}
+            >
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="absolute right-3 top-3 h-8 w-8 rounded-full"
+                onClick={closeQuickActionPanel}
               >
-                {quickActionBadge.label}
-              </Badge>
-            </div>
+                <X className="h-4 w-4" />
+              </Button>
 
-            <div className="rounded-[20px] border border-border/70 bg-background/80 p-3">
-              <div className="space-y-2 text-sm">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-muted-foreground">Tarih</span>
-                  <span className="text-right font-medium text-foreground">
-                    {quickActionSlot.dateLabel}
-                  </span>
+              <div className="space-y-4 pr-8">
+                <div className="space-y-1">
+                  <h3 className="text-base font-semibold text-foreground">{doctorName}</h3>
+                  {specializationName ? (
+                    <p className="text-sm text-muted-foreground">{specializationName}</p>
+                  ) : null}
                 </div>
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-muted-foreground">Saat</span>
-                  <span className="font-medium text-foreground">
-                    {quickActionSlot.timeLabel}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-muted-foreground">Durum</span>
-                  <Badge
-                    variant="outline"
-                    className={cn("rounded-full", quickActionBadge.className)}
-                  >
-                    {quickActionBadge.label}
-                  </Badge>
-                </div>
+
+                {isQuickActionEditable ? (
+                  <div className="grid grid-cols-[minmax(0,1fr)_88px_auto_88px] items-start gap-2">
+                    <button
+                      type="button"
+                      className="flex min-w-0 items-center justify-between gap-2 rounded-lg border border-border/40 bg-muted/60 px-3 py-1.5 text-sm font-medium transition-colors hover:bg-muted"
+                      onClick={() =>
+                        setQuickActionPicker((current) =>
+                          current === "date" ? null : "date",
+                        )
+                      }
+                    >
+                      <span className="truncate">{quickActionDatePillLabel}</span>
+                      <ChevronDown
+                        className={cn(
+                          "h-4 w-4 shrink-0 transition-transform",
+                          quickActionPicker === "date" && "rotate-180",
+                        )}
+                      />
+                    </button>
+
+                    <button
+                      type="button"
+                      className="flex items-center gap-1.5 rounded-lg border border-border/40 bg-muted/60 px-3 py-1.5 text-sm font-medium transition-colors hover:bg-muted"
+                      onClick={() =>
+                        setQuickActionPicker((current) =>
+                          current === "start" ? null : "start",
+                        )
+                      }
+                    >
+                      <span>{format(quickActionSlot.start, "HH:mm")}</span>
+                      <ChevronDown
+                        className={cn(
+                          "h-4 w-4 shrink-0 transition-transform",
+                          quickActionPicker === "start" && "rotate-180",
+                        )}
+                      />
+                    </button>
+
+                    <div className="flex h-[38px] items-center justify-center text-sm font-medium text-muted-foreground">
+                      -
+                    </div>
+
+                    <button
+                      type="button"
+                      className="flex items-center gap-1.5 rounded-lg border border-border/40 bg-muted/60 px-3 py-1.5 text-sm font-medium transition-colors hover:bg-muted"
+                      onClick={() =>
+                        setQuickActionPicker((current) =>
+                          current === "end" ? null : "end",
+                        )
+                      }
+                    >
+                      <span>{format(quickActionSlot.end, "HH:mm")}</span>
+                      <ChevronDown
+                        className={cn(
+                          "h-4 w-4 shrink-0 transition-transform",
+                          quickActionPicker === "end" && "rotate-180",
+                        )}
+                      />
+                    </button>
+
+                    {quickActionPicker === "date" ? (
+                      <div className="col-span-4 animate-in fade-in-0 zoom-in-95 duration-150">
+                        <div className="rounded-xl border border-border/50 bg-background/90 p-2 shadow-sm">
+                          <DatePickerCalendar
+                            mode="single"
+                            selected={quickActionSlot.start}
+                            month={quickActionCalendarMonth}
+                            onMonthChange={setQuickActionCalendarMonth}
+                            onSelect={handleQuickActionDateSelect}
+                            fixedWeeks
+                            locale={tr}
+                            weekStartsOn={1}
+                            className="p-0"
+                            classNames={{
+                              months: "w-full",
+                              month: "w-full space-y-3",
+                              caption: "relative flex items-center justify-center pb-1 pt-1",
+                              caption_label: "text-sm font-semibold",
+                              nav: "flex items-center gap-1",
+                              nav_button:
+                                "h-7 w-7 rounded-full border border-border/50 bg-background/80 p-0 opacity-100 hover:bg-muted",
+                              nav_button_previous: "absolute left-0",
+                              nav_button_next: "absolute right-0",
+                              table: "w-full border-collapse",
+                              head_row: "flex w-full justify-between",
+                              head_cell:
+                                "w-9 text-center text-[11px] font-medium text-muted-foreground",
+                              row: "mt-1 flex w-full justify-between",
+                              cell: "h-9 w-9 p-0 text-center text-sm",
+                              day: "h-9 w-9 rounded-full p-0 text-sm font-medium transition-colors hover:bg-muted",
+                              day_today:
+                                "rounded-full bg-sky-500 text-white hover:bg-sky-500 hover:text-white",
+                              day_selected:
+                                "rounded-full bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground",
+                            }}
+                          />
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {quickActionPicker === "start" ? (
+                      <div className="col-start-2 col-span-3 animate-in fade-in-0 zoom-in-95 duration-150">
+                        <div className="w-[196px] rounded-xl border border-border/50 bg-background/95 p-2 shadow-sm">
+                          <Input
+                            value={quickActionStartInput}
+                            onChange={(event) => setQuickActionStartInput(event.target.value)}
+                            onBlur={() => handleQuickActionTimeInputCommit("start")}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter") {
+                                event.preventDefault();
+                                handleQuickActionTimeInputCommit("start");
+                              }
+                            }}
+                            inputMode="numeric"
+                            maxLength={5}
+                            placeholder="HH:mm"
+                            className="h-9 rounded-lg border-border/50 bg-muted/30 text-sm"
+                          />
+                          <div
+                            className="mt-2 max-h-44 overflow-y-auto pr-1"
+                            data-quick-action-time-list="start"
+                          >
+                            {quarterHourTimes.map((timeValue) => (
+                              <button
+                                key={timeValue}
+                                type="button"
+                                data-quick-action-time-value={timeValue}
+                                className={cn(
+                                  "flex w-full items-center rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-muted",
+                                  format(quickActionSlot.start, "HH:mm") === timeValue &&
+                                    "bg-primary text-primary-foreground hover:bg-primary",
+                                )}
+                                onClick={() =>
+                                  handleQuickActionTimeOptionSelect("start", timeValue)
+                                }
+                              >
+                                {timeValue}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {quickActionPicker === "end" ? (
+                      <div className="col-start-3 col-span-2 flex justify-end animate-in fade-in-0 zoom-in-95 duration-150">
+                        <div className="w-[196px] rounded-xl border border-border/50 bg-background/95 p-2 shadow-sm">
+                          <Input
+                            value={quickActionEndInput}
+                            onChange={(event) => setQuickActionEndInput(event.target.value)}
+                            onBlur={() => handleQuickActionTimeInputCommit("end")}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter") {
+                                event.preventDefault();
+                                handleQuickActionTimeInputCommit("end");
+                              }
+                            }}
+                            inputMode="numeric"
+                            maxLength={5}
+                            placeholder="HH:mm"
+                            className="h-9 rounded-lg border-border/50 bg-muted/30 text-sm"
+                          />
+                          <div
+                            className="mt-2 max-h-44 overflow-y-auto pr-1"
+                            data-quick-action-time-list="end"
+                          >
+                            {quickActionEndTimeOptions.map((timeValue) => (
+                              <button
+                                key={timeValue}
+                                type="button"
+                                data-quick-action-time-value={timeValue}
+                                className={cn(
+                                  "flex w-full items-center rounded-lg px-3 py-2 text-left text-sm transition-colors hover:bg-muted",
+                                  format(quickActionSlot.end, "HH:mm") === timeValue &&
+                                    "bg-primary text-primary-foreground hover:bg-primary",
+                                )}
+                                onClick={() =>
+                                  handleQuickActionTimeOptionSelect("end", timeValue)
+                                }
+                              >
+                                <span>{timeValue}</span>
+                                <span className="ml-auto text-xs text-muted-foreground">
+                                  {formatDuration(
+                                    timeToMinutes(timeValue) -
+                                      timeToMinutes(format(quickActionSlot.start, "HH:mm")),
+                                  )}
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-border/50 bg-background/80 p-3 text-sm">
+                    <div className="font-medium text-foreground">{quickActionSlot.dateLabel}</div>
+                    <div className="mt-1 text-muted-foreground">
+                      {quickActionSlot.timeLabel}
+                    </div>
+                  </div>
+                )}
+
+                <Badge
+                  variant="outline"
+                  className={cn("inline-flex rounded-full px-3 py-1", quickActionBadge.className)}
+                >
+                  {quickActionBadge.label}
+                </Badge>
+
+                {renderQuickActionWarning()}
+
+                {renderQuickActionActions()}
               </div>
-            </div>
-
-            <p className="text-xs text-muted-foreground">
-              {quickActionSlot.kind === "available"
-                ? "Bu panel secili musait aralik icin hizli aksiyon sunar. Mevcut musaitlige tasan secimler duzenleme formuna kapsamli prefill ile gider."
-                : quickActionSlot.kind === "blocked"
-                  ? "Bu aralikta gunluk istisna vardir. Duzenleme ve kaldirma istisna kaydi uzerinden yapilir."
-                  : "Bu aralik takvimde musaitlik disi gorunur. Musaitlik ekleme ayri panelde acilir."}
-            </p>
-
-            <div className="grid gap-2">
-              {quickActionSlot.kind === "available" ? (
-                <>
-                  <Button
-                    type="button"
-                    className="justify-start rounded-xl"
-                    onClick={handleQuickActionOpenAppointmentComposer}
-                  >
-                    <UserPlus className="mr-2 h-4 w-4" />
-                    Randevu olustur
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="justify-start rounded-xl border-border/70 bg-background/70"
-                    onClick={handleQuickActionOpenAvailabilityEditor}
-                  >
-                    <Pencil className="mr-2 h-4 w-4" />
-                    {availabilityQuickActionLabel}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="justify-start rounded-xl border-border/70 bg-background/70"
-                    onClick={handleQuickActionBlockTime}
-                  >
-                    <CircleOff className="mr-2 h-4 w-4" />
-                    Bu araliga blok istisnasi ekle
-                  </Button>
-                </>
-              ) : null}
-
-              {quickActionSlot.kind === "unavailable" ? (
-                <>
-                  <Button
-                    type="button"
-                    className="justify-start rounded-xl"
-                    onClick={handleQuickActionOpenAvailabilityEditor}
-                  >
-                    <Pencil className="mr-2 h-4 w-4" />
-                    {availabilityQuickActionLabel}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="justify-start rounded-xl border-border/70 bg-background/70"
-                    onClick={handleQuickActionBlockTime}
-                  >
-                    <CircleOff className="mr-2 h-4 w-4" />
-                    Bu araliga blok istisnasi ekle
-                  </Button>
-                </>
-              ) : null}
-
-              {quickActionSlot.kind === "blocked" ? (
-                <>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="justify-start rounded-xl border-border/70 bg-background/70"
-                    onClick={handleQuickActionEditOverride}
-                  >
-                    <Pencil className="mr-2 h-4 w-4" />
-                    Istisnayi panelde duzenle
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={quickActionCanRemoveDirectly ? "destructive" : "outline"}
-                    className={cn(
-                      "justify-start rounded-xl",
-                      !quickActionCanRemoveDirectly &&
-                        "border-border/70 bg-background/70",
-                    )}
-                    onClick={handleQuickActionRemoveOverride}
-                  >
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    {quickActionCanRemoveDirectly
-                      ? "Istisnayi kaldir"
-                      : "Istisnayi panelde gozden gecir"}
-                  </Button>
-                </>
-              ) : null}
-            </div>
-          </div>
-        </div>
-      ) : null}
+            </div>,
+            document.body,
+          )
+        : null}
 
       <Drawer
         open={Boolean(quickActionSlot?.open) && isMobile}
@@ -2410,14 +3488,12 @@ export function DoctorCalendar({
         <DrawerContent className="rounded-t-[28px]">
           <DrawerHeader>
             <DrawerTitle>
-              {quickActionSlot?.kind === "available"
-                ? "Secili musait aralik"
-                : quickActionSlot?.kind === "blocked"
-                  ? "Secili istisna"
-                  : "Secili aralik"}
+              {quickActionSlot?.kind === "blocked"
+                ? "Secili istisna"
+                : "Secili aralik"}
             </DrawerTitle>
             <DrawerDescription>
-              Secilen aralik ayrintisi burada acilir. Musaitlik duzenleme ayri paneldedir.
+              Secilen tarih ve saat araligi icin hizli aksiyonlar burada acilir.
             </DrawerDescription>
           </DrawerHeader>
 
@@ -2455,97 +3531,9 @@ export function DoctorCalendar({
                 </div>
               </div>
 
-              <p className="text-xs text-muted-foreground">
-                {quickActionSlot.kind === "available"
-                  ? "Bu panel secili musait aralik icin hizli aksiyon sunar. Mevcut musaitlige tasan secimler duzenleme formuna kapsamli prefill ile gider."
-                  : quickActionSlot.kind === "blocked"
-                    ? "Bu aralikta gunluk istisna vardir. Duzenleme ve kaldirma istisna kaydi uzerinden yapilir."
-                    : "Bu aralik takvimde musaitlik disi gorunur. Musaitlik ekleme ayri panelde acilir."}
-              </p>
+              {renderQuickActionWarning()}
 
-              <div className="grid gap-2">
-                {quickActionSlot.kind === "available" ? (
-                  <>
-                    <Button
-                      type="button"
-                      className="rounded-xl"
-                      onClick={handleQuickActionOpenAppointmentComposer}
-                    >
-                      <UserPlus className="mr-2 h-4 w-4" />
-                      Randevu olustur
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="rounded-xl"
-                      onClick={handleQuickActionOpenAvailabilityEditor}
-                    >
-                      <Pencil className="mr-2 h-4 w-4" />
-                      {availabilityQuickActionLabel}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="rounded-xl"
-                      onClick={handleQuickActionBlockTime}
-                    >
-                      <Ban className="mr-2 h-4 w-4" />
-                      Bu araliga blok istisnasi ekle
-                    </Button>
-                  </>
-                ) : null}
-
-                {quickActionSlot.kind === "unavailable" ? (
-                  <>
-                    <Button
-                      type="button"
-                      className="rounded-xl"
-                      onClick={handleQuickActionOpenAvailabilityEditor}
-                    >
-                      <Pencil className="mr-2 h-4 w-4" />
-                      {availabilityQuickActionLabel}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="rounded-xl"
-                      onClick={handleQuickActionBlockTime}
-                    >
-                      <Ban className="mr-2 h-4 w-4" />
-                      Bu araliga blok istisnasi ekle
-                    </Button>
-                  </>
-                ) : null}
-
-                {quickActionSlot.kind === "blocked" ? (
-                  <>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="rounded-xl"
-                      onClick={handleQuickActionEditOverride}
-                    >
-                      <Pencil className="mr-2 h-4 w-4" />
-                      Istisnayi panelde duzenle
-                    </Button>
-                    <Button
-                      type="button"
-                      variant={quickActionCanRemoveDirectly ? "destructive" : "outline"}
-                      className={cn(
-                        "rounded-xl",
-                        !quickActionCanRemoveDirectly &&
-                          "border-border/70 bg-background/70",
-                      )}
-                      onClick={handleQuickActionRemoveOverride}
-                    >
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      {quickActionCanRemoveDirectly
-                        ? "Istisnayi kaldir"
-                        : "Istisnayi panelde gozden gecir"}
-                    </Button>
-                  </>
-                ) : null}
-              </div>
+              {renderQuickActionActions("h-11 w-full rounded-xl font-medium")}
             </div>
           ) : null}
         </DrawerContent>
@@ -3039,7 +4027,14 @@ export function DoctorCalendar({
                               })}
                             </div>
                             <div className="flex items-center gap-2">
-                              <Badge variant="outline" className={badge.className}>
+                              <Badge
+                                variant="outline"
+                                style={{
+                                  backgroundColor: `${badge.color}26`,
+                                  borderColor: `${badge.color}26`,
+                                  color: badge.color,
+                                }}
+                              >
                                 {badge.label}
                               </Badge>
                               {override.type === "custom_hours" &&
