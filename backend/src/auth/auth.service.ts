@@ -21,7 +21,7 @@ import { ResetPasswordDto } from './dto/reset-password.dto';
 import { VerifyAuthOtpDto } from './dto/verify-auth-otp.dto';
 import { AuditService } from '../audit/audit.service';
 import { PatientsService } from '../patients/patients.service';
-import { users, patients, trustedDevices } from '../database/schema';
+import { clinics, users, patients, trustedDevices } from '../database/schema';
 
 interface RequestContext {
   ipAddress?: string;
@@ -461,8 +461,18 @@ export class AuthService {
 
   async findById(userId: string) {
     const [user] = await this.db
-      .select()
+      .select({
+        id: users.id,
+        email: users.email,
+        firstName: users.first_name,
+        lastName: users.last_name,
+        role: users.role,
+        clinicId: users.clinic_id,
+        avatar_url: users.avatar_url,
+        default_appointment_duration: clinics.default_appointment_duration,
+      })
       .from(users)
+      .leftJoin(clinics, eq(users.clinic_id, clinics.id))
       .where(eq(users.id, userId))
       .limit(1);
 
@@ -470,15 +480,7 @@ export class AuthService {
       throw new UnauthorizedException('User not found');
     }
 
-    return {
-      id: user.id,
-      email: user.email,
-      firstName: user.first_name,
-      lastName: user.last_name,
-      role: user.role,
-      clinicId: user.clinic_id,
-      avatar_url: user.avatar_url,
-    };
+    return user;
   }
 
   async googleLogin(googleUser: {

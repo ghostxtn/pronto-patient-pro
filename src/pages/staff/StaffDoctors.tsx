@@ -456,12 +456,6 @@ export default function StaffDoctors() {
     };
   }, [doctors, todayDateString]);
 
-  const { data: clinic } = useQuery({
-    queryKey: ["clinic", user?.clinic_id],
-    queryFn: async () => api.clinics.get(user!.clinic_id!),
-    enabled: Boolean(user?.clinic_id),
-  });
-
   useEffect(() => {
     if (!selectedDoctorId && doctors.length > 0) {
       setSelectedDoctorId(doctors[0].id);
@@ -646,7 +640,7 @@ export default function StaffDoctors() {
                   mode="staff"
                   doctorName={getDoctorDisplayName(selectedDoctor, t.doctor)}
                   specializationName={selectedDoctor.specialization?.name ?? t.specialtyNotSpecified}
-                  defaultDuration={clinic?.default_appointment_duration ?? 30}
+                  defaultDuration={user?.default_appointment_duration ?? 30}
                   calendarDate={calendarDate}
                   onCalendarDateChange={handleCalendarDateChange}
                   calendarView={calendarView}

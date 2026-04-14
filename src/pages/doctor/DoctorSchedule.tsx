@@ -32,12 +32,6 @@ export default function DoctorSchedule() {
     enabled: !!user,
   });
 
-  const { data: clinic } = useQuery({
-    queryKey: ["clinic", user?.clinic_id],
-    queryFn: async () => api.clinics.get(user!.clinic_id!),
-    enabled: Boolean(user?.clinic_id),
-  });
-
   useEffect(() => {
     console.debug("[doctor][schedule] query state", {
       userId: user?.id,
@@ -65,7 +59,7 @@ export default function DoctorSchedule() {
             <DoctorCalendar
               doctorId={doctorRecord.id}
               mode="doctor"
-              defaultDuration={clinic?.default_appointment_duration ?? 30}
+              defaultDuration={user?.default_appointment_duration ?? 30}
               calendarDate={calendarDate}
               onCalendarDateChange={setCalendarDate}
               calendarView={calendarView}

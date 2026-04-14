@@ -17,6 +17,7 @@ export interface User {
   role: AppRole;
   clinic_id: string | null;
   avatar_url: string | null;
+  default_appointment_duration?: number;
 }
 
 interface AuthContextType {
@@ -34,21 +35,23 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-function normalizeUser(input: any): User {
+function normalizeUser(raw: any): User {
   const validRoles: AppRole[] = ["owner", "admin", "staff", "doctor", "patient"];
-  const role = validRoles.includes(input.role) ? input.role : "patient";
+  const role = validRoles.includes(raw.role) ? raw.role : "patient";
 
   return {
-    id: input.id,
-    email: input.email,
+    id: raw.id,
+    email: raw.email,
     name:
-      input.name ||
-      input.full_name ||
-      [input.firstName, input.lastName].filter(Boolean).join(" ") ||
-      [input.first_name, input.last_name].filter(Boolean).join(" "),
+      raw.name ||
+      raw.full_name ||
+      [raw.firstName, raw.lastName].filter(Boolean).join(" ") ||
+      [raw.first_name, raw.last_name].filter(Boolean).join(" "),
     role,
-    clinic_id: input.clinic_id ?? input.clinicId ?? null,
-    avatar_url: input.avatar_url ?? input.avatarUrl ?? null,
+    clinic_id: raw.clinic_id ?? raw.clinicId ?? null,
+    avatar_url: raw.avatar_url ?? raw.avatarUrl ?? null,
+    default_appointment_duration:
+      raw.default_appointment_duration ?? raw.defaultAppointmentDuration ?? 30,
   };
 }
 

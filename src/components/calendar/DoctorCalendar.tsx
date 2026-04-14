@@ -345,13 +345,6 @@ const CALENDAR_START_HOUR = 6;
 const CALENDAR_END_HOUR = 23;
 const CALENDAR_START_MINUTES = CALENDAR_START_HOUR * 60;
 const CALENDAR_END_MINUTES = CALENDAR_END_HOUR * 60;
-const quarterHourTimes = Array.from(
-  {
-    length:
-      (QUICK_ACTION_TIME_MINUTES_END - QUICK_ACTION_TIME_MINUTES_START) / 15 + 1,
-  },
-  (_, index) => minutesToTime(QUICK_ACTION_TIME_MINUTES_START + index * 15),
-);
 
 const dayLabels: Record<number, string> = {
   0: "Pazar",
@@ -1145,6 +1138,16 @@ export function DoctorCalendar({
   )
     ? defaultDuration
     : 30;
+  const durationAlignedTimes = useMemo(() => {
+    const times: string[] = [];
+    const totalMinutes = 24 * 60;
+    for (let m = 0; m < totalMinutes; m += resolvedDefaultDuration) {
+      const h = Math.floor(m / 60).toString().padStart(2, "0");
+      const min = (m % 60).toString().padStart(2, "0");
+      times.push(`${h}:${min}`);
+    }
+    return times;
+  }, [resolvedDefaultDuration]);
 
   const [internalCurrentDate, setInternalCurrentDate] = useState(new Date());
   const [internalView, setInternalView] = useState<View>(Views.WEEK);
@@ -1768,13 +1771,19 @@ export function DoctorCalendar({
       type: "draft",
       resource: {
         durationMinutes: Math.max(
-          15,
+          resolvedDefaultDuration,
           differenceInMinutes(quickActionSlot.end, quickActionSlot.start),
         ),
         source: "selection",
       },
     };
-  }, [availabilityDraft, quickActionSlot, resolvedCurrentDate, resolvedView]);
+  }, [
+    availabilityDraft,
+    quickActionSlot,
+    resolvedCurrentDate,
+    resolvedDefaultDuration,
+    resolvedView,
+  ]);
 
   const selectedCalendarEvent = useMemo(
     () =>
@@ -2562,15 +2571,36 @@ export function DoctorCalendar({
     );
   }, [availabilitySlots, data?.appointments, quickActionSlot]);
 
+  const quickActionStartTimeOptions = useMemo(
+    () =>
+      durationAlignedTimes.filter((timeValue) => {
+        const minutes = timeToMinutes(timeValue);
+        return (
+          minutes >= QUICK_ACTION_TIME_MINUTES_START &&
+          minutes <= QUICK_ACTION_TIME_MINUTES_END
+        );
+      }),
+    [durationAlignedTimes],
+  );
+
   const quickActionEndTimeOptions = useMemo(() => {
     if (!quickActionSlot) {
-      return quarterHourTimes;
+      return quickActionStartTimeOptions;
     }
 
     const startMinutes = timeToMinutes(format(quickActionSlot.start, "HH:mm"));
+    const times: string[] = [];
 
-    return quarterHourTimes.filter((timeValue) => timeToMinutes(timeValue) > startMinutes);
-  }, [quickActionSlot]);
+    for (
+      let minutes = startMinutes + resolvedDefaultDuration;
+      minutes <= QUICK_ACTION_TIME_MINUTES_END;
+      minutes += resolvedDefaultDuration
+    ) {
+      times.push(minutesToTime(minutes));
+    }
+
+    return times;
+  }, [quickActionSlot, quickActionStartTimeOptions, resolvedDefaultDuration]);
 
   if (isLoading) {
     return (
@@ -2687,7 +2717,7 @@ export function DoctorCalendar({
     }
 
     const currentDuration = Math.max(
-      15,
+      resolvedDefaultDuration,
       differenceInMinutes(quickActionSlot.end, quickActionSlot.start),
     );
 
@@ -3205,7 +3235,7 @@ export function DoctorCalendar({
         popup
         culture="tr"
         step={resolvedDefaultDuration}
-        timeslots={2}
+        timeslots={1}
         min={setMinutes(setHours(new Date(), CALENDAR_START_HOUR), 0)}
         max={setMinutes(setHours(new Date(), CALENDAR_END_HOUR), 0)}
         drilldownView={Views.DAY}
@@ -3380,7 +3410,7 @@ export function DoctorCalendar({
                             className="mt-2 max-h-44 overflow-y-auto pr-1"
                             data-quick-action-time-list="start"
                           >
-                            {quarterHourTimes.map((timeValue) => (
+                            {quickActionStartTimeOptions.map((timeValue) => (
                               <button
                                 key={timeValue}
                                 type="button"
