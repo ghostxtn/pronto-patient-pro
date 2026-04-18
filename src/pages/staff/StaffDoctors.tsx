@@ -102,6 +102,7 @@ function DoctorSelectionList({
             onClick={() => onSelect(doctor.id)}
             className={cn(
               "block w-full max-w-full overflow-hidden rounded-[22px] border px-3 py-3 text-left transition-all duration-200",
+              !doctor.isAvailableToday && "opacity-50",
               isSelected
                 ? "border-primary/20 bg-primary/10 shadow-soft"
                 : "border-border/60 bg-background/70 hover:border-primary/15 hover:bg-accent/35",
@@ -109,12 +110,8 @@ function DoctorSelectionList({
           >
             <div className="flex items-start gap-2.5 overflow-hidden">
               <div
-                className={cn(
-                  "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border text-[11px] font-semibold",
-                  isSelected
-                    ? "border-primary/20 bg-primary/15 text-primary"
-                    : "border-border/60 bg-card text-foreground",
-                )}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[11px] font-semibold text-white"
+                style={{ backgroundColor: isSelected ? "#2563eb" : "#65a98f" }}
               >
                 {getDoctorInitials(doctor)}
               </div>
@@ -129,17 +126,18 @@ function DoctorSelectionList({
                       {doctor.specialization?.name ?? "Brans belirtilmedi"}
                     </p>
                   </div>
-                  <Badge
-                    variant="outline"
-                    className={cn(
-                      "shrink-0 rounded-full border px-1.5 py-0.5 text-[10px] font-medium leading-none",
-                      doctor.isAvailableToday
-                        ? "border-secondary/25 bg-secondary/10 text-secondary"
-                        : "border-border/60 bg-card text-muted-foreground",
-                    )}
-                  >
-                    {doctor.isAvailableToday ? "Aktif" : "Pasif"}
-                  </Badge>
+                  {doctor.isAvailableToday ? (
+                    <span
+                      style={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: "9999px",
+                        backgroundColor: "#16a34a",
+                        display: "inline-block",
+                        flexShrink: 0,
+                      }}
+                    />
+                  ) : null}
                 </div>
 
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -168,7 +166,10 @@ function SelectedDoctorContext({ doctor }: { doctor: DoctorSummary | null }) {
   return (
     <div className="rounded-[24px] border border-primary/15 bg-primary/5 px-4 py-4">
       <div className="flex items-start gap-3">
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] bg-card text-sm font-semibold text-primary shadow-soft">
+        <div
+          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg text-sm font-semibold text-white shadow-soft"
+          style={{ backgroundColor: "#65a98f" }}
+        >
           {getDoctorInitials(doctor)}
         </div>
 
@@ -242,8 +243,8 @@ function StaffSchedulerRail({
     <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-[32px] border border-border/60 bg-card/95 shadow-soft">
       <div className="min-h-0 flex-1 overflow-y-auto scrollbar-thin">
         <section className="border-b border-border/50 px-4 py-4">
-          <div className="mb-4">
-            <h2 className="text-lg font-display font-semibold text-foreground">Doktor Odağı</h2>
+          <div className="mb-2">
+            <h2 className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">Doktor Odağı</h2>
           </div>
 
           <div className="rounded-[26px] border border-border/60 bg-background/72 p-3 shadow-soft">

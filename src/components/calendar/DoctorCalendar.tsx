@@ -18,6 +18,7 @@ import {
   endOfWeek,
   format,
   getDay,
+  isSameDay,
   isToday,
   parse,
   setHours,
@@ -204,13 +205,9 @@ interface CalendarAppointmentResponse {
 
 interface CustomToolbarProps extends ToolbarProps<SchedulerEvent, object> {
   onManageAvailability: () => void;
+  onNewAppointment: () => void;
   calendarTitle: string;
   specializationName?: string;
-}
-
-interface CalendarHeaderProps {
-  date: Date;
-  onContextMenu: (event: React.MouseEvent<HTMLElement>, date: Date) => void;
 }
 
 interface AvailabilityDraftPreview {
@@ -836,6 +833,7 @@ const CustomToolbar = ({
   onView,
   view,
   onManageAvailability,
+  onNewAppointment,
 }: CustomToolbarProps) => (
   <div className="scheduler-toolbar-shell">
     <div className="scheduler-toolbar-row">
@@ -914,45 +912,167 @@ const CustomToolbar = ({
           <Settings2 className="mr-2 h-4 w-4" />
           Musaitlik paneli
         </Button>
+
+        <Button
+          type="button"
+          className="rounded-full px-4 text-sm font-medium text-white"
+          style={{
+            backgroundColor: "#2563eb",
+            minHeight: "36px",
+            boxShadow: "none",
+            border: "none",
+          }}
+          onClick={onNewAppointment}
+        >
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 16 16"
+            fill="none"
+            style={{ marginRight: 6 }}
+            aria-hidden="true"
+          >
+            <path
+              d="M8 3v10M3 8h10"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+            />
+          </svg>
+          Yeni Randevu
+        </Button>
       </div>
     </div>
   </div>
 );
 
-const CalendarHeader = ({ date, onContextMenu }: CalendarHeaderProps) => {
-  const currentDay = isToday(date);
+function AppointmentStatusIcon({ status }: { status: string }) {
+  if (status === "confirmed") {
+    return (
+      <span
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          width: 13,
+          height: 13,
+          borderRadius: "9999px",
+          backgroundColor: "#2563eb",
+          flexShrink: 0,
+        }}
+      >
+        <svg width="7" height="7" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+          <path
+            d="M2 5l2.5 2.5L8 3"
+            stroke="#fff"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </span>
+    );
+  }
+
+  if (status === "pending") {
+    return (
+      <span
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          width: 13,
+          height: 13,
+          borderRadius: "9999px",
+          backgroundColor: "#CA8A04",
+          flexShrink: 0,
+          fontSize: 8,
+          color: "#fff",
+          fontWeight: 700,
+          lineHeight: 1,
+        }}
+      >
+        !
+      </span>
+    );
+  }
+
+  if (status === "completed") {
+    return (
+      <span
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          width: 13,
+          height: 13,
+          borderRadius: "9999px",
+          backgroundColor: "#16A34A",
+          flexShrink: 0,
+        }}
+      >
+        <svg width="7" height="7" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+          <path
+            d="M2 5l2.5 2.5L8 3"
+            stroke="#fff"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </span>
+    );
+  }
 
   return (
-    <div
-      onContextMenu={(event) => onContextMenu(event, date)}
-      className={cn(
-        "scheduler-week-header",
-        currentDay && "scheduler-week-header-today",
-      )}
-      title="Sag tik: gunluk istisna ekle. Haftalik slotlar panelden duzenlenir."
-    >
-      <span className="scheduler-week-header-day">
-        {formatCalendarHeaderDay(date)}
-      </span>
-      <span className="scheduler-week-header-date">
-        {format(date, "d", { locale: tr })}
-      </span>
-    </div>
+    <span
+      style={{
+        width: 13,
+        height: 13,
+        borderRadius: "9999px",
+        backgroundColor: "#9CA3AF",
+        flexShrink: 0,
+        display: "inline-flex",
+      }}
+    />
   );
-};
+}
 
 function CalendarEventContent({
   event,
   title,
   view,
+  defaultDuration,
 }: {
   event: SchedulerEvent;
   title: string;
   view?: string;
+  defaultDuration: number;
 }) {
   const timeRange = `${format(event.start, "HH:mm")} - ${format(event.end, "HH:mm")}`;
 
-  if (event.type === "availability-surface" || event.type === "blackout-surface") {
+  if (event.type === "availability-surface") {
+    const durationMinutes =
+      (event.end.getTime() - event.start.getTime()) / 60000;
+
+    if (durationMinutes < 45) {
+      return null;
+    }
+
+    const timeLabel = `${format(event.start, "HH:mm")} – ${format(event.end, "HH:mm")}`;
+    const slotCount = Math.floor(durationMinutes / defaultDuration);
+
+    return (
+      <div className="avail-surface-label">
+        <span className="avail-surface-time">{timeLabel}</span>
+        {slotCount > 0 ? (
+          <span className="avail-surface-slots">{slotCount} slot</span>
+        ) : null}
+      </div>
+    );
+  }
+
+  if (event.type === "blackout-surface") {
     return null;
   }
 
@@ -1006,18 +1126,35 @@ function CalendarEventContent({
     );
   }
 
-  const accentDot =
-    event.type === "appointment" ? (
-      <span className="scheduler-event-accent-dot" aria-hidden="true" />
-    ) : null;
+  const appointmentStatus =
+    event.type === "appointment"
+      ? normalizeAppointmentStatus(
+          (event.resource as Appointment | undefined)?.status,
+        )
+      : null;
 
   return (
     <div className="scheduler-event-content-stack">
       <span className="scheduler-event-meta">{timeRange}</span>
       <span className="scheduler-event-title-row">
-        {accentDot}
+        {appointmentStatus ? (
+          <AppointmentStatusIcon status={appointmentStatus} />
+        ) : null}
         <span className="scheduler-event-title">{title}</span>
       </span>
+      {appointmentStatus === "pending" ? (
+        <span
+          style={{
+            fontSize: 9,
+            opacity: 0.75,
+            fontWeight: 500,
+            marginTop: 1,
+            display: "block",
+          }}
+        >
+          Onay bekliyor
+        </span>
+      ) : null}
     </div>
   );
 }
@@ -1856,6 +1993,20 @@ export function DoctorCalendar({
     setBlockActionState(null);
     setContextMenuState({ open: false, x: 0, y: 0 });
     clearCalendarSelection();
+  };
+
+  const openAppointmentComposer = (start: Date, end: Date) => {
+    const nextComposer: AppointmentComposerState = {
+      open: true,
+      start,
+      end,
+      dateLabel: format(start, "d MMMM yyyy, EEEE", { locale: tr }),
+      timeLabel: `${format(start, "HH:mm")} - ${format(end, "HH:mm")}`,
+    };
+
+    resetCalendarActiveState();
+    resetAppointmentComposerForm();
+    setAppointmentComposer(nextComposer);
   };
 
   const getBlockingOverrideForRange = (start: Date, end: Date) => {
@@ -2839,17 +2990,7 @@ export function DoctorCalendar({
       return;
     }
 
-    const nextComposer: AppointmentComposerState = {
-      open: true,
-      start: quickActionSlot.start,
-      end: quickActionSlot.end,
-      dateLabel: quickActionSlot.dateLabel,
-      timeLabel: quickActionSlot.timeLabel,
-    };
-
-    resetCalendarActiveState();
-    resetAppointmentComposerForm();
-    setAppointmentComposer(nextComposer);
+    openAppointmentComposer(quickActionSlot.start, quickActionSlot.end);
   };
 
   const handleQuickActionOpenAvailabilityEditor = (options?: {
@@ -3133,6 +3274,74 @@ export function DoctorCalendar({
     } as SlotInfo);
   };
 
+  const handleToolbarOpenAppointmentComposer = () => {
+    const candidateWindows = availabilityWindows.filter(
+      (window) =>
+        differenceInMinutes(window.end, window.start) >= resolvedDefaultDuration &&
+        window.end > new Date(),
+    );
+    const preferredWindow =
+      candidateWindows.find((window) => isSameDay(window.start, resolvedCurrentDate)) ??
+      candidateWindows[0];
+
+    if (!preferredWindow) {
+      resetCalendarActiveState();
+      setIsAvailabilitySheetOpen(true);
+      return;
+    }
+
+    openAppointmentComposer(
+      preferredWindow.start,
+      addMinutes(preferredWindow.start, resolvedDefaultDuration),
+    );
+  };
+
+  const renderWeekHeader = (date: Date) => {
+    const dayOfWeek = getDay(date);
+    const daySlotCount = availabilitySlots.filter(
+      (slot) => slot.day_of_week === dayOfWeek,
+    ).length;
+    const dayApptCount = events.filter(
+      (event) => event.type === "appointment" && isSameDay(event.start, date),
+    ).length;
+    const currentDay = isToday(date);
+
+    return (
+      <div
+        onContextMenu={(event) => handleHeaderContextMenu(event, date)}
+        className={cn(
+          "scheduler-week-header",
+          currentDay && "scheduler-week-header-today",
+        )}
+        title="Sag tik: gunluk istisna ekle."
+      >
+        <span className="scheduler-week-header-day">
+          {formatCalendarHeaderDay(date)}
+        </span>
+        <span className="scheduler-week-header-date">
+          {format(date, "d", { locale: tr })}
+        </span>
+        <span className="scheduler-week-header-meta">
+          {daySlotCount > 0 ? (
+            <>
+              <span>{daySlotCount} slot</span>
+              {dayApptCount > 0 ? (
+                <>
+                  <span className="scheduler-week-header-sep">·</span>
+                  <span className="scheduler-week-header-booked">
+                    {dayApptCount} dolu
+                  </span>
+                </>
+              ) : null}
+            </>
+          ) : (
+            <span style={{ color: "#d1d5db" }}>-</span>
+          )}
+        </span>
+      </div>
+    );
+  };
+
   return (
     <div
       ref={calendarShellRef}
@@ -3160,12 +3369,7 @@ export function DoctorCalendar({
           week: RollingWeekView,
         }}
         components={{
-          header: ({ date }) => (
-            <CalendarHeader
-              date={date}
-              onContextMenu={handleHeaderContextMenu}
-            />
-          ),
+          header: ({ date }) => renderWeekHeader(date),
           dateHeader: ({ date, label }) =>
             resolvedView === Views.MONTH ? (
               <div
@@ -3177,10 +3381,7 @@ export function DoctorCalendar({
                 {label}
               </div>
             ) : (
-              <CalendarHeader
-                date={date}
-                onContextMenu={handleHeaderContextMenu}
-              />
+              renderWeekHeader(date)
             ),
           toolbar: (toolbarProps) => (
             <CustomToolbar
@@ -3191,10 +3392,16 @@ export function DoctorCalendar({
                 resetCalendarActiveState();
                 setIsAvailabilitySheetOpen(true);
               }}
+              onNewAppointment={handleToolbarOpenAppointmentComposer}
             />
           ),
           event: ({ event, title }) => (
-            <CalendarEventContent event={event} title={title} view={resolvedView} />
+            <CalendarEventContent
+              event={event}
+              title={title}
+              view={resolvedView}
+              defaultDuration={resolvedDefaultDuration}
+            />
           ),
         }}
         localizer={localizer}
