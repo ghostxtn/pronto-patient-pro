@@ -329,50 +329,80 @@
 
   .scheduler-toolbar-shell {
     @apply flex flex-col gap-0;
+    padding-left: 16px;
   }
 
   .scheduler-toolbar-row {
-    @apply flex flex-col gap-3 lg:grid lg:grid-cols-[1fr_auto_1fr] lg:items-center;
+    @apply flex flex-wrap items-center gap-3;
+  }
+
+  .scheduler-toolbar-identity {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    flex-shrink: 0;
+  }
+
+  .scheduler-toolbar-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background-color: #2563eb;
+    color: white;
+    font-size: 14px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    overflow: hidden;
+  }
+
+  .scheduler-toolbar-identity-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .scheduler-toolbar-doctor-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: hsl(var(--foreground));
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .scheduler-toolbar-spec-badge {
+    font-size: 11px;
+    font-weight: 500;
+    color: hsl(var(--muted-foreground));
+    white-space: nowrap;
+  }
+
+  .scheduler-toolbar-center {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex: 1;
+    justify-content: center;
+    min-width: 0;
   }
 
   .scheduler-toolbar-title {
-    font-size: 22px;
-    font-weight: 500;
-    letter-spacing: -0.02em;
-    line-height: 1.2;
-    color: #374151;
-  }
-
-  .scheduler-toolbar-primary {
-    @apply flex min-w-0 items-center gap-1.5;
-  }
-
-  .scheduler-toolbar-title-row {
-    @apply flex min-w-0 items-center justify-center;
-  }
-
-  .scheduler-toolbar-context {
-    @apply hidden;
-  }
-
-  .scheduler-toolbar-context-name {
-    @apply truncate font-medium text-foreground;
-  }
-
-  .scheduler-toolbar-context-dot {
-    @apply h-1 w-1 shrink-0 rounded-full bg-border;
-  }
-
-  .scheduler-toolbar-context-specialization {
-    @apply truncate;
+    font-size: 15px;
+    font-weight: 600;
+    color: hsl(var(--foreground));
+    white-space: nowrap;
+    min-width: 160px;
+    text-align: center;
   }
 
   .scheduler-toolbar-actions {
-    @apply flex items-center justify-start gap-2 lg:justify-end;
-  }
-
-  .scheduler-nav-group {
-    @apply flex items-center gap-0.5;
+    @apply flex items-center justify-end gap-2;
+    flex-shrink: 0;
   }
 
   .scheduler-toolbar-today-button {
@@ -1058,7 +1088,16 @@
     }
 
     .scheduler-toolbar-title {
-      font-size: 18px;
+      font-size: 14px;
+      min-width: 0;
+    }
+
+    .scheduler-toolbar-center {
+      @apply w-full justify-between;
+    }
+
+    .scheduler-toolbar-identity {
+      @apply w-full;
     }
 
     .scheduler-toolbar-today-button,

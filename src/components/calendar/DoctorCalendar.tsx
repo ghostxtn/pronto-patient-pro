@@ -205,7 +205,6 @@ interface CalendarAppointmentResponse {
 
 interface CustomToolbarProps extends ToolbarProps<SchedulerEvent, object> {
   onManageAvailability: () => void;
-  onNewAppointment: () => void;
   calendarTitle: string;
   specializationName?: string;
 }
@@ -833,46 +832,55 @@ const CustomToolbar = ({
   onView,
   view,
   onManageAvailability,
-  onNewAppointment,
+  calendarTitle,
+  specializationName,
 }: CustomToolbarProps) => (
   <div className="scheduler-toolbar-shell">
     <div className="scheduler-toolbar-row">
-      <div className="scheduler-toolbar-primary">
-        <div className="scheduler-nav-group">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="scheduler-toolbar-nav-button"
-            onClick={() => onNavigate("PREV")}
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="scheduler-toolbar-nav-button"
-            onClick={() => onNavigate("NEXT")}
-          >
-            <ChevronRight className="h-4 w-4" />
-          </Button>
+      <div className="scheduler-toolbar-identity">
+        {calendarTitle ? (
+          <div className="scheduler-toolbar-avatar">
+            {calendarTitle.charAt(0).toUpperCase()}
+          </div>
+        ) : null}
+        <div className="scheduler-toolbar-identity-text">
+          <span className="scheduler-toolbar-doctor-name">{calendarTitle}</span>
+          {specializationName ? (
+            <span className="scheduler-toolbar-spec-badge">{specializationName}</span>
+          ) : null}
         </div>
+      </div>
 
+      <div className="scheduler-toolbar-center">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="scheduler-toolbar-nav-button"
+          onClick={() => onNavigate("PREV")}
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </Button>
+        <span className="scheduler-toolbar-title">
+          {formatToolbarRangeLabel(date, view)}
+        </span>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="scheduler-toolbar-nav-button"
+          onClick={() => onNavigate("NEXT")}
+        >
+          <ChevronRight className="h-4 w-4" />
+        </Button>
         <Button
           type="button"
           variant="ghost"
           className="scheduler-toolbar-today-button"
           onClick={() => onNavigate("TODAY")}
         >
-          Bugun
+          Bugün
         </Button>
-      </div>
-
-      <div className="scheduler-toolbar-title-row">
-        <h3 className="scheduler-toolbar-title">
-          {formatToolbarRangeLabel(date, view)}
-        </h3>
       </div>
 
       <div className="scheduler-toolbar-actions">
@@ -911,35 +919,6 @@ const CustomToolbar = ({
         >
           <Settings2 className="mr-2 h-4 w-4" />
           Musaitlik paneli
-        </Button>
-
-        <Button
-          type="button"
-          className="rounded-full px-4 text-sm font-medium text-white"
-          style={{
-            backgroundColor: "#2563eb",
-            minHeight: "36px",
-            boxShadow: "none",
-            border: "none",
-          }}
-          onClick={onNewAppointment}
-        >
-          <svg
-            width="12"
-            height="12"
-            viewBox="0 0 16 16"
-            fill="none"
-            style={{ marginRight: 6 }}
-            aria-hidden="true"
-          >
-            <path
-              d="M8 3v10M3 8h10"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              strokeLinecap="round"
-            />
-          </svg>
-          Yeni Randevu
         </Button>
       </div>
     </div>
@@ -1695,6 +1674,17 @@ export function DoctorCalendar({
     },
     onError: (error: unknown) => {
       toast.error(error instanceof Error ? error.message : "Randevu olusturulamadi");
+    },
+  });
+
+  const updateAppointmentStatus = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: string }) =>
+      api.appointments.updateStatus(id, status),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["doctor-calendar", doctorId] });
+      setSelectedAppointment((prev) =>
+        prev ? { ...prev, status: variables.status } : prev,
+      );
     },
   });
 
@@ -3274,28 +3264,6 @@ export function DoctorCalendar({
     } as SlotInfo);
   };
 
-  const handleToolbarOpenAppointmentComposer = () => {
-    const candidateWindows = availabilityWindows.filter(
-      (window) =>
-        differenceInMinutes(window.end, window.start) >= resolvedDefaultDuration &&
-        window.end > new Date(),
-    );
-    const preferredWindow =
-      candidateWindows.find((window) => isSameDay(window.start, resolvedCurrentDate)) ??
-      candidateWindows[0];
-
-    if (!preferredWindow) {
-      resetCalendarActiveState();
-      setIsAvailabilitySheetOpen(true);
-      return;
-    }
-
-    openAppointmentComposer(
-      preferredWindow.start,
-      addMinutes(preferredWindow.start, resolvedDefaultDuration),
-    );
-  };
-
   const renderWeekHeader = (date: Date) => {
     const dayOfWeek = getDay(date);
     const daySlotCount = availabilitySlots.filter(
@@ -3347,19 +3315,6 @@ export function DoctorCalendar({
       ref={calendarShellRef}
       className="scheduler-calendar-shell flex h-full min-h-0 flex-col overflow-hidden rounded-[34px] border border-border/60 bg-card/95 shadow-soft"
     >
-      {mode === "staff" ? (
-        <div className="scheduler-surface-context shrink-0">
-          <div className="min-w-0">
-            <h2 className="scheduler-surface-context-title">{surfaceContextTitle}</h2>
-          </div>
-          {specializationName ? (
-            <Badge variant="outline" className="scheduler-surface-context-badge">
-              {specializationName}
-            </Badge>
-          ) : null}
-        </div>
-      ) : null}
-
       <BigCalendar<SchedulerEvent>
         className="scheduler-calendar min-h-0 flex-1 overflow-hidden"
         views={{
@@ -3392,7 +3347,6 @@ export function DoctorCalendar({
                 resetCalendarActiveState();
                 setIsAvailabilitySheetOpen(true);
               }}
-              onNewAppointment={handleToolbarOpenAppointmentComposer}
             />
           ),
           event: ({ event, title }) => (
@@ -4137,53 +4091,56 @@ export function DoctorCalendar({
         }}
       >
         <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-lg">
-          <SheetHeader>
-            <SheetTitle>Musaitlik paneli</SheetTitle>
-            <SheetDescription>
-              Haftalik musaitlik slotlarini burada duzenleyebilir, aktiflik durumunu degistirebilir veya yeni slot ekleyebilirsiniz. Takvimdeki yesil alanlar yalnizca gosterimdir.
+          <SheetHeader className="pb-2">
+            <SheetTitle className="text-lg font-semibold">Musaitlik paneli</SheetTitle>
+            <SheetDescription className="text-sm text-muted-foreground">
+              Haftalik musaitlik slotlarini burada duzenleyebilir, aktiflik durumunu
+              degistirebilir veya yeni slot ekleyebilirsiniz. Takvimdeki yesil alanlar
+              yalnizca gosterimdir.
             </SheetDescription>
           </SheetHeader>
 
-          <div className="mt-6 space-y-4">
-            <div className="space-y-4 rounded-2xl border border-border/70 bg-background p-4">
+          <div className="mt-6 space-y-6">
+            <section className="space-y-3">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <h3 className="font-semibold">Haftalik Slotlar</h3>
-                  <p className="text-sm text-muted-foreground">
+                  <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                    Haftalik Slotlar
+                  </h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">
                     Duzenli calisma saatlerinizi yonetin.
                   </p>
                 </div>
                 <Button
                   type="button"
-                  className="rounded-xl"
-                  onClick={() =>
-                    setAvailabilityModal({
-                      open: true,
-                      mode: "create",
-                    })
-                  }
+                  size="sm"
+                  className="rounded-xl text-sm"
+                  onClick={() => setAvailabilityModal({ open: true, mode: "create" })}
                 >
                   + Yeni Slot Ekle
                 </Button>
               </div>
 
               {sortedAvailabilitySlots.length > 0 ? (
-                <div className="space-y-3">
+                <div className="space-y-2">
                   {sortedAvailabilitySlots.map((slot) => (
                     <div
                       key={slot.id}
-                      className="rounded-2xl border border-border/70 bg-background p-4"
+                      className="flex items-center justify-between gap-3 rounded-2xl border border-border/60 bg-muted/30 px-4 py-3"
                     >
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <div className="font-semibold">{dayLabels[slot.day_of_week]}</div>
-                          <div className="text-sm text-muted-foreground">
-                            {formatTimeRange(slot.start_time, slot.end_time)}
-                          </div>
-                          <div className="text-sm text-muted-foreground">
-                            {slot.slot_duration} dakika
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-xs font-bold text-primary">
+                          {dayLabels[slot.day_of_week]?.slice(0, 3)}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-sm font-semibold leading-tight">{dayLabels[slot.day_of_week]}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {formatTimeRange(slot.start_time, slot.end_time)} · {slot.slot_duration} dk
                           </div>
                         </div>
+                      </div>
+
+                      <div className="flex shrink-0 items-center gap-2">
                         <Switch
                           checked={slot.is_active}
                           onCheckedChange={(checked) => {
@@ -4191,75 +4148,59 @@ export function DoctorCalendar({
                               .update(slot.id, { isActive: checked })
                               .then(() => {
                                 toast.success("Musaitlik durumu guncellendi");
-                                return queryClient.invalidateQueries({
-                                  queryKey: ["availability", doctorId],
-                                });
+                                return queryClient.invalidateQueries({ queryKey: ["availability", doctorId] });
                               })
-                              .then(() =>
-                                queryClient.invalidateQueries({
-                                  queryKey: ["doctor-calendar", doctorId],
-                                }),
-                              )
+                              .then(() => queryClient.invalidateQueries({ queryKey: ["doctor-calendar", doctorId] }))
                               .catch((error: unknown) => {
-                                toast.error(
-                                  error instanceof Error
-                                    ? error.message
-                                    : "Musaitlik durumu guncellenemedi",
-                                );
+                                toast.error(error instanceof Error ? error.message : "Musaitlik durumu guncellenemedi");
                               });
                           }}
                           aria-label={`${dayLabels[slot.day_of_week]} musaitlik durumu`}
                         />
-                      </div>
-
-                      <div className="mt-4 flex items-center gap-2">
                         <Button
                           type="button"
-                          variant="outline"
-                          className="rounded-xl"
-                          onClick={() =>
-                            setAvailabilityModal({
-                              open: true,
-                              mode: "edit",
-                              slot,
-                            })
-                          }
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 rounded-xl text-muted-foreground hover:text-foreground"
+                          onClick={() => setAvailabilityModal({ open: true, mode: "edit", slot })}
                         >
-                          <Pencil className="mr-2 h-4 w-4" />
-                          Duzenle
+                          <Pencil className="h-3.5 w-3.5" />
                         </Button>
                         <Button
                           type="button"
-                          variant="destructive"
-                          className="rounded-xl"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 rounded-xl text-destructive/70 hover:text-destructive hover:bg-destructive/10"
                           onClick={() => setSlotToDelete(slot)}
                         >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Sil
+                          <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       </div>
                     </div>
                   ))}
                 </div>
               ) : (
-                <div className="rounded-2xl border border-dashed p-4 text-sm text-muted-foreground">
-                  Henuz tanimli musaitlik slotu bulunmuyor.
+                <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed py-8 text-center">
+                  <p className="text-sm text-muted-foreground">Henuz tanimli musaitlik slotu bulunmuyor.</p>
                 </div>
               )}
-            </div>
+            </section>
 
-            <div className="space-y-4 rounded-2xl border border-border/70 bg-background p-4">
+            <section className="space-y-3">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <h3 className="font-semibold">Istisnalar</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Son 30 gun ve gelecek icin planlanan gunluk kapanis ve bloklu zaman istisnalari.
+                  <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                    Istisnalar
+                  </h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Son 30 gun ve gelecek icin kapanis ve bloklu zaman istisnalari.
                   </p>
                 </div>
                 <Button
                   type="button"
                   variant="outline"
-                  className="rounded-xl"
+                  size="sm"
+                  className="rounded-xl text-sm"
                   onClick={() =>
                     setOverrideModal({
                       open: true,
@@ -4274,89 +4215,80 @@ export function DoctorCalendar({
               </div>
 
               {isOverrideListLoading ? (
-                <div className="space-y-3">
+                <div className="space-y-2">
                   {[1, 2, 3].map((item) => (
-                    <Skeleton key={item} className="h-24 rounded-2xl" />
+                    <Skeleton key={item} className="h-16 rounded-2xl" />
                   ))}
                 </div>
               ) : sortedOverrides.length > 0 ? (
-                <div className="space-y-3">
+                <div className="space-y-2">
                   {sortedOverrides.map((override) => {
                     const badge = getOverrideBadge(override.type);
-
                     return (
                       <div
                         key={override.id}
-                        className="rounded-2xl border border-border/70 bg-background p-4"
+                        className="flex items-center justify-between gap-3 rounded-2xl border border-border/60 bg-muted/30 px-4 py-3"
                       >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="space-y-2">
-                            <div className="font-semibold">
-                              {format(parseDateOnly(override.date), "d MMMM yyyy", {
-                                locale: tr,
-                              })}
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div
+                            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-xs font-bold"
+                            style={{ backgroundColor: `${badge.color}18`, color: badge.color }}
+                          >
+                            {format(parseDateOnly(override.date), "dd", { locale: tr })}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="text-sm font-semibold leading-tight">
+                              {format(parseDateOnly(override.date), "d MMMM yyyy", { locale: tr })}
                             </div>
-                            <div className="flex items-center gap-2">
-                              <Badge
-                                variant="outline"
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              <span
+                                className="rounded-full px-2 py-0.5 text-[10px] font-medium"
                                 style={{
-                                  backgroundColor: `${badge.color}26`,
-                                  borderColor: `${badge.color}26`,
+                                  backgroundColor: `${badge.color}18`,
                                   color: badge.color,
                                 }}
                               >
                                 {badge.label}
-                              </Badge>
-                              {override.type === "custom_hours" &&
-                              override.start_time &&
-                              override.end_time ? (
-                                <span className="text-sm text-muted-foreground">
-                                  {formatTimeRange(
-                                    override.start_time,
-                                    override.end_time,
-                                  )}
+                              </span>
+                              {override.type === "custom_hours" && override.start_time && override.end_time ? (
+                                <span className="text-xs text-muted-foreground">
+                                  {formatTimeRange(override.start_time, override.end_time)}
                                 </span>
                               ) : null}
                             </div>
                           </div>
+                        </div>
 
-                          <div className="flex items-center gap-2">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              className="rounded-xl"
-                              onClick={() =>
-                                setOverrideModal({
-                                  open: true,
-                                  mode: "edit",
-                                  override,
-                                })
-                              }
-                            >
-                              <Pencil className="mr-2 h-4 w-4" />
-                              Duzenle
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="destructive"
-                              className="rounded-xl"
-                              onClick={() => setOverrideToDelete(override)}
-                            >
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              Sil
-                            </Button>
-                          </div>
+                        <div className="flex shrink-0 items-center gap-1">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 rounded-xl text-muted-foreground hover:text-foreground"
+                            onClick={() => setOverrideModal({ open: true, mode: "edit", override })}
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 rounded-xl text-destructive/70 hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => setOverrideToDelete(override)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
                         </div>
                       </div>
                     );
                   })}
                 </div>
               ) : (
-                <div className="rounded-2xl border border-dashed p-4 text-sm text-muted-foreground">
-                  Tanimli istisna bulunmuyor.
+                <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed py-8 text-center">
+                  <p className="text-sm text-muted-foreground">Tanimli istisna bulunmuyor.</p>
                 </div>
               )}
-            </div>
+            </section>
           </div>
         </SheetContent>
       </Sheet>
@@ -4432,6 +4364,7 @@ export function DoctorCalendar({
         }}
         mode={availabilityModal.mode}
         doctorId={doctorId}
+        defaultDuration={resolvedDefaultDuration}
         initialDayOfWeek={availabilityModal.dayOfWeek}
         initialStartTime={availabilityModal.startTime}
         initialEndTime={availabilityModal.endTime}
@@ -4453,6 +4386,7 @@ export function DoctorCalendar({
         }}
         mode={overrideModal.mode}
         doctorId={doctorId}
+        defaultDuration={resolvedDefaultDuration}
         initialDate={overrideModal.initialDate}
         initialType={overrideModal.initialType}
         override={overrideModal.override}
@@ -4470,6 +4404,9 @@ export function DoctorCalendar({
         appointment={selectedAppointment}
         open={Boolean(selectedAppointment)}
         onClose={resetCalendarActiveState}
+        onStatusUpdate={(id, status) =>
+          updateAppointmentStatus.mutate({ id, status })
+        }
       />
     </div>
   );

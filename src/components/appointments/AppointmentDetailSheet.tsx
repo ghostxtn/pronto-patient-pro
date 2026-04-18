@@ -167,10 +167,61 @@ export function AppointmentDetailSheet({
                 </div>
               ) : null}
 
-              {appointment.status === "confirmed" && onStatusUpdate ? (
-                <Button className="w-full rounded-xl" onClick={() => onStatusUpdate(appointment.id, "completed")}>
-                  <CheckCircle2 className="mr-2 h-4 w-4" /> {t.markCompleted}
-                </Button>
+              {onStatusUpdate ? (
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    Durumu Güncelle
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      { key: "pending", label: "Bekleyen", color: "#f59e0b" },
+                      { key: "confirmed", label: "Onaylanan", color: "#2563eb" },
+                      { key: "completed", label: "Tamamlanan", color: "#16a34a" },
+                      { key: "cancelled", label: "İptal Edilen", color: "#dc2626" },
+                    ].map(({ key, label, color }) => {
+                      const isActive = appointment.status === key;
+
+                      return (
+                        <button
+                          key={key}
+                          type="button"
+                          disabled={isActive}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onStatusUpdate(appointment.id, key);
+                          }}
+                          className={cn(
+                            "flex items-center justify-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-medium transition-all",
+                            isActive
+                              ? "cursor-default opacity-100"
+                              : "opacity-60 hover:opacity-90",
+                          )}
+                          style={
+                            isActive
+                              ? {
+                                  backgroundColor: `${color}18`,
+                                  borderColor: `${color}50`,
+                                  color,
+                                }
+                              : {
+                                  backgroundColor: "transparent",
+                                  borderColor: "var(--border)",
+                                  color: "var(--muted-foreground)",
+                                }
+                          }
+                        >
+                          {isActive ? (
+                            <span
+                              className="h-1.5 w-1.5 rounded-full"
+                              style={{ backgroundColor: color }}
+                            />
+                          ) : null}
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
               ) : null}
 
               {!isStaff ? (
