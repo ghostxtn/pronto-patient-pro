@@ -2852,7 +2852,7 @@ export function DoctorCalendar({
     }
 
     handleQuickActionOpenAvailabilityEditor({
-      startTime: primarySlot.start_time,
+      startTime: primarySlot.start_time.slice(0, 5),
       endTime: format(quickActionSlot.end, "HH:mm"),
     });
   };
