@@ -361,12 +361,28 @@ function formatTimeRange(startTime: string, endTime: string) {
 }
 
 function getAvailabilitySortValue(slot: AvailabilitySlot) {
+  if (slot.specific_date) {
+    return Number.MAX_SAFE_INTEGER;
+  }
+
   const normalizedDay = slot.day_of_week === 0 ? 7 : slot.day_of_week;
   return (
     normalizedDay * 10000 +
     Number(slot.start_time.slice(0, 2)) * 100 +
     Number(slot.start_time.slice(3, 5))
   );
+}
+
+function isWeeklyAvailabilitySlot(slot: AvailabilitySlot) {
+  return !slot.specific_date;
+}
+
+function matchesAvailabilitySlotDate(slot: AvailabilitySlot, date: Date) {
+  if (slot.specific_date) {
+    return slot.specific_date === toApiDate(date);
+  }
+
+  return slot.day_of_week === date.getDay();
 }
 
 function getOverrideBadge(type: AvailabilityOverride["type"]) {
@@ -544,7 +560,7 @@ function computeSlotStatus(
 
   const mergedAvailabilityRanges = mergeMinuteRanges(
     availabilitySlots
-      .filter((slot) => slot.is_active && slot.day_of_week === date.getDay())
+      .filter((slot) => slot.is_active && matchesAvailabilitySlotDate(slot, date))
       .map((slot) =>
         normalizeMinuteRange(
           timeToMinutes(slot.start_time),
@@ -1383,6 +1399,31 @@ export function DoctorCalendar({
     },
   });
 
+  const createQuickAvailability = useMutation({
+    mutationFn: async (payload: {
+      specificDate: string;
+      startTime: string;
+      endTime: string;
+    }) =>
+      api.availability.create({
+        doctorId,
+        specificDate: payload.specificDate,
+        startTime: payload.startTime,
+        endTime: payload.endTime,
+      }),
+    onSuccess: async () => {
+      toast.success("Musaitlik eklendi");
+      resetCalendarActiveState();
+      await queryClient.invalidateQueries({ queryKey: ["availability", doctorId] });
+      await queryClient.refetchQueries({ queryKey: ["availability", doctorId] });
+      await queryClient.invalidateQueries({ queryKey: ["doctor-calendar", doctorId] });
+      await queryClient.refetchQueries({ queryKey: ["doctor-calendar", doctorId] });
+    },
+    onError: (error: unknown) => {
+      toast.error(error instanceof Error ? error.message : "Musaitlik eklenemedi");
+    },
+  });
+
   const createQuickBlock = useMutation({
     mutationFn: async (payload: { start: Date; end: Date }) => {
       const date = toApiDate(payload.start);
@@ -1533,7 +1574,7 @@ export function DoctorCalendar({
     ) {
       const dateKey = toApiDate(currentDay);
       const daySlots = activeSlots.filter(
-        (slot) => slot.day_of_week === currentDay.getDay(),
+        (slot) => matchesAvailabilitySlotDate(slot, currentDay),
       );
       const dayOverrides = (data?.overrides ?? []).filter(
         (override) => override.date === dateKey,
@@ -1690,7 +1731,7 @@ export function DoctorCalendar({
 
   const sortedAvailabilitySlots = useMemo(
     () =>
-      [...availabilitySlots].sort(
+      availabilitySlots.filter(isWeeklyAvailabilitySlot).sort(
         (left, right) => getAvailabilitySortValue(left) - getAvailabilitySortValue(right),
       ),
     [availabilitySlots],
@@ -2819,28 +2860,10 @@ export function DoctorCalendar({
       return;
     }
 
-    const availabilityTarget = quickActionSlot.availabilityTarget;
-    const defaultStartTime =
-      availabilityTarget?.shouldPrefillExpand || !availabilityTarget?.primarySlot
-        ? format(availabilityTarget?.prefillStart ?? quickActionSlot.start, "HH:mm")
-        : undefined;
-    const defaultEndTime =
-      availabilityTarget?.shouldPrefillExpand || !availabilityTarget?.primarySlot
-        ? format(availabilityTarget?.prefillEnd ?? quickActionSlot.end, "HH:mm")
-        : undefined;
-    const nextModalState = {
-      open: true as const,
-      mode: availabilityTarget?.primarySlot ? ("edit" as const) : ("create" as const),
-      dayOfWeek: availabilityTarget?.primarySlot?.day_of_week ?? quickActionSlot.dayOfWeek,
-      startTime: options?.startTime ?? defaultStartTime,
-      endTime: options?.endTime ?? defaultEndTime,
-      slotDuration: availabilityTarget?.slotDuration,
-      slot: availabilityTarget?.primarySlot ?? undefined,
-    };
-
-    resetCalendarActiveState();
-    setAvailabilityModal({
-      ...nextModalState,
+    createQuickAvailability.mutate({
+      specificDate: format(quickActionSlot.start, "yyyy-MM-dd"),
+      startTime: options?.startTime ?? format(quickActionSlot.start, "HH:mm"),
+      endTime: options?.endTime ?? format(quickActionSlot.end, "HH:mm"),
     });
   };
 
@@ -2930,8 +2953,13 @@ export function DoctorCalendar({
               "justify-center bg-emerald-600 text-white hover:bg-emerald-700",
             )}
             onClick={handleQuickActionOpenAvailabilityEditor}
+            disabled={createQuickAvailability.isPending}
           >
-            <Plus className="h-4 w-4" />
+            {createQuickAvailability.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Plus className="h-4 w-4" />
+            )}
             Musaitlik ekle
           </Button>
         </div>
@@ -2948,8 +2976,13 @@ export function DoctorCalendar({
               "justify-center bg-emerald-600 text-white hover:bg-emerald-700",
             )}
             onClick={handleQuickActionExpandAvailability}
+            disabled={createQuickAvailability.isPending}
           >
-            <Expand className="h-4 w-4" />
+            {createQuickAvailability.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Expand className="h-4 w-4" />
+            )}
             Musaitligi genislet
           </Button>
           <Button

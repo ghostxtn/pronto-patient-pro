@@ -1,4 +1,5 @@
 import {
+  IsDateString,
   IsInt,
   IsOptional,
   IsString,
@@ -12,10 +13,15 @@ export class CreateAvailabilityDto {
   @IsUUID()
   doctorId!: string;
 
+  @IsOptional()
   @IsInt()
   @Min(0)
   @Max(6)
-  dayOfWeek!: number;
+  dayOfWeek?: number;
+
+  @IsOptional()
+  @IsDateString()
+  specificDate?: string;
 
   @IsString()
   @Matches(/^([01]\d|2[0-3]):[0-5]\d$/, {

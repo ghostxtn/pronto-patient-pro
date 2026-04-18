@@ -57,7 +57,12 @@ export default function StaffDashboard() {
       const doctorAvailability = await Promise.all(
         doctors.map(async (doctor: any) => {
           const slots = await api.availability.listByDoctor(doctor.id);
-          const todaySlots = slots.filter((slot: any) => slot.day_of_week === todayDayOfWeek && slot.is_active !== false);
+          const todaySlots = slots.filter(
+            (slot: any) =>
+              slot.is_active !== false &&
+              (slot.specific_date === today ||
+                (!slot.specific_date && slot.day_of_week === todayDayOfWeek)),
+          );
 
           return {
             id: doctor.id,

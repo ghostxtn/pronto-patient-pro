@@ -458,10 +458,11 @@ const api = {
       ),
     create: (data: {
       doctorId: string;
-      dayOfWeek: number;
+      dayOfWeek?: number;
+      specificDate?: string;
       startTime: string;
       endTime: string;
-      slotDuration: number;
+      slotDuration?: number;
     }) =>
       request<any>("/availability", {
         method: "POST",

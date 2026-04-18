@@ -29,16 +29,27 @@ export function availabilityToEvents(
 ): CalendarEvent[] {
   const sundayBase = startOfWeek(subDays(weekStart, 1), { weekStartsOn: 0 });
 
-  return slots.map((slot) => {
-    const slotDate = addDays(sundayBase, slot.day_of_week);
-    return {
-      id: `availability-${slot.id}-${format(slotDate, "yyyy-MM-dd")}`,
-      title: "Musait",
-      start: parseTimeToDate(slotDate, slot.start_time),
-      end: parseTimeToDate(slotDate, slot.end_time),
-      type: "availability",
-      resource: slot,
-    };
+  return slots.flatMap((slot) => {
+    const slotDate = slot.specific_date
+      ? parseDateOnly(slot.specific_date)
+      : Number.isInteger(slot.day_of_week)
+        ? addDays(sundayBase, slot.day_of_week)
+        : null;
+
+    if (!slotDate) {
+      return [];
+    }
+
+    return [
+      {
+        id: `availability-${slot.id}-${format(slotDate, "yyyy-MM-dd")}`,
+        title: "Musait",
+        start: parseTimeToDate(slotDate, slot.start_time),
+        end: parseTimeToDate(slotDate, slot.end_time),
+        type: "availability" as const,
+        resource: slot,
+      },
+    ];
   });
 }
 
