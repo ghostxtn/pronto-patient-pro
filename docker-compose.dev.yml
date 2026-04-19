@@ -1,0 +1,12 @@
+# DEV ONLY — Do NOT use in production.
+# Run with: docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+# Required for: drizzle-kit migrations, direct DB access from host
+services:
+  postgres:
+    ports:
+      - "127.0.0.1:5432:5432"
+  api:
+    environment:
+      NODE_ENV: development
+      APP_ENV: development
+      FRONTEND_URL: http://test-klinik.localhost

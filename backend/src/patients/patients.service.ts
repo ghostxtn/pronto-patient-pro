@@ -1,4 +1,4 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
 import { patients } from '../database/schema';
 import { EncryptionService } from '../encryption/encryption.service';
@@ -7,6 +7,7 @@ import { UpdatePatientDto } from './dto/update-patient.dto';
 
 @Injectable()
 export class PatientsService {
+  private readonly logger = new Logger(PatientsService.name);
   private readonly ENCRYPTED_FIELDS = [
     'first_name',
     'last_name',
@@ -20,6 +21,21 @@ export class PatientsService {
     @Inject('DRIZZLE') private readonly db: any,
     private readonly encryptionService: EncryptionService,
   ) {}
+
+  private omitClinicId<T extends { clinic_id?: unknown }>(row: T) {
+    const { clinic_id: _cid, ...rest } = row;
+    return rest;
+  }
+
+  private redactEncryptedFields<T extends Record<string, any>>(row: T) {
+    const redacted = { ...row } as Record<string, any>;
+    for (const field of this.ENCRYPTED_FIELDS) {
+      if (redacted[field]) {
+        redacted[field] = '[REDACTED]';
+      }
+    }
+    return redacted as T;
+  }
 
   async create(dto: CreatePatientDto, clinicId: string) {
     const rawData: Record<string, any> = {
@@ -47,10 +63,12 @@ export class PatientsService {
 
     const [patient] = await this.db.insert(patients).values(encryptedData).returning();
 
-    return this.encryptionService.decryptFields(
-      patient,
-      this.ENCRYPTED_FIELDS,
-      clinicId,
+    return this.omitClinicId(
+      await this.encryptionService.decryptFields(
+        patient,
+        this.ENCRYPTED_FIELDS,
+        clinicId,
+      ),
     );
   }
 
@@ -61,9 +79,23 @@ export class PatientsService {
       .where(and(eq(patients.clinic_id, clinicId), eq(patients.is_active, true)));
 
     return Promise.all(
-      results.map((p: any) =>
-        this.encryptionService.decryptFields(p, this.ENCRYPTED_FIELDS, clinicId),
-      ),
+      results.map(async (p: any) => {
+        try {
+          return this.omitClinicId(
+            await this.encryptionService.decryptFields(
+              p,
+              this.ENCRYPTED_FIELDS,
+              clinicId,
+            ),
+          );
+        } catch (err) {
+          this.logger.error(
+            `Decryption failed for record ${p.id} - returning redacted`,
+            err instanceof Error ? err.constructor.name : 'UnknownError',
+          );
+          return this.omitClinicId(this.redactEncryptedFields(p));
+        }
+      }),
     );
   }
 
@@ -78,10 +110,12 @@ export class PatientsService {
       throw new NotFoundException('Patient not found');
     }
 
-    return this.encryptionService.decryptFields(
-      patient,
-      this.ENCRYPTED_FIELDS,
-      clinicId,
+    return this.omitClinicId(
+      await this.encryptionService.decryptFields(
+        patient,
+        this.ENCRYPTED_FIELDS,
+        clinicId,
+      ),
     );
   }
 
@@ -142,10 +176,12 @@ export class PatientsService {
       .where(eq(patients.id, id))
       .returning();
 
-    return this.encryptionService.decryptFields(
-      patient,
-      this.ENCRYPTED_FIELDS,
-      clinicId,
+    return this.omitClinicId(
+      await this.encryptionService.decryptFields(
+        patient,
+        this.ENCRYPTED_FIELDS,
+        clinicId,
+      ),
     );
   }
 
@@ -161,10 +197,12 @@ export class PatientsService {
       .where(eq(patients.id, id))
       .returning();
 
-    return this.encryptionService.decryptFields(
-      patient,
-      this.ENCRYPTED_FIELDS,
-      clinicId,
+    return this.omitClinicId(
+      await this.encryptionService.decryptFields(
+        patient,
+        this.ENCRYPTED_FIELDS,
+        clinicId,
+      ),
     );
   }
 
@@ -176,10 +214,12 @@ export class PatientsService {
       .where(and(eq(patients.tc_no_hash, hash), eq(patients.clinic_id, clinicId)))
       .limit(1);
     if (results.length === 0) return null;
-    return this.encryptionService.decryptFields(
-      results[0],
-      this.ENCRYPTED_FIELDS,
-      clinicId,
+    return this.omitClinicId(
+      await this.encryptionService.decryptFields(
+        results[0],
+        this.ENCRYPTED_FIELDS,
+        clinicId,
+      ),
     );
   }
 }

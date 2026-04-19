@@ -8,7 +8,7 @@ import {
 import { existsSync, readFileSync, unlinkSync } from 'fs';
 import { unlink } from 'fs/promises';
 import { and, eq } from 'drizzle-orm';
-import { appointmentFiles, appointments, patients, users } from '../database/schema';
+import { appointmentFiles, appointments, doctors, patients, users } from '../database/schema';
 import { validateImageMagicBytes } from '../common/utils/magic-bytes.util';
 
 @Injectable()
@@ -16,6 +16,28 @@ export class StorageService {
   private readonly PDF_MAGIC_BYTES = Buffer.from([0x25, 0x50, 0x44, 0x46]);
 
   constructor(@Inject('DRIZZLE') private readonly db: any) {}
+
+  private async getDoctorIdByUserId(userId: string, clinicId: string) {
+    const [doctor] = await this.db
+      .select({ id: doctors.id })
+      .from(doctors)
+      .where(and(eq(doctors.user_id, userId), eq(doctors.clinic_id, clinicId)))
+      .limit(1);
+
+    if (!doctor) {
+      throw new ForbiddenException('Doctor profile not found');
+    }
+
+    return doctor.id;
+  }
+
+  private toFileResponse(file: typeof appointmentFiles.$inferSelect) {
+    const { clinic_id: _cid, file_path: _fp, ...rest } = file;
+    return {
+      ...rest,
+      downloadUrl: `/api/storage/files/${file.id}/download`,
+    };
+  }
 
   private validateFileContent(file: Express.Multer.File): void {
     const isImage = ['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype);
@@ -75,11 +97,11 @@ export class StorageService {
       })
       .returning();
 
-    return savedFile;
+    return this.toFileResponse(savedFile);
   }
 
   async getFilesByAppointment(appointmentId: string, clinicId: string) {
-    return this.db
+    const files = await this.db
       .select()
       .from(appointmentFiles)
       .where(
@@ -88,8 +110,13 @@ export class StorageService {
           eq(appointmentFiles.clinic_id, clinicId),
         ),
       );
+
+    return files.map((f: typeof appointmentFiles.$inferSelect) =>
+      this.toFileResponse(f),
+    );
   }
 
+  /** Internal use only — returns file_path for disk access */
   async getFileById(fileId: string, clinicId: string, userId?: string, role?: string) {
     const [file] = await this.db
       .select()
@@ -101,6 +128,32 @@ export class StorageService {
 
     if (!file) {
       throw new NotFoundException('File not found');
+    }
+
+    if (file.clinic_id !== clinicId) {
+      throw new ForbiddenException('File does not belong to this clinic');
+    }
+
+    if (file.appointment_id && role === 'doctor' && userId) {
+      const actualDoctorId = await this.getDoctorIdByUserId(userId, clinicId);
+      const [appointment] = await this.db
+        .select()
+        .from(appointments)
+        .where(
+          and(
+            eq(appointments.id, file.appointment_id),
+            eq(appointments.clinic_id, clinicId),
+          ),
+        )
+        .limit(1);
+
+      if (!appointment) {
+        throw new NotFoundException('File not found');
+      }
+
+      if (appointment.doctor_id !== actualDoctorId) {
+        throw new ForbiddenException('You do not have access to this file');
+      }
     }
 
     if (role === 'patient' && userId) {
@@ -148,7 +201,7 @@ export class StorageService {
       }
     } catch {}
 
-    return deletedFile;
+    return this.toFileResponse(deletedFile);
   }
 
   async saveAvatar(userId: string, file: Express.Multer.File) {

@@ -19,12 +19,14 @@ type PendingOtpState = {
   source: "login" | "signup" | "google";
 };
 
-function readOtpState(searchParams: URLSearchParams): PendingOtpState | null {
-  const mode = searchParams.get("mode");
-  const flowToken = searchParams.get("flowToken");
-  const email = searchParams.get("email");
+const OTP_FLOW_TOKEN_KEY = "otp_flow_token";
+const OTP_FLOW_EMAIL_KEY = "otp_flow_email";
 
-  if (mode !== "otp" || !flowToken || !email) {
+function readOtpState(): PendingOtpState | null {
+  const flowToken = sessionStorage.getItem(OTP_FLOW_TOKEN_KEY);
+  const email = sessionStorage.getItem(OTP_FLOW_EMAIL_KEY);
+
+  if (!flowToken || !email) {
     return null;
   }
 
@@ -44,7 +46,7 @@ export default function Auth() {
   const [lastName, setLastName] = useState("");
   const [otpCode, setOtpCode] = useState("");
   const [loading, setLoading] = useState(false);
-  const [pendingOtp, setPendingOtp] = useState<PendingOtpState | null>(() => readOtpState(searchParams));
+  const [pendingOtp, setPendingOtp] = useState<PendingOtpState | null>(() => readOtpState());
   const navigate = useNavigate();
   const { user, login, register, googleLogin, verifyOtp, resendOtp } = useAuth();
   const { lang, t } = useLanguage();
@@ -60,8 +62,8 @@ export default function Auth() {
   }, [user, navigate]);
 
   useEffect(() => {
-    setPendingOtp(readOtpState(searchParams));
-  }, [searchParams]);
+    setPendingOtp(readOtpState());
+  }, []);
 
   const otpDescription = useMemo(() => {
     if (!pendingOtp) {
@@ -85,16 +87,14 @@ export default function Auth() {
 
       if (result?.requiresOtp) {
         setOtpCode("");
-        setPendingOtp({
+        const nextOtpState = {
           flowToken: result.flowToken,
           email: result.email,
           source: isSignUp ? "signup" : "login",
-        });
-        setSearchParams({
-          mode: "otp",
-          flowToken: result.flowToken,
-          email: result.email,
-        });
+        } satisfies PendingOtpState;
+        sessionStorage.setItem(OTP_FLOW_TOKEN_KEY, result.flowToken);
+        sessionStorage.setItem(OTP_FLOW_EMAIL_KEY, result.email);
+        setPendingOtp(nextOtpState);
         toast.success(t.otpCodeSent);
       }
     } catch (err: any) {
@@ -114,7 +114,9 @@ export default function Auth() {
     setLoading(true);
     try {
       await verifyOtp(pendingOtp.flowToken, otpCode);
-      setSearchParams({});
+      sessionStorage.removeItem(OTP_FLOW_TOKEN_KEY);
+      sessionStorage.removeItem(OTP_FLOW_EMAIL_KEY);
+      setPendingOtp(null);
     } catch (err: any) {
       toast.error(err.message);
     } finally {
@@ -130,16 +132,14 @@ export default function Auth() {
     setLoading(true);
     try {
       const result = await resendOtp(pendingOtp.flowToken);
-      setPendingOtp({
+      const nextOtpState = {
         ...pendingOtp,
         flowToken: result.flowToken,
         email: result.email,
-      });
-      setSearchParams({
-        mode: "otp",
-        flowToken: result.flowToken,
-        email: result.email,
-      });
+      };
+      sessionStorage.setItem(OTP_FLOW_TOKEN_KEY, result.flowToken);
+      sessionStorage.setItem(OTP_FLOW_EMAIL_KEY, result.email);
+      setPendingOtp(nextOtpState);
       setOtpCode("");
       toast.success(t.otpCodeResent);
     } catch (err: any) {
@@ -150,6 +150,8 @@ export default function Auth() {
   };
 
   const handleCancelOtp = () => {
+    sessionStorage.removeItem(OTP_FLOW_TOKEN_KEY);
+    sessionStorage.removeItem(OTP_FLOW_EMAIL_KEY);
     setPendingOtp(null);
     setOtpCode("");
     setSearchParams(isSignUp ? { tab: "signup" } : {});

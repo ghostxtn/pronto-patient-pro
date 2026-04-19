@@ -13,6 +13,11 @@ import { UpdateSpecializationDto } from './dto/update-specialization.dto';
 export class SpecializationsService {
   constructor(@Inject('DRIZZLE') private readonly db: any) {}
 
+  private omitClinicId<T extends { clinic_id?: unknown }>(row: T) {
+    const { clinic_id: _cid, ...rest } = row;
+    return rest;
+  }
+
   async create(dto: CreateSpecializationDto, clinicId: string) {
     const [specialization] = await this.db
       .insert(specializations)
@@ -22,17 +27,16 @@ export class SpecializationsService {
       })
       .returning();
 
-    return specialization;
+    return this.omitClinicId(specialization);
   }
 
   async findAllByClinic(clinicId: string) {
-    return this.db
+    const specializationsInClinic = await this.db
       .select({
         id: specializations.id,
         name: specializations.name,
         description: specializations.description,
         imageUrl: specializations.imageUrl,
-        clinic_id: specializations.clinic_id,
         is_active: specializations.is_active,
         created_at: specializations.created_at,
         updated_at: specializations.updated_at,
@@ -44,6 +48,8 @@ export class SpecializationsService {
           eq(specializations.is_active, true),
         ),
       );
+
+    return specializationsInClinic;
   }
 
   async findPublicDiscoveryByClinic(clinicId: string) {
@@ -78,7 +84,7 @@ export class SpecializationsService {
       throw new ForbiddenException('Access denied to this clinic');
     }
 
-    return specialization;
+    return this.omitClinicId(specialization);
   }
 
   async update(id: string, dto: UpdateSpecializationDto, clinicId: string) {
@@ -93,7 +99,7 @@ export class SpecializationsService {
       .where(eq(specializations.id, id))
       .returning();
 
-    return specialization;
+    return this.omitClinicId(specialization);
   }
 
   async updateImageUrl(id: string, clinicId: string, imageUrl: string) {
@@ -113,7 +119,7 @@ export class SpecializationsService {
       )
       .returning();
 
-    return specialization;
+    return this.omitClinicId(specialization);
   }
 
   async softDelete(id: string, clinicId: string) {
@@ -128,6 +134,6 @@ export class SpecializationsService {
       .where(eq(specializations.id, id))
       .returning();
 
-    return specialization;
+    return this.omitClinicId(specialization);
   }
 }

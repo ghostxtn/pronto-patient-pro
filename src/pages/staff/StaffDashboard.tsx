@@ -48,7 +48,7 @@ export default function StaffDashboard() {
     queryFn: async () => {
       const [pendingAppointments, todayAppointments, patients, doctors] = await Promise.all([
         api.appointments.list({ status: "pending" }),
-        api.appointments.list({ date_from: today, date_to: today }),
+        api.appointments.list({ dateFrom: today, dateTo: today }),
         api.patients.list({ limit: 0 }),
         api.doctors.list(),
       ]);

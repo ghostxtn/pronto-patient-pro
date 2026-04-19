@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
 } from '@nestjs/common';
@@ -38,7 +39,10 @@ export class PatientsController {
   @Get(':id')
   @Audit('VIEW_PATIENT', 'patient')
   @Roles('owner', 'admin', 'doctor', 'staff')
-  findById(@Param('id') id: string, @CurrentUser() user: { clinicId: string }) {
+  findById(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: { clinicId: string },
+  ) {
     return this.patientsService.findById(id, user.clinicId);
   }
 
@@ -46,7 +50,7 @@ export class PatientsController {
   @Audit('UPDATE_PATIENT', 'patient')
   @Roles('owner', 'admin', 'doctor', 'staff')
   update(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdatePatientDto,
     @CurrentUser() user: { clinicId: string },
   ) {
@@ -57,7 +61,7 @@ export class PatientsController {
   @Audit('DELETE_PATIENT', 'patient')
   @Roles('owner', 'admin')
   softDelete(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: { clinicId: string },
   ) {
     return this.patientsService.softDelete(id, user.clinicId);

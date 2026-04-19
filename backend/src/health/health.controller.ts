@@ -3,7 +3,7 @@ import { SkipThrottle } from '@nestjs/throttler';
 import { Public } from '../common/decorators/public.decorator';
 
 @Public()
-@SkipThrottle({ global: true })
+@SkipThrottle()
 @Controller('health')
 export class HealthController {
   @Get()

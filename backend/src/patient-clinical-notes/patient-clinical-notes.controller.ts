@@ -14,6 +14,7 @@ import { Audit } from '../common/decorators/audit.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
 import { TenantGuard } from '../common/guards/tenant.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { ClinicalNotesQueryDto } from './dto/clinical-notes-query.dto';
 import { CreateClinicalNoteDto } from './dto/create-clinical-note.dto';
 import { UpdateClinicalNoteDto } from './dto/update-clinical-note.dto';
 import { PatientClinicalNotesService } from './patient-clinical-notes.service';
@@ -27,20 +28,21 @@ export class PatientClinicalNotesController {
 
   @Get()
   @Audit('LIST_CLINICAL_NOTES', 'clinical_note')
-  @Roles('owner', 'admin', 'doctor', 'staff')
+  @Roles('owner', 'doctor')
   listByPatient(
-    @Query('patient_id') patientId: string,
-    @CurrentUser() user: { clinicId: string },
+    @Query() query: ClinicalNotesQueryDto,
+    @CurrentUser() user: { clinicId: string; role: string },
   ) {
     return this.patientClinicalNotesService.listByPatient(
-      patientId,
+      query.patient_id,
       user.clinicId,
+      user.role,
     );
   }
 
   @Post()
   @Audit('CREATE_CLINICAL_NOTE', 'clinical_note')
-  @Roles('owner', 'admin', 'doctor')
+  @Roles('owner', 'doctor')
   create(
     @Body() dto: CreateClinicalNoteDto,
     @CurrentUser() user: { clinicId: string },
@@ -50,7 +52,7 @@ export class PatientClinicalNotesController {
 
   @Patch(':id')
   @Audit('UPDATE_CLINICAL_NOTE', 'clinical_note')
-  @Roles('owner', 'admin', 'doctor')
+  @Roles('owner', 'doctor')
   update(
     @Param('id') id: string,
     @Body() dto: UpdateClinicalNoteDto,
@@ -61,7 +63,7 @@ export class PatientClinicalNotesController {
 
   @Delete(':id')
   @Audit('DELETE_CLINICAL_NOTE', 'clinical_note')
-  @Roles('owner', 'admin', 'doctor')
+  @Roles('owner', 'doctor')
   remove(
     @Param('id') id: string,
     @CurrentUser() user: { clinicId: string },

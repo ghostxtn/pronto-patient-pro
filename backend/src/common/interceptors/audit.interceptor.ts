@@ -3,16 +3,16 @@ import {
   ExecutionContext,
   Injectable,
   NestInterceptor,
+  SetMetadata,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Observable, tap } from 'rxjs';
 import { randomUUID } from 'crypto';
 import { AuditService } from '../../audit/audit.service';
-import {
-  AUDIT_KEY,
-  AuditMetadata,
-  NO_AUDIT_KEY,
-} from '../decorators/audit.decorator';
+import { AUDIT_KEY, AuditMetadata } from '../decorators/audit.decorator';
+
+export const SKIP_AUDIT_KEY = 'skipAudit';
+export const SkipAudit = () => SetMetadata(SKIP_AUDIT_KEY, true);
 
 @Injectable()
 export class AuditInterceptor implements NestInterceptor {
@@ -22,23 +22,40 @@ export class AuditInterceptor implements NestInterceptor {
   ) {}
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
-    const noAudit = this.reflector.get<boolean>(NO_AUDIT_KEY, context.getHandler());
-    if (noAudit) return next.handle();
-
-    const auditMeta = this.reflector.get<AuditMetadata>(AUDIT_KEY, context.getHandler());
-    if (!auditMeta) return next.handle();
-
     const request = context.switchToHttp().getRequest();
+    const shouldSkipAudit = this.reflector.getAllAndOverride<boolean>(
+      SKIP_AUDIT_KEY,
+      [context.getHandler(), context.getClass()],
+    );
+    if (shouldSkipAudit || ['GET', 'HEAD'].includes(request.method)) {
+      return next.handle();
+    }
+
+    const auditMeta = this.reflector.getAllAndOverride<AuditMetadata>(
+      AUDIT_KEY,
+      [context.getHandler(), context.getClass()],
+    );
     const user = request.user;
     const requestId = (request as any).requestId || randomUUID();
 
     return next.handle().pipe(
       tap((responseBody) => {
         let entityId: string | undefined;
-        if (responseBody?.id) {
-          entityId = responseBody.id;
-        } else if (request.params?.id) {
-          entityId = request.params.id;
+        let action: string;
+        let entity: string;
+
+        if (auditMeta) {
+          action = auditMeta.action;
+          entity = auditMeta.entity;
+
+          if (responseBody?.id) {
+            entityId = responseBody.id;
+          } else if (request.params?.id) {
+            entityId = request.params.id;
+          }
+        } else {
+          action = `${request.method} ${request.path}`;
+          entity = 'unknown';
         }
 
         const ipAddress =
@@ -50,8 +67,8 @@ export class AuditInterceptor implements NestInterceptor {
           clinicId: user?.clinicId,
           userId: user?.userId,
           userRole: user?.role,
-          action: auditMeta.action,
-          entity: auditMeta.entity,
+          action,
+          entity,
           entityId,
           ipAddress,
           requestId,

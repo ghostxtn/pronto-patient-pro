@@ -1,5 +1,5 @@
-import { ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { and, eq, gte, lte, ne } from 'drizzle-orm';
+import { ConflictException, ForbiddenException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { and, eq, gt, gte, lt, lte, ne } from 'drizzle-orm';
 import {
   AvailabilityService,
   type PublicSlotEntry,
@@ -19,6 +19,7 @@ import { UpdateAppointmentDto } from './dto/update-appointment.dto';
 
 @Injectable()
 export class AppointmentsService {
+  private readonly logger = new Logger(AppointmentsService.name);
   private readonly NOTE_ENCRYPTED_FIELDS = ['diagnosis', 'treatment', 'prescription', 'notes'];
   private readonly PATIENT_ENCRYPTED_FIELDS = ['firstName', 'lastName', 'email'];
 
@@ -28,6 +29,34 @@ export class AppointmentsService {
     private readonly availabilityService: AvailabilityService,
     private readonly emailService: EmailService,
   ) {}
+
+  private omitClinicId<T extends { clinic_id?: unknown }>(row: T) {
+    const { clinic_id: _cid, ...rest } = row;
+    return rest;
+  }
+
+  private redactFields<T extends Record<string, any>>(row: T, fields: string[]) {
+    const redacted = { ...row } as Record<string, any>;
+    for (const field of fields) {
+      if (redacted[field]) {
+        redacted[field] = '[REDACTED]';
+      }
+    }
+    return redacted as T;
+  }
+
+  private async getDoctorIdByUserId(userId: string, clinicId: string): Promise<string> {
+    const [doctor] = await this.db
+      .select({ id: doctors.id })
+      .from(doctors)
+      .where(and(eq(doctors.user_id, userId), eq(doctors.clinic_id, clinicId)));
+
+    if (!doctor) {
+      throw new ForbiddenException('Doctor profile not found');
+    }
+
+    return doctor.id;
+  }
 
   async create(
     dto: CreateAppointmentDto,
@@ -61,6 +90,27 @@ export class AppointmentsService {
       dto.startTime,
       dto.endTime,
     );
+
+    const [conflictingPatientAppointment] = await this.db
+      .select({ id: appointments.id })
+      .from(appointments)
+      .where(
+        and(
+          eq(appointments.patient_id, patientId),
+          eq(appointments.clinic_id, clinicId),
+          eq(appointments.appointment_date, dto.appointmentDate),
+          ne(appointments.status, 'cancelled'),
+          lt(appointments.start_time, dto.endTime),
+          gt(appointments.end_time, dto.startTime),
+        ),
+      )
+      .limit(1);
+
+    if (conflictingPatientAppointment) {
+      throw new ConflictException(
+        'Patient already has an appointment during this time slot',
+      );
+    }
 
     const [appointment] = await this.db
       .insert(appointments)
@@ -108,7 +158,7 @@ export class AppointmentsService {
       });
     }
 
-    return appointment;
+    return this.omitClinicId(appointment);
   }
 
   async findAllByClinic(
@@ -202,16 +252,31 @@ export class AppointmentsService {
       .where(and(...conditions));
 
     return Promise.all(
-      results.map(async (row: any) => ({
-        ...row,
-        patient: row.patient
-          ? await this.encryptionService.decryptFields(
-              row.patient,
-              this.PATIENT_ENCRYPTED_FIELDS,
-              clinicId,
-            )
-          : row.patient,
-      })),
+      results.map(async (row: any) => {
+        try {
+          return {
+            ...this.omitClinicId(row),
+            patient: row.patient
+              ? await this.encryptionService.decryptFields(
+                  row.patient,
+                  this.PATIENT_ENCRYPTED_FIELDS,
+                  clinicId,
+                )
+              : row.patient,
+          };
+        } catch (err) {
+          this.logger.error(
+            `Decryption failed for record ${row.id} - returning redacted`,
+            err instanceof Error ? err.constructor.name : 'UnknownError',
+          );
+          return {
+            ...this.omitClinicId(row),
+            patient: row.patient
+              ? this.redactFields(row.patient, this.PATIENT_ENCRYPTED_FIELDS)
+              : row.patient,
+          };
+        }
+      }),
     );
   }
 
@@ -243,7 +308,7 @@ export class AppointmentsService {
       }
     }
 
-    return appointment;
+    return this.omitClinicId(appointment);
   }
 
   async update(id: string, dto: UpdateAppointmentDto, clinicId: string) {
@@ -307,7 +372,7 @@ export class AppointmentsService {
       .where(eq(appointments.id, id))
       .returning();
 
-    return appointment;
+    return this.omitClinicId(appointment);
   }
 
   async updateStatus(id: string, status: string, clinicId: string) {
@@ -370,7 +435,7 @@ export class AppointmentsService {
       }
     }
 
-    return appointment;
+    return this.omitClinicId(appointment);
   }
 
   async softDelete(id: string, clinicId: string) {
@@ -400,7 +465,7 @@ export class AppointmentsService {
       });
     }
 
-    return appointment;
+    return this.omitClinicId(appointment);
   }
 
   async createNote(
@@ -409,12 +474,18 @@ export class AppointmentsService {
     doctorId: string,
     clinicId: string,
   ) {
-    await this.findById(appointmentId, clinicId);
+    const actualDoctorId = await this.getDoctorIdByUserId(doctorId, clinicId);
+
+    const appointment = await this.findById(appointmentId, clinicId);
+
+    if (appointment.doctor_id !== actualDoctorId) {
+      throw new ForbiddenException('You can only add notes to your own appointments');
+    }
 
     const rawValues = {
       appointment_id: appointmentId,
       clinic_id: clinicId,
-      doctor_id: doctorId,
+      doctor_id: actualDoctorId,
       diagnosis: dto.diagnosis,
       treatment: dto.treatment,
       prescription: dto.prescription,
@@ -430,14 +501,35 @@ export class AppointmentsService {
       .values(encrypted)
       .returning();
 
-    return this.encryptionService.decryptFields(
-      note,
-      this.NOTE_ENCRYPTED_FIELDS,
-      clinicId,
+    return this.omitClinicId(
+      await this.encryptionService.decryptFields(
+        note,
+        this.NOTE_ENCRYPTED_FIELDS,
+        clinicId,
+      ),
     );
   }
 
-  async findNotesByAppointment(appointmentId: string, clinicId: string) {
+  async findNotesByAppointment(
+    appointmentId: string,
+    clinicId: string,
+    currentUser: { userId: string; role: string },
+  ) {
+    const appointment = await this.findById(appointmentId, clinicId);
+
+    if (currentUser.role === 'doctor') {
+      const actualDoctorId = await this.getDoctorIdByUserId(
+        currentUser.userId,
+        clinicId,
+      );
+
+      if (appointment.doctor_id !== actualDoctorId) {
+        throw new ForbiddenException(
+          'You do not have access to notes for this appointment',
+        );
+      }
+    }
+
     const results = await this.db
       .select()
       .from(appointmentNotes)
@@ -449,13 +541,23 @@ export class AppointmentsService {
       );
 
     return Promise.all(
-      results.map((n: any) =>
-        this.encryptionService.decryptFields(
-          n,
-          this.NOTE_ENCRYPTED_FIELDS,
-          clinicId,
-        ),
-      ),
+      results.map(async (n: any) => {
+        try {
+          return this.omitClinicId(
+            await this.encryptionService.decryptFields(
+              n,
+              this.NOTE_ENCRYPTED_FIELDS,
+              clinicId,
+            ),
+          );
+        } catch (err) {
+          this.logger.error(
+            `Decryption failed for record ${n.id} - returning redacted`,
+            err instanceof Error ? err.constructor.name : 'UnknownError',
+          );
+          return this.omitClinicId(this.redactFields(n, this.NOTE_ENCRYPTED_FIELDS));
+        }
+      }),
     );
   }
 
@@ -463,7 +565,13 @@ export class AppointmentsService {
     noteId: string,
     dto: Partial<CreateAppointmentNoteDto>,
     clinicId: string,
+    requestingDoctorId: string,
   ) {
+    const actualDoctorId = await this.getDoctorIdByUserId(
+      requestingDoctorId,
+      clinicId,
+    );
+
     const [existingNote] = await this.db
       .select()
       .from(appointmentNotes)
@@ -477,6 +585,10 @@ export class AppointmentsService {
 
     if (!existingNote) {
       throw new NotFoundException('Appointment note not found');
+    }
+
+    if (existingNote.doctor_id !== actualDoctorId) {
+      throw new ForbiddenException('You can only edit your own notes');
     }
 
     const fieldsToEncrypt = this.NOTE_ENCRYPTED_FIELDS.filter(
@@ -496,14 +608,21 @@ export class AppointmentsService {
       .where(eq(appointmentNotes.id, noteId))
       .returning();
 
-    return this.encryptionService.decryptFields(
-      note,
-      this.NOTE_ENCRYPTED_FIELDS,
-      clinicId,
+    return this.omitClinicId(
+      await this.encryptionService.decryptFields(
+        note,
+        this.NOTE_ENCRYPTED_FIELDS,
+        clinicId,
+      ),
     );
   }
 
-  async deleteNote(noteId: string, clinicId: string) {
+  async deleteNote(noteId: string, clinicId: string, requestingDoctorId: string) {
+    const actualDoctorId = await this.getDoctorIdByUserId(
+      requestingDoctorId,
+      clinicId,
+    );
+
     const [existingNote] = await this.db
       .select()
       .from(appointmentNotes)
@@ -519,15 +638,21 @@ export class AppointmentsService {
       throw new NotFoundException('Appointment note not found');
     }
 
+    if (existingNote.doctor_id !== actualDoctorId) {
+      throw new ForbiddenException('You can only edit your own notes');
+    }
+
     const [deletedNote] = await this.db
       .delete(appointmentNotes)
       .where(eq(appointmentNotes.id, noteId))
       .returning();
 
-    return this.encryptionService.decryptFields(
-      deletedNote,
-      this.NOTE_ENCRYPTED_FIELDS,
-      clinicId,
+    return this.omitClinicId(
+      await this.encryptionService.decryptFields(
+        deletedNote,
+        this.NOTE_ENCRYPTED_FIELDS,
+        clinicId,
+      ),
     );
   }
 
@@ -558,11 +683,17 @@ export class AppointmentsService {
     const [doctor] = await this.db
       .select({ id: doctors.id })
       .from(doctors)
-      .where(and(eq(doctors.id, doctorId), eq(doctors.clinic_id, clinicId)))
+      .where(
+        and(
+          eq(doctors.id, doctorId),
+          eq(doctors.clinic_id, clinicId),
+          eq(doctors.is_active, true),
+        ),
+      )
       .limit(1);
 
     if (!doctor) {
-      throw new NotFoundException('Doctor not found in this clinic');
+      throw new NotFoundException('Doctor not found or is inactive');
     }
   }
 
@@ -570,11 +701,17 @@ export class AppointmentsService {
     const [patient] = await this.db
       .select({ id: patients.id })
       .from(patients)
-      .where(and(eq(patients.id, patientId), eq(patients.clinic_id, clinicId)))
+      .where(
+        and(
+          eq(patients.id, patientId),
+          eq(patients.clinic_id, clinicId),
+          eq(patients.is_active, true),
+        ),
+      )
       .limit(1);
 
     if (!patient) {
-      throw new NotFoundException('Patient not found in this clinic');
+      throw new NotFoundException('Patient not found or is inactive');
     }
   }
 
@@ -725,7 +862,7 @@ export class AppointmentsService {
       .from(patients)
       .innerJoin(doctors, eq(doctors.id, doctorId))
       .innerJoin(users, eq(users.id, doctors.user_id))
-      .where(eq(patients.id, patientId))
+      .where(and(eq(patients.id, patientId), eq(patients.clinic_id, clinicId)))
       .limit(1);
 
     if (!row) {

@@ -95,6 +95,7 @@ Codex quota is limited — keep prompts minimal and targeted.
 cp .env.example .env
 npm install
 npm run backend:install
+chmod +x postgres/init/01_audit_user.sh
 docker compose up -d
 npm run db:migrate
 npm run db:seed
@@ -111,6 +112,20 @@ npm run db:seed
 - Fresh DB: `docker compose up -d` -> `npm run db:migrate` -> `npm run db:seed`
 - Schema change: `npm run db:generate` -> commit migration -> `npm run db:migrate`
 - Avoid treating `db:push` as the default team flow; prefer committed migrations
+
+### Audit DB Notes
+- `AuditService` uses `AUDIT_DRIZZLE`, not the main `DRIZZLE` provider
+- `AUDIT_DRIZZLE` reads `AUDIT_DATABASE_URL`
+- Docker init script: `postgres/init/01_audit_user.sh`
+- `.env` must include `AUDIT_DB_PASSWORD`
+- The init script only creates `audit_user` and grants DB/schema access
+- Table-level audit grants are handled by migration `backend/drizzle/0016_audit_user_grants.sql`
+- If the init script needs to run again locally, recreate the Postgres volume
+
+### Postgres Port Note
+- `docker-compose.yml` currently exposes `5432:5432`
+- Treat this as dev-only convenience
+- Production expectation: external access stays blocked by firewall/UFW
 
 ### Calendar Integration Note
 - `calendar-integration` branch pulled the calendar scheduler from `origin/Calender_v5_fully-functionable` selectively, not as a full branch merge
@@ -143,7 +158,8 @@ docker compose restart api
 - It currently covers baseline repair / migration marking through `0008`
 
 ### drizzle.config.ts
-Requires `dotenv.config({ path: resolve(__dirname, '../.env') })` to read root `.env`.
+- `backend/drizzle.config.ts` does not load `dotenv` anymore
+- Drizzle commands depend on the package scripts using `node --env-file=../.env ...`
 
 ---
 

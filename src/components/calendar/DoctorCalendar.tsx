@@ -1429,9 +1429,9 @@ export function DoctorCalendar({
           toApiDate(rangeEnd),
         ) as Promise<AvailabilityOverride[]>,
         api.appointments.list({
-          doctor_id: doctorId,
-          date_from: toApiDate(rangeStart),
-          date_to: toApiDate(rangeEnd),
+          doctorId: doctorId,
+          dateFrom: toApiDate(rangeStart),
+          dateTo: toApiDate(rangeEnd),
         }) as Promise<CalendarAppointmentResponse[]>,
       ]);
 

@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
+import { AuditModule } from '../audit/audit.module';
 import { EmailModule } from '../email/email.module';
 import { PatientsModule } from '../patients/patients.module';
 import { AuthController } from './auth.controller';
@@ -18,6 +19,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
         signOptions: { expiresIn: config.get('JWT_EXPIRES_IN', '15m') },
       }),
     }),
+    AuditModule,
     EmailModule,
     PatientsModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),

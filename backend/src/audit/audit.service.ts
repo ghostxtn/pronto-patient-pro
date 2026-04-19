@@ -15,7 +15,7 @@ export interface AuditEntry {
 
 @Injectable()
 export class AuditService {
-  constructor(@Inject('DRIZZLE') private readonly db: any) {}
+  constructor(@Inject('AUDIT_DRIZZLE') private readonly db: any) {}
 
   async log(entry: AuditEntry): Promise<void> {
     try {

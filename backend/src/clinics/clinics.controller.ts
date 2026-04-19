@@ -41,8 +41,8 @@ export class ClinicsController {
 
   @Get()
   @Roles('owner')
-  findAll() {
-    return this.clinicsService.findAll();
+  findAll(@CurrentUser() user: { clinicId: string }) {
+    return this.clinicsService.findAll(user.clinicId);
   }
 
   @Get('current')

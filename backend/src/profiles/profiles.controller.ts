@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Patch } from '@nestjs/common';
 import { Audit } from '../common/decorators/audit.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -12,12 +12,14 @@ export class ProfilesController {
 
   @Get('me')
   @Audit('VIEW_PROFILE', 'user')
+  @Roles('owner', 'admin', 'doctor', 'staff', 'patient')
   getMyProfile(@CurrentUser() user: { userId: string }) {
     return this.profilesService.getMyProfile(user.userId);
   }
 
   @Patch('me')
   @Audit('UPDATE_PROFILE', 'user')
+  @Roles('owner', 'admin', 'doctor', 'staff', 'patient')
   updateMyProfile(
     @CurrentUser() user: { userId: string },
     @Body() dto: UpdateProfileDto,
@@ -36,7 +38,7 @@ export class ProfilesController {
   @Audit('UPDATE_ROLE', 'user')
   @Roles('owner')
   updateRole(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateRoleDto,
     @CurrentUser() user: { clinicId: string },
   ) {

@@ -42,7 +42,7 @@ export default function DoctorDashboard() {
   const { data: appointments } = useQuery({
     queryKey: ["doctor-all-appointments", doctorRecord?.id],
     queryFn: async () => {
-      const data = await api.appointments.list({ doctor_id: doctorRecord!.id });
+      const data = await api.appointments.list({ doctorId: doctorRecord!.id });
       return data.map((appointment: any) => ({
         ...appointment,
         profiles:
