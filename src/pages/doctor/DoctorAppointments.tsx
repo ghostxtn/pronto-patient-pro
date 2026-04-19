@@ -72,7 +72,7 @@ export default function DoctorAppointments() {
   const { data: appointments, isLoading } = useQuery<DoctorAppointmentRow[]>({
     queryKey: ["doctor-appointments-list", doctorRecord?.id],
     queryFn: async () => {
-      const data = await api.appointments.list({ doctor_id: doctorRecord!.id }) as Array<{
+      const data = await api.appointments.list({ doctorId: doctorRecord!.id }) as Array<{
         id: string;
         doctor_id: string;
         patient_id: string;

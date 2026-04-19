@@ -48,6 +48,7 @@ export class AppointmentsController {
         patientId: query.patientId,
         dateFrom: query.dateFrom,
         dateTo: query.dateTo,
+        status: query.status,
       },
       {
         userId: user.userId,

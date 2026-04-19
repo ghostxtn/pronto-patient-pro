@@ -1,4 +1,4 @@
-import { IsDateString, IsOptional, IsUUID } from 'class-validator';
+import { IsDateString, IsIn, IsOptional, IsUUID } from 'class-validator';
 
 export class GetAppointmentsQueryDto {
   @IsOptional()
@@ -16,4 +16,8 @@ export class GetAppointmentsQueryDto {
   @IsOptional()
   @IsDateString()
   dateTo?: string;
+
+  @IsOptional()
+  @IsIn(['pending', 'approved', 'cancelled', 'completed'])
+  status?: string;
 }

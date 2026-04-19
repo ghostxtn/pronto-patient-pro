@@ -522,17 +522,17 @@ const api = {
   },
   appointments: {
     list: (params?: {
-      doctor_id?: string;
-      patient_id?: string;
-      date_from?: string;
-      date_to?: string;
+      doctorId?: string;
+      patientId?: string;
+      dateFrom?: string;
+      dateTo?: string;
       status?: string;
     }) => {
       const search = new URLSearchParams();
-      if (params?.doctor_id) search.set("doctor_id", params.doctor_id);
-      if (params?.patient_id) search.set("patient_id", params.patient_id);
-      if (params?.date_from) search.set("date_from", params.date_from);
-      if (params?.date_to) search.set("date_to", params.date_to);
+      if (params?.doctorId) search.set("doctorId", params.doctorId);
+      if (params?.patientId) search.set("patientId", params.patientId);
+      if (params?.dateFrom) search.set("dateFrom", params.dateFrom);
+      if (params?.dateTo) search.set("dateTo", params.dateTo);
       if (params?.status) search.set("status", params.status);
       return request<any[]>(
         `/appointments${search.toString() ? `?${search.toString()}` : ""}`,
