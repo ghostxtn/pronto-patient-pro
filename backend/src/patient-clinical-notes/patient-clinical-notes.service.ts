@@ -30,6 +30,11 @@ export class PatientClinicalNotesService {
     private readonly encryptionService: EncryptionService,
   ) {}
 
+  private omitClinicId<T extends { clinic_id?: unknown }>(row: T) {
+    const { clinic_id: _cid, ...rest } = row;
+    return rest;
+  }
+
   async listByPatient(patientId: string, clinicId: string, role: string) {
     if (role === 'staff') {
       throw new ForbiddenException('Staff cannot access clinical notes');
@@ -70,11 +75,13 @@ export class PatientClinicalNotesService {
 
     return Promise.all(
       results.map(async (row: any) => ({
-        ...(await this.encryptionService.decryptFields(
-          row,
-          this.ENCRYPTED_FIELDS,
-          clinicId,
-        )),
+        ...this.omitClinicId(
+          await this.encryptionService.decryptFields(
+            row,
+            this.ENCRYPTED_FIELDS,
+            clinicId,
+          ),
+        ),
         doctor: row.doctor,
       })),
     );
@@ -106,10 +113,12 @@ export class PatientClinicalNotesService {
       .values(encrypted as any)
       .returning();
 
-    return this.encryptionService.decryptFields(
-      note,
-      this.ENCRYPTED_FIELDS,
-      clinicId,
+    return this.omitClinicId(
+      await this.encryptionService.decryptFields(
+        note,
+        this.ENCRYPTED_FIELDS,
+        clinicId,
+      ),
     );
   }
 
@@ -171,10 +180,12 @@ export class PatientClinicalNotesService {
       )
       .returning();
 
-    return this.encryptionService.decryptFields(
-      note,
-      this.ENCRYPTED_FIELDS,
-      clinicId,
+    return this.omitClinicId(
+      await this.encryptionService.decryptFields(
+        note,
+        this.ENCRYPTED_FIELDS,
+        clinicId,
+      ),
     );
   }
 
@@ -191,10 +202,12 @@ export class PatientClinicalNotesService {
       )
       .returning();
 
-    return this.encryptionService.decryptFields(
-      deletedNote,
-      this.ENCRYPTED_FIELDS,
-      clinicId,
+    return this.omitClinicId(
+      await this.encryptionService.decryptFields(
+        deletedNote,
+        this.ENCRYPTED_FIELDS,
+        clinicId,
+      ),
     );
   }
 
@@ -214,10 +227,12 @@ export class PatientClinicalNotesService {
       throw new NotFoundException('Clinical note not found');
     }
 
-    return this.encryptionService.decryptFields(
-      note,
-      this.ENCRYPTED_FIELDS,
-      clinicId,
+    return this.omitClinicId(
+      await this.encryptionService.decryptFields(
+        note,
+        this.ENCRYPTED_FIELDS,
+        clinicId,
+      ),
     );
   }
 

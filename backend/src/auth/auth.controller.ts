@@ -7,6 +7,7 @@ import {
   Post,
   Req,
   Res,
+  UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
@@ -16,13 +17,14 @@ import { Throttle } from '@nestjs/throttler';
 import { Audit } from '../common/decorators/audit.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Public } from '../common/decorators/public.decorator';
+import { Roles } from '../common/decorators/roles.decorator';
 import { TenantRequest } from '../common/interfaces/tenant-request.interface';
 import { AuthService } from './auth.service';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ExchangeCodeDto } from './dto/exchange-code.dto';
 import { LoginDto } from './dto/login.dto';
 import { ResendAuthOtpDto } from './dto/resend-auth-otp.dto';
 import { RegisterDto } from './dto/register.dto';
-import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { VerifyAuthOtpDto } from './dto/verify-auth-otp.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -39,6 +41,7 @@ export class AuthController {
   @Post('register')
   @Public()
   @Throttle({ global: { ttl: 3600000, limit: 10 } })
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @HttpCode(201)
   async register(
     @Body() dto: RegisterDto,
@@ -77,14 +80,37 @@ export class AuthController {
       trustedDeviceToken: this.getTrustedDeviceToken(req),
     });
     this.applyTrustedDeviceCookie(res, (result as any).trustedDeviceToken);
+    if ((result as any).refreshToken) {
+      this.applyRefreshTokenCookie(res, (result as any).refreshToken);
+      const { refreshToken: _refreshToken, ...safeResult } = result as Record<
+        string,
+        unknown
+      >;
+      return safeResult;
+    }
+
     return result;
   }
 
   @Post('refresh')
   @Public()
   @HttpCode(200)
-  refresh(@Body() dto: RefreshTokenDto) {
-    return this.authService.refreshToken(dto.refreshToken);
+  async refresh(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const refreshToken = req.cookies?.refreshToken;
+
+    if (!refreshToken) {
+      throw new UnauthorizedException('Refresh token cookie is missing');
+    }
+
+    const result = await this.authService.refreshToken(refreshToken);
+    this.applyRefreshTokenCookie(res, result.refreshToken);
+
+    return {
+      accessToken: result.accessToken,
+    };
   }
 
   @Post('verify-otp')
@@ -106,12 +132,22 @@ export class AuthController {
       trustedDeviceToken: this.getTrustedDeviceToken(req),
     });
     this.applyTrustedDeviceCookie(res, (result as any).trustedDeviceToken);
+    if ((result as any).refreshToken) {
+      this.applyRefreshTokenCookie(res, (result as any).refreshToken);
+      const { refreshToken: _refreshToken, ...safeResult } = result as Record<
+        string,
+        unknown
+      >;
+      return safeResult;
+    }
+
     return result;
   }
 
   @Post('resend-otp')
   @Public()
   @Throttle({ global: { ttl: 60000, limit: 10 } })
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @HttpCode(200)
   resendOtp(@Body() dto: ResendAuthOtpDto, @Req() req: TenantRequest & Request) {
     return this.authService.resendOtp(dto, req.tenant!.clinicId, {
@@ -126,6 +162,7 @@ export class AuthController {
   @Post('forgot-password')
   @Public()
   @Throttle({ global: { ttl: 900000, limit: 5 } })
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   @HttpCode(200)
   forgotPassword(
     @Body() dto: ForgotPasswordDto,
@@ -167,16 +204,17 @@ export class AuthController {
     });
   }
 
-  @Audit('LOGOUT', 'auth')
+  @Public()
   @Post('logout')
-  @UseGuards(JwtAuthGuard)
   @HttpCode(200)
-  logout(@CurrentUser() user: { userId: string }) {
-    return this.authService.logout(user.userId);
+  logout(@Res({ passthrough: true }) res: Response) {
+    res.clearCookie('refreshToken', { path: '/' });
+    return { message: 'Logged out' };
   }
 
   @Get('me')
   @UseGuards(JwtAuthGuard)
+  @Roles('owner', 'admin', 'doctor', 'staff', 'patient')
   me(@CurrentUser() user: { userId: string; email: string; role: string; clinicId: string }) {
     return this.authService.findById(user.userId);
   }
@@ -189,8 +227,22 @@ export class AuthController {
   @Post('exchange-code')
   @Public()
   @HttpCode(200)
-  async exchangeCode(@Body() body: { code: string }) {
-    return this.authService.exchangeOAuthCode(body.code);
+  async exchangeCode(
+    @Body() body: ExchangeCodeDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.authService.exchangeOAuthCode(body.code);
+
+    if ((result as any).refreshToken) {
+      this.applyRefreshTokenCookie(res, (result as any).refreshToken);
+      const { refreshToken: _refreshToken, ...safeResult } = result as Record<
+        string,
+        unknown
+      >;
+      return safeResult;
+    }
+
+    return result;
   }
 
   @Get('google/callback')
@@ -210,8 +262,7 @@ export class AuthController {
         : `https://${clinicDomain}`
       : (this.configService.get<string>('FRONTEND_URL') ?? 'http://localhost:5173');
 
-    const { accessToken, refreshToken, user, flowToken, email, trustedDeviceToken } = req.user as {
-      accessToken?: string;
+    const { refreshToken, user, flowToken, email, trustedDeviceToken } = req.user as {
       refreshToken?: string;
       user?: { role?: string };
       flowToken?: string;
@@ -221,7 +272,6 @@ export class AuthController {
 
     console.log('[auth][googleCallback] redirecting to frontend', {
       frontendUrl,
-      hasAccessToken: Boolean(accessToken),
       hasRefreshToken: Boolean(refreshToken),
       role: user?.role,
     });
@@ -233,16 +283,9 @@ export class AuthController {
     }
 
     this.applyTrustedDeviceCookie(res, trustedDeviceToken);
+    this.applyRefreshTokenCookie(res, refreshToken);
 
-    const code = await this.authService.generateOAuthCode({
-      accessToken: accessToken || '',
-      refreshToken: refreshToken || '',
-      role: user?.role || 'patient',
-    });
-
-    return res.redirect(
-      `${frontendUrl}/auth/callback?code=${encodeURIComponent(code)}`,
-    );
+    return res.redirect(`${frontendUrl}/auth/callback`);
   }
 
   private getTrustedDeviceToken(req: Request) {
@@ -279,6 +322,20 @@ export class AuthController {
       sameSite: 'lax',
       secure: this.configService.get<string>('NODE_ENV') === 'production',
       maxAge: 30 * 24 * 60 * 60 * 1000,
+      path: '/',
+    });
+  }
+
+  private applyRefreshTokenCookie(res: Response, refreshToken?: string) {
+    if (!refreshToken) {
+      return;
+    }
+
+    res.cookie('refreshToken', refreshToken, {
+      httpOnly: true,
+      sameSite: 'strict',
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
       path: '/',
     });
   }

@@ -17,7 +17,29 @@ import { UpdateDoctorDto } from './dto/update-doctor.dto';
 export class DoctorsService {
   constructor(@Inject('DRIZZLE') private readonly db: any) {}
 
+  private omitClinicId<T extends { clinic_id?: unknown }>(row: T) {
+    const { clinic_id: _cid, ...rest } = row;
+    return rest;
+  }
+
   async onboardDoctor(dto: OnboardDoctorDto, clinicId: string) {
+    if (dto.specializationId) {
+      const [spec] = await this.db
+        .select({ id: specializations.id })
+        .from(specializations)
+        .where(
+          and(
+            eq(specializations.id, dto.specializationId),
+            eq(specializations.clinic_id, clinicId),
+          ),
+        )
+        .limit(1);
+
+      if (!spec) {
+        throw new BadRequestException('Invalid specialization');
+      }
+    }
+
     const [existingUser] = await this.db
       .select()
       .from(users)
@@ -55,7 +77,7 @@ export class DoctorsService {
       })
       .returning();
 
-    return doctor;
+    return this.omitClinicId(doctor);
   }
 
   async findAllByClinic(
@@ -77,12 +99,11 @@ export class DoctorsService {
       conditions.push(eq(doctors.specialization_id, specializationId));
     }
 
-    return this.db
+    const doctorsInClinic = await this.db
       .select({
         id: doctors.id,
         user_id: doctors.user_id,
         specialization_id: doctors.specialization_id,
-        clinic_id: doctors.clinic_id,
         title: doctors.title,
         bio: doctors.bio,
         phone: doctors.phone,
@@ -100,6 +121,8 @@ export class DoctorsService {
       .innerJoin(users, eq(doctors.user_id, users.id))
       .leftJoin(specializations, eq(doctors.specialization_id, specializations.id))
       .where(and(...conditions));
+
+    return doctorsInClinic;
   }
 
   async findPublicDiscoveryByClinic(clinicId: string) {
@@ -128,7 +151,6 @@ export class DoctorsService {
         id: doctors.id,
         user_id: doctors.user_id,
         specialization_id: doctors.specialization_id,
-        clinic_id: doctors.clinic_id,
         title: doctors.title,
         bio: doctors.bio,
         phone: doctors.phone,
@@ -157,7 +179,7 @@ export class DoctorsService {
       throw new ForbiddenException('Access denied to this clinic');
     }
 
-    return doctor;
+    return this.omitClinicId(doctor);
   }
 
   async findByUserId(userId: string, clinicId: string) {
@@ -166,7 +188,6 @@ export class DoctorsService {
         id: doctors.id,
         user_id: doctors.user_id,
         specialization_id: doctors.specialization_id,
-        clinic_id: doctors.clinic_id,
         title: doctors.title,
         bio: doctors.bio,
         phone: doctors.phone,
@@ -185,11 +206,28 @@ export class DoctorsService {
       .where(and(eq(doctors.user_id, userId), eq(doctors.clinic_id, clinicId), eq(doctors.is_active, true)))
       .limit(1);
 
-    return doctor ?? null;
+    return doctor ? this.omitClinicId(doctor) : null;
   }
 
   async update(id: string, dto: UpdateDoctorDto, clinicId: string) {
     await this.findById(id, clinicId);
+
+    if (dto.specializationId) {
+      const [spec] = await this.db
+        .select({ id: specializations.id })
+        .from(specializations)
+        .where(
+          and(
+            eq(specializations.id, dto.specializationId),
+            eq(specializations.clinic_id, clinicId),
+          ),
+        )
+        .limit(1);
+
+      if (!spec) {
+        throw new BadRequestException('Invalid specialization');
+      }
+    }
 
     const updateData: Record<string, unknown> = {
       updated_at: new Date(),
@@ -217,7 +255,7 @@ export class DoctorsService {
       .where(eq(doctors.id, id))
       .returning();
 
-    return doctor;
+    return this.omitClinicId(doctor);
   }
 
   async adminUpdateDoctor(id: string, dto: AdminUpdateDoctorDto, clinicId: string) {
@@ -275,7 +313,7 @@ export class DoctorsService {
       .where(eq(doctors.id, id))
       .returning();
 
-    return updatedDoctor;
+    return this.omitClinicId(updatedDoctor);
   }
 
   async adminSetDoctorStatus(id: string, dto: AdminSetDoctorStatusDto, clinicId: string) {
@@ -298,7 +336,7 @@ export class DoctorsService {
       .where(eq(doctors.id, id))
       .returning();
 
-    return updatedDoctor;
+    return this.omitClinicId(updatedDoctor);
   }
 
   async softDelete(id: string, clinicId: string) {
@@ -313,6 +351,6 @@ export class DoctorsService {
       .where(eq(doctors.id, id))
       .returning();
 
-    return doctor;
+    return this.omitClinicId(doctor);
   }
 }

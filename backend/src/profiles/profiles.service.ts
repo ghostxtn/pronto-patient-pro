@@ -12,6 +12,11 @@ import { UpdateProfileDto } from './dto/update-profile.dto';
 export class ProfilesService {
   constructor(@Inject('DRIZZLE') private readonly db: any) {}
 
+  private omitClinicId<T extends { clinic_id?: unknown }>(row: T) {
+    const { clinic_id: _cid, ...rest } = row;
+    return rest;
+  }
+
   async getMyProfile(userId: string) {
     const [user] = await this.db
       .select({
@@ -22,7 +27,6 @@ export class ProfilesService {
         role: users.role,
         clinic_id: users.clinic_id,
         is_active: users.is_active,
-        google_id: users.google_id,
         avatar_url: users.avatar_url,
         created_at: users.created_at,
         updated_at: users.updated_at,
@@ -35,7 +39,7 @@ export class ProfilesService {
       throw new NotFoundException('User not found');
     }
 
-    return user;
+    return this.omitClinicId(user);
   }
 
   async updateMyProfile(userId: string, dto: UpdateProfileDto) {
@@ -67,7 +71,6 @@ export class ProfilesService {
         role: users.role,
         clinic_id: users.clinic_id,
         is_active: users.is_active,
-        google_id: users.google_id,
         avatar_url: users.avatar_url,
         created_at: users.created_at,
         updated_at: users.updated_at,
@@ -77,11 +80,11 @@ export class ProfilesService {
       throw new NotFoundException('User not found');
     }
 
-    return user;
+    return this.omitClinicId(user);
   }
 
   async findAllByClinic(clinicId: string) {
-    return this.db
+    const usersInClinic = await this.db
       .select({
         id: users.id,
         email: users.email,
@@ -90,13 +93,14 @@ export class ProfilesService {
         role: users.role,
         clinic_id: users.clinic_id,
         is_active: users.is_active,
-        google_id: users.google_id,
         avatar_url: users.avatar_url,
         created_at: users.created_at,
         updated_at: users.updated_at,
       })
       .from(users)
       .where(and(eq(users.clinic_id, clinicId), eq(users.is_active, true)));
+
+    return usersInClinic.map((user: any) => this.omitClinicId(user));
   }
 
   async updateRole(userId: string, role: string, requestorClinicId: string) {
@@ -129,12 +133,11 @@ export class ProfilesService {
         role: users.role,
         clinic_id: users.clinic_id,
         is_active: users.is_active,
-        google_id: users.google_id,
         avatar_url: users.avatar_url,
         created_at: users.created_at,
         updated_at: users.updated_at,
       });
 
-    return updatedUser;
+    return this.omitClinicId(updatedUser);
   }
 }

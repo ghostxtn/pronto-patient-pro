@@ -21,6 +21,11 @@ export class PatientsService {
     private readonly encryptionService: EncryptionService,
   ) {}
 
+  private omitClinicId<T extends { clinic_id?: unknown }>(row: T) {
+    const { clinic_id: _cid, ...rest } = row;
+    return rest;
+  }
+
   async create(dto: CreatePatientDto, clinicId: string) {
     const rawData: Record<string, any> = {
       clinic_id: clinicId,
@@ -47,10 +52,12 @@ export class PatientsService {
 
     const [patient] = await this.db.insert(patients).values(encryptedData).returning();
 
-    return this.encryptionService.decryptFields(
-      patient,
-      this.ENCRYPTED_FIELDS,
-      clinicId,
+    return this.omitClinicId(
+      await this.encryptionService.decryptFields(
+        patient,
+        this.ENCRYPTED_FIELDS,
+        clinicId,
+      ),
     );
   }
 
@@ -61,8 +68,14 @@ export class PatientsService {
       .where(and(eq(patients.clinic_id, clinicId), eq(patients.is_active, true)));
 
     return Promise.all(
-      results.map((p: any) =>
-        this.encryptionService.decryptFields(p, this.ENCRYPTED_FIELDS, clinicId),
+      results.map(async (p: any) =>
+        this.omitClinicId(
+          await this.encryptionService.decryptFields(
+            p,
+            this.ENCRYPTED_FIELDS,
+            clinicId,
+          ),
+        ),
       ),
     );
   }
@@ -78,10 +91,12 @@ export class PatientsService {
       throw new NotFoundException('Patient not found');
     }
 
-    return this.encryptionService.decryptFields(
-      patient,
-      this.ENCRYPTED_FIELDS,
-      clinicId,
+    return this.omitClinicId(
+      await this.encryptionService.decryptFields(
+        patient,
+        this.ENCRYPTED_FIELDS,
+        clinicId,
+      ),
     );
   }
 
@@ -142,10 +157,12 @@ export class PatientsService {
       .where(eq(patients.id, id))
       .returning();
 
-    return this.encryptionService.decryptFields(
-      patient,
-      this.ENCRYPTED_FIELDS,
-      clinicId,
+    return this.omitClinicId(
+      await this.encryptionService.decryptFields(
+        patient,
+        this.ENCRYPTED_FIELDS,
+        clinicId,
+      ),
     );
   }
 
@@ -161,10 +178,12 @@ export class PatientsService {
       .where(eq(patients.id, id))
       .returning();
 
-    return this.encryptionService.decryptFields(
-      patient,
-      this.ENCRYPTED_FIELDS,
-      clinicId,
+    return this.omitClinicId(
+      await this.encryptionService.decryptFields(
+        patient,
+        this.ENCRYPTED_FIELDS,
+        clinicId,
+      ),
     );
   }
 
@@ -176,10 +195,12 @@ export class PatientsService {
       .where(and(eq(patients.tc_no_hash, hash), eq(patients.clinic_id, clinicId)))
       .limit(1);
     if (results.length === 0) return null;
-    return this.encryptionService.decryptFields(
-      results[0],
-      this.ENCRYPTED_FIELDS,
-      clinicId,
+    return this.omitClinicId(
+      await this.encryptionService.decryptFields(
+        results[0],
+        this.ENCRYPTED_FIELDS,
+        clinicId,
+      ),
     );
   }
 }

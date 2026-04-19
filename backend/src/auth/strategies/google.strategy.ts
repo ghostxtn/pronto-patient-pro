@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
 import { Profile, Strategy } from 'passport-google-oauth20';
@@ -8,6 +8,8 @@ import { AuthService } from '../auth.service';
 
 @Injectable()
 export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
+  private readonly logger = new Logger(GoogleStrategy.name);
+
   constructor(
     private readonly configService: ConfigService,
     private readonly authService: AuthService,
@@ -24,6 +26,22 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
     });
   }
 
+  private maskEmail(email?: string | null) {
+    if (!email) {
+      return '';
+    }
+
+    return email.replace(/^(.{2}).*(@.*)$/, '$1***$2');
+  }
+
+  private maskGoogleId(googleId?: string | null) {
+    if (!googleId) {
+      return '';
+    }
+
+    return `***${googleId.slice(-4)}`;
+  }
+
   async validate(
     req: TenantRequest,
     accessToken: string,
@@ -31,15 +49,17 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
     profile: Profile,
     done: VerifyCallback,
   ) {
-    console.log('[auth][googleStrategy] validate start', {
-      clinicId: req.tenant?.clinicId,
-      googleId: profile.id,
-      email: profile.emails?.[0]?.value ?? '',
-    });
+    this.logger.log(
+      `[auth][googleStrategy] validate start ${JSON.stringify({
+        clinicId: req.tenant?.clinicId,
+        googleId: this.maskGoogleId(profile.id),
+        email: this.maskEmail(profile.emails?.[0]?.value ?? ''),
+      })}`,
+    );
 
     const clinicId = req.tenant?.clinicId;
     if (!clinicId) {
-      console.error('[auth][googleStrategy] tenant context missing');
+      this.logger.error('[auth][googleStrategy] tenant context missing');
       return done(new Error('Tenant context missing'), false);
     }
 
@@ -66,13 +86,24 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
         trustedDeviceToken: this.getTrustedDeviceToken(req),
       });
 
-      console.log('[auth][googleStrategy] validate success', {
-        email,
-        requiresOtp: 'requiresOtp' in result ? result.requiresOtp : false,
-      });
+      this.logger.log(
+        `[auth][googleStrategy] validate success ${JSON.stringify({
+          clinicId,
+          email: this.maskEmail(email),
+          googleId: this.maskGoogleId(googleId),
+          requiresOtp: 'requiresOtp' in result ? result.requiresOtp : false,
+        })}`,
+      );
       done(null, result);
     } catch (error) {
-      console.error('[auth][googleStrategy] validate failed', error);
+      this.logger.error(
+        `[auth][googleStrategy] validate failed ${JSON.stringify({
+          clinicId,
+          email: this.maskEmail(email),
+          googleId: this.maskGoogleId(googleId),
+          errorName: error instanceof Error ? error.name : 'UnknownError',
+        })}`,
+      );
       done(error as Error, false);
     }
   }
