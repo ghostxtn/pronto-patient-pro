@@ -4,6 +4,7 @@ import {
   IsOptional,
   IsString,
   Length,
+  MaxLength,
   MinLength,
 } from 'class-validator';
 
@@ -11,11 +12,13 @@ export class UpdatePatientDto {
   @IsOptional()
   @IsString()
   @MinLength(1)
+  @MaxLength(100)
   firstName?: string;
 
   @IsOptional()
   @IsString()
   @MinLength(1)
+  @MaxLength(100)
   lastName?: string;
 
   @IsOptional()
@@ -34,6 +37,7 @@ export class UpdatePatientDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(20)
   phone?: string;
 
   @IsOptional()
@@ -42,6 +46,7 @@ export class UpdatePatientDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(500)
   address?: string;
 
   @IsOptional()

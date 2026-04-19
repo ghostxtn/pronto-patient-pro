@@ -49,6 +49,8 @@ type ClinicSeed = {
   }>;
 };
 
+const seedPassword = process.env.SEED_PASSWORD ?? 'Password123!';
+
 const clinicSeeds: ClinicSeed[] = [
   {
     clinic: {
@@ -61,21 +63,21 @@ const clinicSeeds: ClinicSeed[] = [
     },
     owner: {
       email: 'owner@testklinik.local',
-      password: 'Password123!',
+      password: seedPassword,
       firstName: 'Test',
       lastName: 'Owner',
       role: 'owner',
     },
     admin: {
       email: 'admin@testklinik.local',
-      password: 'Password123!',
+      password: seedPassword,
       firstName: 'Test',
       lastName: 'Admin',
       role: 'admin',
     },
     doctor: {
       email: 'doctor@testklinik.local',
-      password: 'Password123!',
+      password: seedPassword,
       firstName: 'Deniz',
       lastName: 'Yilmaz',
       role: 'doctor',
@@ -85,7 +87,7 @@ const clinicSeeds: ClinicSeed[] = [
     },
     staff: {
       email: 'staff@testklinik.local',
-      password: 'Password123!',
+      password: seedPassword,
       firstName: 'Test',
       lastName: 'Staff',
       role: 'staff',
@@ -93,7 +95,7 @@ const clinicSeeds: ClinicSeed[] = [
     },
     patient: {
       email: 'patient@testklinik.local',
-      password: 'Password123!',
+      password: seedPassword,
       firstName: 'Ayse',
       lastName: 'Demir',
       role: 'patient',
@@ -335,6 +337,10 @@ async function ensureDoctorProfile(
 }
 
 async function main() {
+  if (!process.env.SEED_PASSWORD) {
+    console.warn('[SEED] SEED_PASSWORD not set — using default dev password');
+  }
+
   const connectionString = process.env.DATABASE_URL;
 
   if (!connectionString) {

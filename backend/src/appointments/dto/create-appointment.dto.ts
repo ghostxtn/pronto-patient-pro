@@ -1,4 +1,4 @@
-import { IsDateString, IsOptional, IsString, IsUUID, Matches } from 'class-validator';
+import { IsDateString, IsOptional, IsString, IsUUID, Matches, MaxLength } from 'class-validator';
 
 export class CreateAppointmentDto {
   @IsUUID()
@@ -28,5 +28,6 @@ export class CreateAppointmentDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(2000)
   notes?: string;
 }
