@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   Inject,
   Injectable,
@@ -59,6 +60,29 @@ export class AvailabilityService {
     await this.ensureDoctorInClinic(dto.doctorId, clinicId);
     this.validateAvailabilityRange(dto.startTime, dto.endTime);
 
+    if (dto.specificDate) {
+      const [availability] = await this.db
+        .insert(doctorAvailability)
+        .values({
+          doctor_id: dto.doctorId,
+          clinic_id: clinicId,
+          day_of_week: null,
+          specific_date: dto.specificDate,
+          start_time: dto.startTime,
+          end_time: dto.endTime,
+          slot_duration: dto.slotDuration ?? 30,
+        })
+        .returning();
+
+      return availability;
+    }
+
+    if (dto.dayOfWeek === undefined) {
+      throw new BadRequestException(
+        'dayOfWeek is required when specificDate is not provided.',
+      );
+    }
+
     const candidateRange = this.toRange(dto.startTime, dto.endTime);
     const overlappingSlots = await this.findOverlappingActiveSlots({
       clinicId,
@@ -78,6 +102,7 @@ export class AvailabilityService {
           doctor_id: dto.doctorId,
           clinic_id: clinicId,
           day_of_week: dto.dayOfWeek,
+          specific_date: null,
           start_time: dto.startTime,
           end_time: dto.endTime,
           slot_duration: slotDuration,
@@ -144,6 +169,10 @@ export class AvailabilityService {
     this.validateAvailabilityRange(nextStartTime, nextEndTime);
 
     if (!nextIsActive) {
+      return this.updateAvailabilityRecord(id, dto);
+    }
+
+    if (nextDayOfWeek === null || nextDayOfWeek === undefined) {
       return this.updateAvailabilityRecord(id, dto);
     }
 
@@ -228,24 +257,36 @@ export class AvailabilityService {
       await this.getClinicDefaultAppointmentDurationForDoctor(doctorId);
 
     const dayOfWeek = new Date(`${date}T00:00:00`).getDay();
-    const availabilityBlocks = await this.db
-      .select()
-      .from(doctorAvailability)
-      .where(
-        and(
-          eq(doctorAvailability.doctor_id, doctorId),
-          eq(doctorAvailability.clinic_id, clinicId),
-          eq(doctorAvailability.day_of_week, dayOfWeek),
-          eq(doctorAvailability.is_active, true),
-        ),
-      );
+    const [weeklyAvailabilityBlocks, specificDateAvailabilityBlocks] =
+      await Promise.all([
+        this.db
+          .select()
+          .from(doctorAvailability)
+          .where(
+            and(
+              eq(doctorAvailability.doctor_id, doctorId),
+              eq(doctorAvailability.clinic_id, clinicId),
+              eq(doctorAvailability.day_of_week, dayOfWeek),
+              eq(doctorAvailability.is_active, true),
+            ),
+          ),
+        this.db
+          .select()
+          .from(doctorAvailability)
+          .where(
+            and(
+              eq(doctorAvailability.doctor_id, doctorId),
+              eq(doctorAvailability.clinic_id, clinicId),
+              eq(doctorAvailability.specific_date, date),
+              eq(doctorAvailability.is_active, true),
+            ),
+          ),
+      ]);
 
-    if (availabilityBlocks.length === 0) {
-      return {
-        availabilityRanges: [],
-        slotEntries: [],
-      };
-    }
+    const availabilityBlocks = [
+      ...(weeklyAvailabilityBlocks as DoctorAvailability[]),
+      ...(specificDateAvailabilityBlocks as DoctorAvailability[]),
+    ];
 
     const overrides = await this.db
       .select()
@@ -259,6 +300,13 @@ export class AvailabilityService {
       );
 
     if (overrides.some((override: { type: string }) => override.type === 'blackout')) {
+      return {
+        availabilityRanges: [],
+        slotEntries: [],
+      };
+    }
+
+    if (availabilityBlocks.length === 0) {
       return {
         availabilityRanges: [],
         slotEntries: [],

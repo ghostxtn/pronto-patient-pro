@@ -17,7 +17,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -26,6 +25,7 @@ export interface AvailabilityModalProps {
   onClose: () => void;
   mode: "create" | "edit";
   doctorId: string;
+  defaultDuration: number;
   initialDayOfWeek?: number;
   initialStartTime?: string;
   initialEndTime?: string;
@@ -47,6 +47,7 @@ export function AvailabilityModal({
   onClose,
   mode,
   doctorId,
+  defaultDuration,
   initialDayOfWeek,
   initialStartTime,
   initialEndTime,
@@ -68,6 +69,27 @@ export function AvailabilityModal({
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const allTimes = useMemo(() => {
+    const times: string[] = [];
+    const startMinutes = 6 * 60;
+    const endMinutes = 22 * 60;
+    for (let m = startMinutes; m <= endMinutes; m += defaultDuration) {
+      const h = Math.floor(m / 60).toString().padStart(2, "0");
+      const min = (m % 60).toString().padStart(2, "0");
+      times.push(`${h}:${min}`);
+    }
+    return times;
+  }, [defaultDuration]);
+
+  const endTimeOptions = useMemo(() => {
+    if (!startTime) return allTimes;
+    const [h, m] = startTime.split(":").map(Number);
+    const startMinutes = h * 60 + m;
+    return allTimes.filter((t) => {
+      const [th, tm] = t.split(":").map(Number);
+      return th * 60 + tm > startMinutes;
+    });
+  }, [allTimes, startTime]);
 
   useEffect(() => {
     if (!open) return;
@@ -185,19 +207,41 @@ export function AvailabilityModal({
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
-                <Label htmlFor="availability-start">{t.startTime}</Label>
-                <Input id="availability-start" type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} className="rounded-xl" />
+                <Label>{t.startTime}</Label>
+                <Select
+                  value={startTime}
+                  onValueChange={(val) => {
+                    setStartTime(val);
+                    if (endTime) {
+                      const [sh, sm] = val.split(":").map(Number);
+                      const [eh, em] = endTime.split(":").map(Number);
+                      if (eh * 60 + em <= sh * 60 + sm) setEndTime("");
+                    }
+                  }}
+                >
+                  <SelectTrigger className="rounded-xl">
+                    <SelectValue placeholder="--:--" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {allTimes.map((t) => (
+                      <SelectItem key={t} value={t}>{t}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="availability-end">{t.endTime}</Label>
-                <Input
-                  id="availability-end"
-                  type="time"
-                  value={endTime}
-                  onChange={(event) => setEndTime(event.target.value)}
-                  className="rounded-xl"
-                />
+                <Label>{t.endTime}</Label>
+                <Select value={endTime} onValueChange={setEndTime} disabled={!startTime}>
+                  <SelectTrigger className="rounded-xl">
+                    <SelectValue placeholder="--:--" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {endTimeOptions.map((t) => (
+                      <SelectItem key={t} value={t}>{t}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 

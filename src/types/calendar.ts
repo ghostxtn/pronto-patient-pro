@@ -1,7 +1,8 @@
 export interface AvailabilitySlot {
   id: string;
   doctor_id: string;
-  day_of_week: number;
+  day_of_week: number | null;
+  specific_date?: string | null;
   start_time: string;
   end_time: string;
   slot_duration: number;

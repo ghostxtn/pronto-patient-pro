@@ -1,3 +1,709 @@
+## FILE: src/pages/staff/StaffDoctors.tsx
+
+```tsx
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { tr } from "date-fns/locale";
+import { motion } from "framer-motion";
+import { Views, type View } from "react-big-calendar";
+import { CalendarDays, ChevronRight, PanelLeftOpen, Search } from "lucide-react";
+import AppLayout from "@/components/AppLayout";
+import { DoctorCalendar } from "@/components/calendar/DoctorCalendar";
+import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
+import api from "@/services/api";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerDescription,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer";
+import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
+import type { AvailabilitySlot } from "@/types/calendar";
+
+const fadeUp = {
+  hidden: { opacity: 0, y: 20 },
+  visible: (i: number) => ({
+    opacity: 1,
+    y: 0,
+    transition: { delay: i * 0.08, duration: 0.5, ease: [0.22, 1, 0.36, 1] as const },
+  }),
+};
+
+type DoctorFilter = "all" | "available";
+
+interface DoctorSummary {
+  id: string;
+  email?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+  specialization?: {
+    name?: string | null;
+  } | null;
+  todaySlotCount: number;
+  isAvailableToday: boolean;
+}
+
+function getDoctorDisplayName(
+  doctor: Pick<DoctorSummary, "email" | "firstName" | "lastName">,
+  fallback = "Doktor",
+) {
+  const fullName = `${doctor.firstName ?? ""} ${doctor.lastName ?? ""}`.trim();
+  return fullName || doctor.email || fallback;
+}
+
+function getDoctorInitials(doctor: Pick<DoctorSummary, "email" | "firstName" | "lastName">) {
+  const name = getDoctorDisplayName(doctor);
+  return name
+    .split(" ")
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("");
+}
+
+function DoctorSelectionList({
+  doctors,
+  isLoading,
+  selectedDoctorId,
+  onSelect,
+}: {
+  doctors: DoctorSummary[];
+  isLoading: boolean;
+  selectedDoctorId: string | null;
+  onSelect: (doctorId: string) => void;
+}) {
+  if (isLoading) {
+    return (
+      <div className="space-y-3">
+        {[1, 2, 3, 4].map((item) => (
+          <div key={item} className="h-24 animate-pulse rounded-[22px] bg-muted/40" />
+        ))}
+      </div>
+    );
+  }
+
+  if (!doctors.length) {
+    return <p className="py-8 text-center text-sm text-muted-foreground">Filtreyle eslesen doktor bulunmuyor.</p>;
+  }
+
+  return (
+    <div className="space-y-2.5 overflow-x-hidden">
+      {doctors.map((doctor) => {
+        const isSelected = selectedDoctorId === doctor.id;
+
+        return (
+          <button
+            key={doctor.id}
+            type="button"
+            onClick={() => onSelect(doctor.id)}
+            className={cn(
+              "block w-full max-w-full overflow-hidden rounded-[22px] border px-3 py-3 text-left transition-all duration-200",
+              !doctor.isAvailableToday && "opacity-50",
+              isSelected
+                ? "border-primary/20 bg-primary/10 shadow-soft"
+                : "border-border/60 bg-background/70 hover:border-primary/15 hover:bg-accent/35",
+            )}
+          >
+            <div className="flex items-start gap-2.5 overflow-hidden">
+              <div
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[11px] font-semibold text-white"
+                style={{ backgroundColor: isSelected ? "#2563eb" : "#65a98f" }}
+              >
+                {getDoctorInitials(doctor)}
+              </div>
+
+              <div className="min-w-0 flex-1 space-y-1.5 overflow-hidden">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-foreground">
+                      {getDoctorDisplayName(doctor)}
+                    </p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {doctor.specialization?.name ?? "Brans belirtilmedi"}
+                    </p>
+                  </div>
+                  {doctor.isAvailableToday ? (
+                    <span
+                      style={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: "9999px",
+                        backgroundColor: "#16a34a",
+                        display: "inline-block",
+                        flexShrink: 0,
+                      }}
+                    />
+                  ) : null}
+                </div>
+
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <span className="max-w-full truncate rounded-full bg-accent/70 px-2 py-0.5 text-[10px] font-medium text-foreground/80">
+                    {doctor.todaySlotCount} bugunku slot
+                  </span>
+                </div>
+              </div>
+            </div>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function SelectedDoctorContext({ doctor }: { doctor: DoctorSummary | null }) {
+  if (!doctor) {
+    return (
+      <div className="rounded-[24px] border border-dashed border-border/60 bg-background/60 px-4 py-5 text-sm text-muted-foreground">
+        Takvimi odaga almak icin bir doktor secin.
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-[24px] border border-primary/15 bg-primary/5 px-4 py-4">
+      <div className="flex items-start gap-3">
+        <div
+          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg text-sm font-semibold text-white shadow-soft"
+          style={{ backgroundColor: "#65a98f" }}
+        >
+          {getDoctorInitials(doctor)}
+        </div>
+
+        <div className="min-w-0 space-y-1">
+          <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-primary">
+            Secili doktor
+          </p>
+          <h2 className="truncate text-lg font-display font-semibold text-foreground">
+            {getDoctorDisplayName(doctor)}
+          </h2>
+          <p className="truncate text-sm text-muted-foreground">
+            {doctor.specialization?.name ?? "Brans belirtilmedi"}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        <Badge variant="outline" className="rounded-full border-border/60 bg-card text-foreground">
+          {doctor.todaySlotCount} aktif slot
+        </Badge>
+        <Badge
+          variant="outline"
+          className={cn(
+            "rounded-full border",
+            doctor.isAvailableToday
+              ? "border-secondary/25 bg-secondary/10 text-secondary"
+              : "border-border/60 bg-card text-muted-foreground",
+          )}
+        >
+          {doctor.isAvailableToday ? "Bugun musait" : "Bugun pasif"}
+        </Badge>
+      </div>
+    </div>
+  );
+}
+
+function StaffSchedulerRail({
+  calendarDate,
+  calendarMonth,
+  onDateSelect,
+  onMonthChange,
+  onToday,
+  selectedDoctor,
+  searchValue,
+  onSearchChange,
+  filterMode,
+  onFilterModeChange,
+  doctors,
+  isLoading,
+  selectedDoctorId,
+  onSelectDoctor,
+  mobile = false,
+}: {
+  calendarDate: Date;
+  calendarMonth: Date;
+  onDateSelect: (date: Date) => void;
+  onMonthChange: (date: Date) => void;
+  onToday: () => void;
+  selectedDoctor: DoctorSummary | null;
+  searchValue: string;
+  onSearchChange: (value: string) => void;
+  filterMode: DoctorFilter;
+  onFilterModeChange: (value: DoctorFilter) => void;
+  doctors: DoctorSummary[];
+  isLoading: boolean;
+  selectedDoctorId: string | null;
+  onSelectDoctor: (doctorId: string) => void;
+  mobile?: boolean;
+}) {
+  return (
+    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-[32px] border border-border/60 bg-card/95 shadow-soft">
+      <div className="min-h-0 flex-1 overflow-y-auto scrollbar-thin">
+        <section className="border-b border-border/50 px-4 py-4">
+          <div className="mb-2">
+            <h2 className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">Doktor Odağı</h2>
+          </div>
+
+          <div className="rounded-[26px] border border-border/60 bg-background/72 p-3 shadow-soft">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                  Tarih gezgini
+                </p>
+                <p className="mt-1 text-sm font-semibold text-foreground">
+                  {calendarDate.toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" })}
+                </p>
+              </div>
+
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="rounded-full border-border/60 bg-card"
+                onClick={onToday}
+              >
+                Bugun
+              </Button>
+            </div>
+
+            <Calendar
+              mode="single"
+              selected={calendarDate}
+              month={calendarMonth}
+              locale={tr}
+              onMonthChange={onMonthChange}
+              onSelect={(date) => date && onDateSelect(date)}
+              className="w-full rounded-[20px] bg-transparent p-0"
+              classNames={{
+                months: "w-full",
+                month: "space-y-3",
+                caption: "relative flex items-center justify-center px-8 pt-1",
+                caption_label: "text-sm font-semibold text-foreground",
+                nav_button: "h-8 w-8 rounded-full border border-border/60 bg-card p-0 opacity-100 hover:bg-accent",
+                table: "w-full border-collapse",
+                head_cell: "w-9 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground",
+                row: "mt-1.5 flex w-full",
+                cell: "h-9 w-9 p-0 text-center text-sm",
+                day: "h-9 w-9 rounded-full p-0 text-sm font-medium text-foreground hover:bg-accent/70",
+                day_today: "bg-accent text-accent-foreground",
+                day_selected: "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground",
+              }}
+            />
+          </div>
+
+          <div className="mt-4">
+            <SelectedDoctorContext doctor={selectedDoctor} />
+          </div>
+        </section>
+
+        <section className="flex flex-col px-4 pt-4 pb-3">
+          <div className="shrink-0 space-y-4">
+            <div>
+              <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                Doktorlar
+              </p>
+              <h2 className="text-lg font-display font-semibold text-foreground">Arama ve filtreler</h2>
+            </div>
+
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={searchValue}
+                onChange={(event) => onSearchChange(event.target.value)}
+                placeholder="Doktor veya brans ara"
+                className="rounded-full border-border/60 bg-background/70 pl-9"
+              />
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant={filterMode === "all" ? "default" : "outline"}
+                className={cn(
+                  "rounded-full",
+                  filterMode === "all" ? "shadow-soft" : "border-border/60 bg-card",
+                )}
+                onClick={() => onFilterModeChange("all")}
+              >
+                Tum doktorlar
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={filterMode === "available" ? "default" : "outline"}
+                className={cn(
+                  "rounded-full",
+                  filterMode === "available" ? "shadow-soft" : "border-border/60 bg-card",
+                )}
+                onClick={() => onFilterModeChange("available")}
+              >
+                Bugun musait
+              </Button>
+            </div>
+          </div>
+
+          <div className="mt-3 rounded-[24px] border border-border/50 bg-background/55 overflow-hidden">
+            <div className="overflow-y-auto overflow-x-hidden px-2 py-2 scrollbar-thin" style={{ maxHeight: "22rem" }}>
+              <DoctorSelectionList
+                doctors={doctors}
+                isLoading={isLoading}
+                selectedDoctorId={selectedDoctorId}
+                onSelect={onSelectDoctor}
+              />
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}
+
+export default function StaffDoctors() {
+  const { t } = useLanguage();
+  const { user } = useAuth();
+  const previousCompactLayoutRef = useRef(false);
+  const [isCompactLayout, setIsCompactLayout] = useState(false);
+  const [doctorAvailabilityMap, setDoctorAvailabilityMap] = useState<
+    Record<string, Pick<DoctorSummary, "todaySlotCount" | "isAvailableToday">>
+  >({});
+  const [selectedDoctorId, setSelectedDoctorId] = useState<string | null>(null);
+  const [isDoctorDrawerOpen, setIsDoctorDrawerOpen] = useState(false);
+  const [calendarDate, setCalendarDate] = useState(new Date());
+  const [calendarMonth, setCalendarMonth] = useState(new Date());
+  const [calendarView, setCalendarView] = useState<View>(
+    () => (typeof window !== "undefined" && window.innerWidth < 1024 ? Views.DAY : Views.WEEK),
+  );
+  const [hasAutoCompactView, setHasAutoCompactView] = useState(false);
+  const [searchValue, setSearchValue] = useState("");
+  const [filterMode, setFilterMode] = useState<DoctorFilter>("all");
+  const todayDayOfWeek = new Date().getDay();
+  const todayDateString = new Date().toISOString().slice(0, 10);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(max-width: 1023px)");
+    const syncCompactLayout = () => {
+      setIsCompactLayout(mediaQuery.matches);
+    };
+
+    syncCompactLayout();
+    mediaQuery.addEventListener("change", syncCompactLayout);
+
+    return () => mediaQuery.removeEventListener("change", syncCompactLayout);
+  }, []);
+
+  const { data: doctors = [], isLoading } = useQuery<DoctorSummary[]>({
+    queryKey: ["staff-doctors", todayDayOfWeek],
+    queryFn: async () =>
+      (await api.doctors.list() as DoctorSummary[]).map((doctor) => ({
+        ...doctor,
+        todaySlotCount: 0,
+        isAvailableToday: false,
+      })),
+  });
+
+  useEffect(() => {
+    let isCancelled = false;
+
+    setDoctorAvailabilityMap({});
+
+    if (doctors.length === 0) {
+      return;
+    }
+
+    void Promise.allSettled(
+      doctors.map(async (doctor) => {
+        const slots = await api.availability.getDoctorSlots(doctor.id, todayDateString);
+        return {
+          doctorId: doctor.id,
+          todaySlotCount: slots.length,
+          isAvailableToday: slots.length > 0,
+        };
+      }),
+    ).then((results) => {
+      if (isCancelled) {
+        return;
+      }
+
+      const nextAvailabilityMap = doctors.reduce<
+        Record<string, Pick<DoctorSummary, "todaySlotCount" | "isAvailableToday">>
+      >((accumulator, doctor) => {
+        accumulator[doctor.id] = {
+          todaySlotCount: 0,
+          isAvailableToday: false,
+        };
+        return accumulator;
+      }, {});
+
+      for (const result of results) {
+        if (result.status !== "fulfilled") {
+          continue;
+        }
+
+        nextAvailabilityMap[result.value.doctorId] = {
+          todaySlotCount: result.value.todaySlotCount,
+          isAvailableToday: result.value.isAvailableToday,
+        };
+      }
+
+      setDoctorAvailabilityMap(nextAvailabilityMap);
+    });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [doctors, todayDateString]);
+
+  useEffect(() => {
+    if (!selectedDoctorId && doctors.length > 0) {
+      setSelectedDoctorId(doctors[0].id);
+    }
+  }, [doctors, selectedDoctorId]);
+
+  useEffect(() => {
+    const wasCompactLayout = previousCompactLayoutRef.current;
+
+    if (isCompactLayout && !wasCompactLayout) {
+      if (calendarView === Views.WEEK) {
+        setCalendarView(Views.DAY);
+        setHasAutoCompactView(true);
+      }
+    }
+
+    if (!isCompactLayout && wasCompactLayout && hasAutoCompactView && calendarView === Views.DAY) {
+      setCalendarView(Views.WEEK);
+      setHasAutoCompactView(false);
+    }
+
+    if (!isCompactLayout && wasCompactLayout && (!hasAutoCompactView || calendarView !== Views.DAY)) {
+      setHasAutoCompactView(false);
+    }
+
+    previousCompactLayoutRef.current = isCompactLayout;
+  }, [calendarView, hasAutoCompactView, isCompactLayout]);
+
+  const filteredDoctors = useMemo(() => {
+    const normalizedQuery = searchValue.trim().toLocaleLowerCase("tr-TR");
+
+    return doctors
+      .map((doctor) => ({
+        ...doctor,
+        ...doctorAvailabilityMap[doctor.id],
+      }))
+      .filter((doctor) => {
+      if (filterMode === "available" && !doctor.isAvailableToday) {
+        return false;
+      }
+
+      if (!normalizedQuery) {
+        return true;
+      }
+
+      const haystack = [
+        getDoctorDisplayName(doctor),
+        doctor.specialization?.name ?? "",
+        doctor.email ?? "",
+      ]
+        .join(" ")
+        .toLocaleLowerCase("tr-TR");
+
+        return haystack.includes(normalizedQuery);
+      });
+  }, [doctorAvailabilityMap, doctors, filterMode, searchValue]);
+
+  const selectedDoctor = useMemo(
+    () =>
+      doctors
+        .map((doctor) => ({
+          ...doctor,
+          ...doctorAvailabilityMap[doctor.id],
+        }))
+        .find((doctor) => doctor.id === selectedDoctorId) ?? null,
+    [doctorAvailabilityMap, doctors, selectedDoctorId],
+  );
+
+  const handleDoctorSelect = (doctorId: string) => {
+    setSelectedDoctorId(doctorId);
+    setIsDoctorDrawerOpen(false);
+  };
+
+  const handleCalendarDateChange = (date: Date) => {
+    setCalendarDate(date);
+    setCalendarMonth(date);
+  };
+
+  const handleToday = () => {
+    const today = new Date();
+    setCalendarDate(today);
+    setCalendarMonth(today);
+  };
+
+  const handleCalendarViewChange = (nextView: View) => {
+    setCalendarView(nextView);
+    setHasAutoCompactView(false);
+  };
+
+  return (
+    <AppLayout mainWidth="full" mainClassName="box-border flex h-[calc(100dvh-4rem)] min-h-0 overflow-hidden py-3 sm:py-4 px-3 sm:px-4">
+      <motion.div
+        initial="hidden"
+        animate="visible"
+        className="relative flex min-h-0 w-full flex-1 flex-col gap-5 overflow-hidden"
+      >
+        <div className="grid min-h-0 flex-1 gap-5 overflow-hidden lg:grid-cols-[292px_minmax(0,1fr)] xl:grid-cols-[308px_minmax(0,1fr)] 2xl:grid-cols-[320px_minmax(0,1fr)]">
+          <motion.aside
+            custom={0}
+            variants={fadeUp}
+            className="hidden min-h-0 shrink-0 overflow-hidden border-r border-border/40 lg:block"
+          >
+            <div className="flex h-full min-h-0 flex-col">
+              <StaffSchedulerRail
+                calendarDate={calendarDate}
+                calendarMonth={calendarMonth}
+                onDateSelect={handleCalendarDateChange}
+                onMonthChange={setCalendarMonth}
+                onToday={handleToday}
+                selectedDoctor={selectedDoctor}
+                searchValue={searchValue}
+                onSearchChange={setSearchValue}
+                filterMode={filterMode}
+                onFilterModeChange={setFilterMode}
+                doctors={filteredDoctors}
+                isLoading={isLoading}
+                selectedDoctorId={selectedDoctorId}
+                onSelectDoctor={handleDoctorSelect}
+              />
+            </div>
+          </motion.aside>
+
+          <motion.section
+            custom={1}
+            variants={fadeUp}
+            className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-hidden"
+          >
+            {isCompactLayout ? (
+              <Card className="shrink-0 rounded-[28px] border-border/60 bg-card/95 shadow-soft lg:hidden">
+                <CardContent className="flex flex-col gap-4 p-4 md:flex-row md:items-center md:justify-between">
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                      {t.doctorList}
+                    </p>
+                    <h2 className="truncate text-lg font-display font-semibold text-foreground">
+                      {selectedDoctor ? getDoctorDisplayName(selectedDoctor, t.doctor) : t.doctor}
+                    </h2>
+                    <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                      <span>{calendarDate.toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" })}</span>
+                      {selectedDoctor ? <span className="text-border">/</span> : null}
+                      {selectedDoctor ? (
+                        <span>{selectedDoctor.specialization?.name ?? t.specialtyNotSpecified}</span>
+                      ) : null}
+                      {calendarView ? <span className="rounded-full bg-accent/70 px-2 py-0.5 text-[11px] font-medium text-foreground/80">{calendarView === Views.DAY ? "Gun odagi" : calendarView === Views.WEEK ? "Hafta" : calendarView === Views.MONTH ? "Ay" : "Ajanda"}</span> : null}
+                    </div>
+                  </div>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full rounded-xl border-border/60 bg-card md:w-auto"
+                    onClick={() => setIsDoctorDrawerOpen(true)}
+                  >
+                    <PanelLeftOpen className="mr-2 h-4 w-4" />
+                    {t.doctorList}
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : null}
+
+            {!selectedDoctor && !isLoading ? (
+              <Card className="flex min-h-0 flex-1 rounded-[32px] border-border/60 bg-card/95 shadow-soft">
+                <CardContent className="flex min-h-0 flex-1 flex-col items-center justify-center text-center">
+                  <CalendarDays className="mb-4 h-10 w-10 text-primary" />
+                  <h2 className="text-xl font-display font-semibold">{t.calendarViewTitle}</h2>
+                  <p className="mt-2 max-w-md text-sm text-muted-foreground">{t.calendarViewDesc}</p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="mt-6 rounded-xl lg:hidden"
+                    onClick={() => setIsDoctorDrawerOpen(true)}
+                  >
+                    {t.doctorList}
+                    <ChevronRight className="ml-2 h-4 w-4" />
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : selectedDoctor ? (
+              <div className="min-h-0 flex-1 overflow-hidden">
+                <DoctorCalendar
+                  doctorId={selectedDoctor.id}
+                  mode="staff"
+                  doctorName={getDoctorDisplayName(selectedDoctor, t.doctor)}
+                  specializationName={selectedDoctor.specialization?.name ?? t.specialtyNotSpecified}
+                  defaultDuration={user?.default_appointment_duration ?? 30}
+                  calendarDate={calendarDate}
+                  onCalendarDateChange={handleCalendarDateChange}
+                  calendarView={calendarView}
+                  onCalendarViewChange={handleCalendarViewChange}
+                />
+              </div>
+            ) : (
+              <Card className="flex min-h-0 flex-1 rounded-[32px] border-border/60 bg-card/95 shadow-soft">
+                <CardContent className="flex min-h-0 flex-1 items-center justify-center">
+                  <div className="flex items-center gap-3 text-muted-foreground">
+                    <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                    {t.loading}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </motion.section>
+        </div>
+      </motion.div>
+
+      <Drawer open={isDoctorDrawerOpen} onOpenChange={setIsDoctorDrawerOpen}>
+        <DrawerContent className="max-h-[92vh] overflow-hidden rounded-t-[28px] lg:hidden">
+          <DrawerHeader>
+            <DrawerTitle>{t.doctorList}</DrawerTitle>
+            <DrawerDescription>
+              {t.calendarViewDesc}
+            </DrawerDescription>
+          </DrawerHeader>
+
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-6">
+            <StaffSchedulerRail
+              calendarDate={calendarDate}
+              calendarMonth={calendarMonth}
+              onDateSelect={handleCalendarDateChange}
+              onMonthChange={setCalendarMonth}
+              onToday={handleToday}
+              selectedDoctor={selectedDoctor}
+              searchValue={searchValue}
+              onSearchChange={setSearchValue}
+              filterMode={filterMode}
+              onFilterModeChange={setFilterMode}
+              doctors={filteredDoctors}
+              isLoading={isLoading}
+              selectedDoctorId={selectedDoctorId}
+              onSelectDoctor={handleDoctorSelect}
+              mobile
+            />
+          </div>
+        </DrawerContent>
+      </Drawer>
+    </AppLayout>
+  );
+}
+
+```
+
+## FILE: src/components/calendar/DoctorCalendar.tsx
+
+```tsx
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -114,17 +820,17 @@ const localizer = dateFnsLocalizer({
 });
 
 const calendarMessages = {
-  today: "Bugün",
+  today: "Bugun",
   previous: "Geri",
-  next: "İleri",
+  next: "Ileri",
   month: "Ay",
   week: "Hafta",
-  day: "Gün",
+  day: "Gun",
   agenda: "Ajanda",
   date: "Tarih",
   time: "Saat",
   event: "Etkinlik",
-  noEventsInRange: "Bu aralıkta etkinlik yok",
+  noEventsInRange: "Bu aralikta etkinlik yok",
   showMore: (total: number) => `+${total} daha`,
 };
 
@@ -144,9 +850,9 @@ const APPOINTMENT_STATUS_STYLES: Record<
   }
 > = {
   pending: {
-    background: "#FFF7ED",
-    text: "#9A3412",
-    accent: "#EA580C",
+    background: "#FEF9C3",
+    text: "#854D0E",
+    accent: "#CA8A04",
   },
   confirmed: {
     background: "#DBEAFE",
@@ -337,8 +1043,8 @@ const toolbarViewLabels = {
 const toolbarViews = [Views.WEEK, Views.DAY, Views.MONTH, Views.AGENDA] as const;
 const QUICK_ACTION_TIME_MINUTES_START = 6 * 60;
 const QUICK_ACTION_TIME_MINUTES_END = 23 * 60 + 45;
-const CALENDAR_START_HOUR = 7;
-const CALENDAR_END_HOUR = 21;
+const CALENDAR_START_HOUR = 6;
+const CALENDAR_END_HOUR = 23;
 const CALENDAR_START_MINUTES = CALENDAR_START_HOUR * 60;
 const CALENDAR_END_MINUTES = CALENDAR_END_HOUR * 60;
 
@@ -384,7 +1090,7 @@ function matchesAvailabilitySlotDate(slot: AvailabilitySlot, date: Date) {
 function getOverrideBadge(type: AvailabilityOverride["type"]) {
   return type === "blackout"
     ? {
-        label: "Kapalı Gün",
+        label: "Kapali gun",
         color: OVERRIDE_COLORS.blackout,
       }
     : {
@@ -918,7 +1624,7 @@ const CustomToolbar = ({
           onClick={onManageAvailability}
         >
           <Settings2 className="mr-2 h-4 w-4" />
-          Müsaitlik Paneli
+          Musaitlik paneli
         </Button>
       </div>
     </div>
@@ -1093,7 +1799,7 @@ function CalendarEventContent({
       event.type === "appointment"
         ? "Randevu"
         : event.type === "blackout"
-          ? "Kapalı Gün"
+          ? "Kapali gun"
           : "Blok";
 
     return (
@@ -1111,34 +1817,29 @@ function CalendarEventContent({
           (event.resource as Appointment | undefined)?.status,
         )
       : null;
-  const isAppointmentCancelled =
-    event.type === "appointment" &&
-    (() => {
-      const s = (event.resource as Appointment | undefined)?.status;
-      return s === "cancelled" || s === "canceled";
-    })();
 
   return (
     <div className="scheduler-event-content-stack">
+      <span className="scheduler-event-meta">{timeRange}</span>
       <span className="scheduler-event-title-row">
         {appointmentStatus ? (
           <AppointmentStatusIcon status={appointmentStatus} />
         ) : null}
+        <span className="scheduler-event-title">{title}</span>
+      </span>
+      {appointmentStatus === "pending" ? (
         <span
-          className={cn(
-            "scheduler-event-title",
-            isAppointmentCancelled && "line-through opacity-60",
-          )}
+          style={{
+            fontSize: 9,
+            opacity: 0.75,
+            fontWeight: 500,
+            marginTop: 1,
+            display: "block",
+          }}
         >
-          {title}
+          Onay bekliyor
         </span>
-      </span>
-      <span
-        className="scheduler-event-meta"
-        style={{ opacity: isAppointmentCancelled ? 0.45 : 1 }}
-      >
-        {timeRange}
-      </span>
+      ) : null}
     </div>
   );
 }
@@ -1429,9 +2130,9 @@ export function DoctorCalendar({
           toApiDate(rangeEnd),
         ) as Promise<AvailabilityOverride[]>,
         api.appointments.list({
-          doctorId: doctorId,
-          dateFrom: toApiDate(rangeStart),
-          dateTo: toApiDate(rangeEnd),
+          doctor_id: doctorId,
+          date_from: toApiDate(rangeStart),
+          date_to: toApiDate(rangeEnd),
         }) as Promise<CalendarAppointmentResponse[]>,
       ]);
 
@@ -1839,7 +2540,7 @@ export function DoctorCalendar({
       return [
         {
           id: `blackout-surface-${override.id}`,
-          title: "Kapalı Gün",
+          title: "Kapali gun",
           start: withTime(baseDate, "00:00"),
           end: withTime(baseDate, "23:59"),
           type: "blackout-surface" as const,
@@ -3128,7 +3829,7 @@ export function DoctorCalendar({
             disabled
           >
             <UserPlus className="h-4 w-4" />
-            Randevu Oluştur
+            Randevu olustur
           </Button>
         </div>
       );
@@ -3144,7 +3845,7 @@ export function DoctorCalendar({
             onClick={handleQuickActionOpenAppointmentComposer}
           >
             <UserPlus className="h-4 w-4" />
-            Randevu Oluştur
+            Randevu olustur
           </Button>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -3176,7 +3877,7 @@ export function DoctorCalendar({
           onClick={handleQuickActionOpenAppointmentComposer}
         >
           <UserPlus className="h-4 w-4" />
-          Randevu Oluştur
+          Randevu olustur
         </Button>
         <Button
           type="button"
@@ -3286,7 +3987,7 @@ export function DoctorCalendar({
           "scheduler-week-header",
           currentDay && "scheduler-week-header-today",
         )}
-        title="Sağ tık: günlük istisna ekle."
+        title="Sag tik: gunluk istisna ekle."
       >
         <span className="scheduler-week-header-day">
           {formatCalendarHeaderDay(date)}
@@ -3718,11 +4419,11 @@ export function DoctorCalendar({
           <DrawerHeader>
             <DrawerTitle>
               {quickActionSlot?.kind === "blocked"
-                ? "Seçili İstisna"
-                : "Seçili Aralık"}
+                ? "Secili istisna"
+                : "Secili aralik"}
             </DrawerTitle>
             <DrawerDescription>
-              Seçilen tarih ve saat aralığı için hızlı aksiyonlar.
+              Secilen tarih ve saat araligi icin hizli aksiyonlar burada acilir.
             </DrawerDescription>
           </DrawerHeader>
 
@@ -3780,9 +4481,9 @@ export function DoctorCalendar({
       >
         <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-lg">
           <SheetHeader>
-            <SheetTitle>Randevu Oluştur</SheetTitle>
+            <SheetTitle>Randevu olustur</SheetTitle>
             <SheetDescription>
-              Seçilen müsait zaman için randevu oluşturun
+              Secilen musait zaman icin hizli randevu kaydi olusturun.
             </SheetDescription>
           </SheetHeader>
 
@@ -3823,7 +4524,7 @@ export function DoctorCalendar({
                     setManualPatientNote("");
                   }}
                 >
-                  Kayıtlı Hasta
+                  Kayitli hasta
                 </Button>
                 <Button
                   type="button"
@@ -3835,7 +4536,7 @@ export function DoctorCalendar({
                     setPatientSearch("");
                   }}
                 >
-                  Manuel Giriş
+                  Manuel giris
                 </Button>
               </div>
 
@@ -4022,7 +4723,7 @@ export function DoctorCalendar({
           ) : null}
 
           <AlertDialogFooter>
-            <AlertDialogCancel>İptal</AlertDialogCancel>
+            <AlertDialogCancel>Iptal</AlertDialogCancel>
             <Button
               type="button"
               variant="destructive"
@@ -4097,9 +4798,9 @@ export function DoctorCalendar({
       >
         <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-lg">
           <SheetHeader className="pb-2">
-            <SheetTitle className="text-lg font-semibold">Müsaitlik Paneli</SheetTitle>
+            <SheetTitle className="text-lg font-semibold">Musaitlik paneli</SheetTitle>
             <SheetDescription className="text-sm text-muted-foreground">
-              Haftalık slotlar panelden düzenlenir, aktiflik durumunu
+              Haftalik musaitlik slotlarini burada duzenleyebilir, aktiflik durumunu
               degistirebilir veya yeni slot ekleyebilirsiniz. Takvimdeki yesil alanlar
               yalnizca gosterimdir.
             </SheetDescription>
@@ -4313,7 +5014,7 @@ export function DoctorCalendar({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setSlotToDelete(null)}>
-              İptal
+              Iptal
             </AlertDialogCancel>
             <Button
               variant="destructive"
@@ -4344,7 +5045,7 @@ export function DoctorCalendar({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setOverrideToDelete(null)}>
-              İptal
+              Iptal
             </AlertDialogCancel>
             <Button
               variant="destructive"
@@ -4416,3 +5117,1308 @@ export function DoctorCalendar({
     </div>
   );
 }
+
+```
+
+## FILE: src/components/calendar/AvailabilityModal.tsx
+
+```tsx
+import { useEffect, useMemo, useState } from "react";
+import { useMutation } from "@tanstack/react-query";
+import { Loader2, Trash2 } from "lucide-react";
+import { toast } from "sonner";
+import api, { ApiError } from "@/services/api";
+import type { AvailabilitySlot } from "@/types/calendar";
+import { useLanguage } from "@/contexts/LanguageContext";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+export interface AvailabilityModalProps {
+  open: boolean;
+  onClose: () => void;
+  mode: "create" | "edit";
+  doctorId: string;
+  defaultDuration: number;
+  initialDayOfWeek?: number;
+  initialStartTime?: string;
+  initialEndTime?: string;
+  slot?: AvailabilitySlot;
+  onDraftChange?: (draft: {
+    dayOfWeek: number;
+    startTime: string;
+    endTime: string;
+  } | null) => void;
+  onSaved: () => void;
+}
+
+function to24Hour(time?: string | null) {
+  return time ? time.slice(0, 5) : "";
+}
+
+export function AvailabilityModal({
+  open,
+  onClose,
+  mode,
+  doctorId,
+  defaultDuration,
+  initialDayOfWeek,
+  initialStartTime,
+  initialEndTime,
+  slot,
+  onDraftChange,
+  onSaved,
+}: AvailabilityModalProps) {
+  const { t } = useLanguage();
+  const dayOptions = [
+    { value: "1", label: t.monday },
+    { value: "2", label: t.tuesday },
+    { value: "3", label: t.wednesday },
+    { value: "4", label: t.thursday },
+    { value: "5", label: t.friday },
+    { value: "6", label: t.saturday },
+    { value: "0", label: t.sunday },
+  ] as const;
+  const [dayOfWeek, setDayOfWeek] = useState("1");
+  const [startTime, setStartTime] = useState("");
+  const [endTime, setEndTime] = useState("");
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const allTimes = useMemo(() => {
+    const times: string[] = [];
+    const startMinutes = 6 * 60;
+    const endMinutes = 22 * 60;
+    for (let m = startMinutes; m <= endMinutes; m += defaultDuration) {
+      const h = Math.floor(m / 60).toString().padStart(2, "0");
+      const min = (m % 60).toString().padStart(2, "0");
+      times.push(`${h}:${min}`);
+    }
+    return times;
+  }, [defaultDuration]);
+
+  const endTimeOptions = useMemo(() => {
+    if (!startTime) return allTimes;
+    const [h, m] = startTime.split(":").map(Number);
+    const startMinutes = h * 60 + m;
+    return allTimes.filter((t) => {
+      const [th, tm] = t.split(":").map(Number);
+      return th * 60 + tm > startMinutes;
+    });
+  }, [allTimes, startTime]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    if (mode === "edit" && slot) {
+      setDayOfWeek(String(slot.day_of_week));
+      setStartTime(initialStartTime ?? to24Hour(slot.start_time));
+      setEndTime(initialEndTime ?? to24Hour(slot.end_time));
+      return;
+    }
+
+    setDayOfWeek(String(initialDayOfWeek ?? 1));
+    setStartTime(initialStartTime ?? "");
+    setEndTime(initialEndTime ?? "");
+  }, [initialDayOfWeek, initialEndTime, initialStartTime, mode, open, slot]);
+
+  useEffect(() => {
+    if (!onDraftChange) {
+      return;
+    }
+
+    if (!open || !dayOfWeek || !startTime || !endTime) {
+      onDraftChange(null);
+      return;
+    }
+
+    onDraftChange({
+      dayOfWeek: Number(dayOfWeek),
+      startTime,
+      endTime,
+    });
+
+    return () => {
+      onDraftChange(null);
+    };
+  }, [dayOfWeek, endTime, onDraftChange, open, startTime]);
+
+  const timeError = useMemo(() => {
+    if (!startTime || !endTime) return "";
+    return endTime <= startTime ? t.invalidTimeRange : "";
+  }, [endTime, startTime, t]);
+
+  const isValid = Boolean(dayOfWeek && startTime && endTime) && !timeError;
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      if (!isValid) throw new Error(t.invalidForm);
+
+      const payload = {
+        dayOfWeek: Number(dayOfWeek),
+        startTime,
+        endTime,
+      };
+
+      if (mode === "edit" && slot) {
+        return api.availability.update(slot.id, payload);
+      }
+
+      return api.availability.create({ doctorId, ...payload });
+    },
+    onSuccess: () => {
+      toast.success(mode === "edit" ? t.availabilityUpdated : t.availabilityCreated);
+      onSaved();
+    },
+    onError: (error: unknown) => {
+      if (error instanceof ApiError && error.status === 409) {
+        toast.error(t.duplicateAvailability);
+        return;
+      }
+
+      toast.error(t.availabilitySaveFailed);
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      if (!slot) throw new Error(t.noAvailability);
+      return api.availability.remove(slot.id);
+    },
+    onSuccess: () => {
+      toast.success(t.availabilityRemoved);
+      setConfirmDeleteOpen(false);
+      onSaved();
+    },
+    onError: (error: unknown) => {
+      toast.error(error instanceof Error ? error.message : t.availabilityRemoveFailed);
+    },
+  });
+
+  return (
+    <>
+      <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
+        <DialogContent className="sm:max-w-md rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>{mode === "edit" ? t.availabilityEditTitle : t.availabilityCreateTitle}</DialogTitle>
+            <DialogDescription>{t.availabilityModalDesc}</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="availability-day">{t.dayOfWeek}</Label>
+              <Select value={dayOfWeek} onValueChange={setDayOfWeek}>
+                <SelectTrigger id="availability-day" className="rounded-xl">
+                  <SelectValue placeholder={t.selectDay} />
+                </SelectTrigger>
+                <SelectContent>
+                  {dayOptions.map((day) => (
+                    <SelectItem key={day.value} value={day.value}>
+                      {day.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>{t.startTime}</Label>
+                <Select
+                  value={startTime}
+                  onValueChange={(val) => {
+                    setStartTime(val);
+                    if (endTime) {
+                      const [sh, sm] = val.split(":").map(Number);
+                      const [eh, em] = endTime.split(":").map(Number);
+                      if (eh * 60 + em <= sh * 60 + sm) setEndTime("");
+                    }
+                  }}
+                >
+                  <SelectTrigger className="rounded-xl">
+                    <SelectValue placeholder="--:--" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {allTimes.map((t) => (
+                      <SelectItem key={t} value={t}>{t}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>{t.endTime}</Label>
+                <Select value={endTime} onValueChange={setEndTime} disabled={!startTime}>
+                  <SelectTrigger className="rounded-xl">
+                    <SelectValue placeholder="--:--" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {endTimeOptions.map((t) => (
+                      <SelectItem key={t} value={t}>{t}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {timeError ? <p className="text-sm text-destructive">{timeError}</p> : null}
+
+            <div className="flex items-center justify-between gap-3 pt-2">
+              {mode === "edit" && slot ? (
+                <Button type="button" variant="destructive" className="rounded-xl" onClick={() => setConfirmDeleteOpen(true)} disabled={deleteMutation.isPending || saveMutation.isPending}>
+                  <Trash2 className="h-4 w-4" />
+                  {t.delete}
+                </Button>
+              ) : (
+                <div />
+              )}
+
+              <Button type="button" className="rounded-xl" onClick={() => saveMutation.mutate()} disabled={!isValid || saveMutation.isPending || deleteMutation.isPending}>
+                {saveMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                {t.save}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t.deleteAvailabilityTitle}</AlertDialogTitle>
+            <AlertDialogDescription>{t.availabilityDeleteConfirm}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t.cancel}</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={(event) => {
+                event.preventDefault();
+                deleteMutation.mutate();
+              }}
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              {t.delete}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}
+
+```
+
+## FILE: src/components/calendar/OverrideModal.tsx
+
+```tsx
+import { useEffect, useMemo, useState } from "react";
+import { useMutation } from "@tanstack/react-query";
+import { Loader2, Trash2 } from "lucide-react";
+import { toast } from "sonner";
+import api, { ApiError } from "@/services/api";
+import type { AvailabilityOverride } from "@/types/calendar";
+import { useLanguage } from "@/contexts/LanguageContext";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+export interface OverrideModalProps {
+  open: boolean;
+  onClose: () => void;
+  mode: "create" | "edit";
+  doctorId: string;
+  defaultDuration: number;
+  initialDate?: string;
+  initialType?: "blackout" | "custom_hours";
+  override?: AvailabilityOverride;
+  onSaved: () => void;
+}
+
+function toTimeValue(time?: string | null) {
+  return time ? time.slice(0, 5) : "";
+}
+
+export function OverrideModal({
+  open,
+  onClose,
+  mode,
+  doctorId,
+  defaultDuration,
+  initialDate,
+  initialType = "blackout",
+  override,
+  onSaved,
+}: OverrideModalProps) {
+  const { t } = useLanguage();
+  const [date, setDate] = useState("");
+  const [type, setType] = useState<"blackout" | "custom_hours">("blackout");
+  const [startTime, setStartTime] = useState("");
+  const [endTime, setEndTime] = useState("");
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const allTimes = useMemo(() => {
+    const times: string[] = [];
+    const startMinutes = 6 * 60;
+    const endMinutes = 22 * 60;
+    for (let m = startMinutes; m <= endMinutes; m += defaultDuration) {
+      const h = Math.floor(m / 60).toString().padStart(2, "0");
+      const min = (m % 60).toString().padStart(2, "0");
+      times.push(`${h}:${min}`);
+    }
+    return times;
+  }, [defaultDuration]);
+
+  const endTimeOptions = useMemo(() => {
+    if (!startTime) return allTimes;
+    const [h, m] = startTime.split(":").map(Number);
+    const startMinutes = h * 60 + m;
+    return allTimes.filter((t) => {
+      const [th, tm] = t.split(":").map(Number);
+      return th * 60 + tm > startMinutes;
+    });
+  }, [allTimes, startTime]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    if (mode === "edit" && override) {
+      setDate(override.date);
+      setType(override.type);
+      setStartTime(toTimeValue(override.start_time));
+      setEndTime(toTimeValue(override.end_time));
+      return;
+    }
+
+    setDate(initialDate ?? "");
+    setType(initialType);
+    setStartTime("");
+    setEndTime("");
+  }, [initialDate, initialType, mode, open, override]);
+
+  const timeError = useMemo(() => {
+    if (type !== "custom_hours") return "";
+    if (!startTime || !endTime) return t.specialHoursRequireTimes;
+    return endTime <= startTime ? t.invalidTimeRange : "";
+  }, [endTime, startTime, t, type]);
+
+  const isValid = Boolean(date) && !timeError;
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      if (!isValid) throw new Error(t.invalidForm);
+
+      const payload = {
+        date,
+        type,
+        start_time: type === "custom_hours" ? startTime : undefined,
+        end_time: type === "custom_hours" ? endTime : undefined,
+      };
+
+      if (mode === "edit" && override) {
+        return api.availabilityOverrides.update(override.id, payload);
+      }
+
+      return api.availabilityOverrides.create({
+        doctor_id: doctorId,
+        ...payload,
+      });
+    },
+    onSuccess: () => {
+      toast.success(mode === "edit" ? t.overrideUpdated : t.overrideCreated);
+      onSaved();
+    },
+    onError: (error: unknown) => {
+      if (error instanceof ApiError) {
+        toast.error(error.message);
+        return;
+      }
+
+      toast.error(error instanceof Error ? error.message : t.overrideSaveFailed);
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      if (!override) throw new Error(t.deleteOverrideTitle);
+      return api.availabilityOverrides.remove(override.id);
+    },
+    onSuccess: () => {
+      toast.success(t.overrideRemoved);
+      setConfirmDeleteOpen(false);
+      onSaved();
+    },
+    onError: (error: unknown) => {
+      toast.error(error instanceof Error ? error.message : t.overrideRemoveFailed);
+    },
+  });
+
+  return (
+    <>
+      <Sheet open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
+        <SheetContent
+          side="right"
+          overlayClassName="bg-foreground/10 backdrop-blur-sm data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
+          className="w-[480px] overflow-y-auto border-l border-border/40 bg-background/95 px-0 shadow-2xl sm:max-w-[480px]"
+        >
+          <SheetHeader className="border-b border-border/50 px-6 pb-5 pt-8">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                  {t.overrideType}
+                </p>
+                <SheetTitle className="mt-2 font-display text-[1.45rem]">
+                  {mode === "edit" ? t.overrideEditTitle : t.overrideCreateTitle}
+                </SheetTitle>
+              </div>
+            </div>
+            <SheetDescription className="text-sm">
+              {t.overrideModalDesc}
+            </SheetDescription>
+          </SheetHeader>
+
+          <div className="space-y-5 px-6 py-6">
+            <div className="space-y-4 rounded-[24px] border border-border/60 bg-card/90 p-4 shadow-soft">
+              <div className="space-y-2">
+                <Label htmlFor="override-date">{t.date}</Label>
+                <Input
+                  id="override-date"
+                  type="date"
+                  value={date}
+                  onChange={(event) => setDate(event.target.value)}
+                  className="rounded-xl"
+                />
+              </div>
+
+              <div className="space-y-3">
+                <Label>{t.overrideType}</Label>
+                <RadioGroup
+                  value={type}
+                  onValueChange={(value) => setType(value as "blackout" | "custom_hours")}
+                  className="gap-3"
+                >
+                  <label
+                    htmlFor="override-blackout"
+                    className="flex items-center gap-3 rounded-[20px] border border-border/70 bg-background/70 p-3"
+                  >
+                    <RadioGroupItem value="blackout" id="override-blackout" />
+                    <span className="text-sm font-medium">{t.closeThisDay}</span>
+                  </label>
+                  <label
+                    htmlFor="override-custom-hours"
+                    className="flex items-center gap-3 rounded-[20px] border border-border/70 bg-background/70 p-3"
+                  >
+                    <RadioGroupItem value="custom_hours" id="override-custom-hours" />
+                    <span className="text-sm font-medium">{t.defineCustomHours}</span>
+                  </label>
+                </RadioGroup>
+              </div>
+
+              {type === "custom_hours" ? (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label>{t.startTime}</Label>
+                    <Select
+                      value={startTime}
+                      onValueChange={(val) => {
+                        setStartTime(val);
+                        if (endTime) {
+                          const [sh, sm] = val.split(":").map(Number);
+                          const [eh, em] = endTime.split(":").map(Number);
+                          if (eh * 60 + em <= sh * 60 + sm) setEndTime("");
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="rounded-xl">
+                        <SelectValue placeholder="--:--" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {allTimes.map((t) => (
+                          <SelectItem key={t} value={t}>{t}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>{t.endTime}</Label>
+                    <Select value={endTime} onValueChange={setEndTime} disabled={!startTime}>
+                      <SelectTrigger className="rounded-xl">
+                        <SelectValue placeholder="--:--" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {endTimeOptions.map((t) => (
+                          <SelectItem key={t} value={t}>{t}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              ) : null}
+
+              {timeError ? <p className="text-sm text-destructive">{timeError}</p> : null}
+            </div>
+
+            <div className="flex items-center justify-between gap-3">
+              {mode === "edit" && override ? (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  className="rounded-xl"
+                  onClick={() => setConfirmDeleteOpen(true)}
+                  disabled={saveMutation.isPending || deleteMutation.isPending}
+                >
+                  <Trash2 className="h-4 w-4" />
+                  {t.delete}
+                </Button>
+              ) : (
+                <div />
+              )}
+
+              <Button
+                type="button"
+                className="rounded-xl"
+                onClick={() => saveMutation.mutate()}
+                disabled={!isValid || saveMutation.isPending}
+              >
+                {saveMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                {t.save}
+              </Button>
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      <AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t.deleteOverrideTitle}</AlertDialogTitle>
+            <AlertDialogDescription>{t.overrideDeleteConfirm}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t.cancel}</AlertDialogCancel>
+            <Button type="button" variant="destructive" onClick={() => deleteMutation.mutate()} disabled={deleteMutation.isPending}>
+              {deleteMutation.isPending ? t.deleting : t.delete}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}
+
+```
+
+## FILE: src/components/appointments/AppointmentDetailSheet.tsx
+
+```tsx
+import { useEffect, useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { format, parseISO } from "date-fns";
+import { enUS, tr as trLocale } from "date-fns/locale";
+import { AlertCircle, CheckCircle2, FileText, Loader2, XCircle } from "lucide-react";
+import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
+import api from "@/services/api";
+import type { Appointment, ClinicalNote } from "@/types/calendar";
+import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+
+const STATUS_COLORS: Record<string, string> = {
+  pending: "#d4943a",
+  confirmed: "#4f8fe6",
+  completed: "#65a98f",
+  cancelled: "#5a7a8a",
+};
+
+export interface AppointmentDetailSheetProps {
+  appointment: Appointment | null;
+  open: boolean;
+  onClose: () => void;
+  onStatusUpdate?: (id: string, status: string) => void;
+}
+
+export function AppointmentDetailSheet({
+  appointment,
+  open,
+  onClose,
+  onStatusUpdate,
+}: AppointmentDetailSheetProps) {
+  const { user } = useAuth();
+  const { lang, t } = useLanguage();
+  const queryClient = useQueryClient();
+  const locale = lang === "tr" ? trLocale : enUS;
+  const isStaff = user?.role === "staff";
+  const [isNoteFormOpen, setIsNoteFormOpen] = useState(false);
+  const [diagnosis, setDiagnosis] = useState("");
+  const [treatment, setTreatment] = useState("");
+  const [prescription, setPrescription] = useState("");
+  const [notes, setNotes] = useState("");
+
+  useEffect(() => {
+    if (!open) {
+      setIsNoteFormOpen(false);
+      setDiagnosis("");
+      setTreatment("");
+      setPrescription("");
+      setNotes("");
+    }
+  }, [appointment?.id, open]);
+
+  const statusConfig: Record<string, { color: string; icon: React.ElementType; label: string }> = {
+    pending: { color: STATUS_COLORS.pending, icon: AlertCircle, label: t.pending },
+    confirmed: { color: STATUS_COLORS.confirmed, icon: CheckCircle2, label: t.confirmed },
+    completed: { color: STATUS_COLORS.completed, icon: CheckCircle2, label: t.completed },
+    cancelled: { color: STATUS_COLORS.cancelled, icon: XCircle, label: t.cancelled },
+  };
+
+  const { data: clinicalNotes, isLoading: isClinicalNotesLoading } = useQuery<ClinicalNote[]>({
+    queryKey: ["clinical-notes", appointment?.patient.id],
+    queryFn: async () => api.clinicalNotes.listByPatient(appointment!.patient.id),
+    enabled: !isStaff && open && Boolean(appointment?.patient.id),
+  });
+
+  const hasAtLeastOneField = useMemo(
+    () => [diagnosis, treatment, prescription, notes].some((value) => value.trim().length > 0),
+    [diagnosis, notes, prescription, treatment],
+  );
+
+  const createClinicalNote = useMutation({
+    mutationFn: async () => {
+      if (!appointment?.id || !appointment?.patient.id || !appointment.doctor_id) {
+        throw new Error(t.missingData);
+      }
+
+      return api.clinicalNotes.create({
+        patient_id: appointment.patient.id,
+        doctor_id: appointment.doctor_id,
+        appointment_id: appointment.id,
+        diagnosis: diagnosis.trim() || undefined,
+        treatment: treatment.trim() || undefined,
+        prescription: prescription.trim() || undefined,
+        notes: notes.trim() || undefined,
+      });
+    },
+    onSuccess: () => {
+      toast.success(t.clinicalNoteSaved);
+      setIsNoteFormOpen(false);
+      setDiagnosis("");
+      setTreatment("");
+      setPrescription("");
+      setNotes("");
+      queryClient.invalidateQueries({ queryKey: ["clinical-notes", appointment?.patient.id] });
+    },
+    onError: (err: unknown) => {
+      toast.error(err instanceof Error ? err.message : t.clinicalNoteSaveFailed);
+    },
+  });
+
+  const patientName = (
+    appointment?.patient.fullName
+    ?? [appointment?.patient.firstName, appointment?.patient.lastName].filter(Boolean).join(" ").trim()
+  ) || t.patient;
+  const statusKey = appointment?.status === "canceled" ? "cancelled" : appointment?.status;
+  const status = statusKey ? statusConfig[statusKey] : null;
+  const StatusIcon = status?.icon;
+
+  return (
+    <Sheet open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
+      <SheetContent side="right" className="w-[480px] sm:max-w-[480px] overflow-y-auto">
+        {appointment && status && StatusIcon ? (
+          <>
+            <SheetHeader>
+              <SheetTitle className="font-display">{t.appointmentDetails}</SheetTitle>
+              <div>
+                <Badge
+                  className={cn("mt-2 rounded-full border")}
+                  variant="outline"
+                  style={{
+                    backgroundColor: `${status.color}26`,
+                    borderColor: `${status.color}26`,
+                    color: status.color,
+                  }}
+                >
+                  <StatusIcon className="mr-1 h-3 w-3" /> {status.label}
+                </Badge>
+              </div>
+            </SheetHeader>
+
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-secondary to-success">
+                  <span className="font-display font-bold text-secondary-foreground">{patientName[0] || "P"}</span>
+                </div>
+                <div>
+                  <div className="font-semibold">{patientName}</div>
+                  {appointment.patient.email ? <div className="text-sm text-muted-foreground">{appointment.patient.email}</div> : null}
+                  {appointment.patient.phone ? <div className="text-sm text-muted-foreground">{appointment.patient.phone}</div> : null}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="rounded-xl bg-muted p-3">
+                  <div className="mb-1 text-muted-foreground">{t.date}</div>
+                  <div className="font-medium">{format(parseISO(appointment.appointment_date), "EEE, MMM d, yyyy", { locale })}</div>
+                </div>
+                <div className="rounded-xl bg-muted p-3">
+                  <div className="mb-1 text-muted-foreground">{t.time}</div>
+                  <div className="font-medium">{appointment.start_time.slice(0, 5)} - {appointment.end_time.slice(0, 5)}</div>
+                </div>
+              </div>
+
+              {appointment.notes ? (
+                <div className="rounded-xl bg-muted p-3">
+                  <div className="mb-1 flex items-center gap-1 text-sm text-muted-foreground">
+                    <FileText className="h-3 w-3" /> {t.patientNotes}
+                  </div>
+                  <p className="text-sm">{appointment.notes}</p>
+                </div>
+              ) : null}
+
+              {onStatusUpdate ? (
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    Durumu Güncelle
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      { key: "pending", label: "Bekleyen", color: "#f59e0b" },
+                      { key: "confirmed", label: "Onaylanan", color: "#2563eb" },
+                      { key: "completed", label: "Tamamlanan", color: "#16a34a" },
+                      { key: "cancelled", label: "İptal Edilen", color: "#dc2626" },
+                    ].map(({ key, label, color }) => {
+                      const isActive = appointment.status === key;
+
+                      return (
+                        <button
+                          key={key}
+                          type="button"
+                          disabled={isActive}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onStatusUpdate(appointment.id, key);
+                          }}
+                          className={cn(
+                            "flex items-center justify-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-medium transition-all",
+                            isActive
+                              ? "cursor-default opacity-100"
+                              : "opacity-60 hover:opacity-90",
+                          )}
+                          style={
+                            isActive
+                              ? {
+                                  backgroundColor: `${color}18`,
+                                  borderColor: `${color}50`,
+                                  color,
+                                }
+                              : {
+                                  backgroundColor: "transparent",
+                                  borderColor: "var(--border)",
+                                  color: "var(--muted-foreground)",
+                                }
+                          }
+                        >
+                          {isActive ? (
+                            <span
+                              className="h-1.5 w-1.5 rounded-full"
+                              style={{ backgroundColor: color }}
+                            />
+                          ) : null}
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
+
+              {!isStaff ? (
+                <div className="border-t pt-4">
+                  <div className="space-y-4">
+                    <div>
+                      <h4 className="font-display font-semibold">{t.previousNotes}</h4>
+                      <p className="mt-1 text-sm text-muted-foreground">{t.previousNotesDesc}</p>
+                    </div>
+
+                    {isClinicalNotesLoading ? (
+                      <div className="flex items-center gap-2 rounded-xl bg-muted p-3 text-sm text-muted-foreground">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        {t.clinicalNotesLoading}
+                      </div>
+                    ) : clinicalNotes && clinicalNotes.length > 0 ? (
+                      <div className="space-y-3">
+                        {clinicalNotes.map((note) => (
+                          <Card key={note.id} className="rounded-2xl border-border/60 shadow-none">
+                            <CardHeader className="space-y-2 pb-3">
+                              <div className="flex items-start justify-between gap-3">
+                                <CardTitle className="text-base font-semibold">
+                                  {[note.doctor.title, note.doctor.firstName, note.doctor.lastName].filter(Boolean).join(" ")}
+                                </CardTitle>
+                                <span className="text-xs text-muted-foreground">
+                                  {format(new Date(note.created_at), "d MMMM yyyy, HH:mm", { locale })}
+                                </span>
+                              </div>
+                            </CardHeader>
+                            <CardContent className="space-y-2 text-sm">
+                              {note.diagnosis ? <p><span className="font-medium">{t.diagnosis}:</span> {note.diagnosis}</p> : null}
+                              {note.treatment ? <p><span className="font-medium">{t.treatment}:</span> {note.treatment}</p> : null}
+                              {note.prescription ? <p><span className="font-medium">{t.prescription}:</span> {note.prescription}</p> : null}
+                              {note.notes ? <p><span className="font-medium">{t.notes}:</span> {note.notes}</p> : null}
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">{t.noClinicalNotesYet}</p>
+                    )}
+
+                    <div className="space-y-3 rounded-2xl bg-muted/40 p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <h4 className="font-display font-semibold">{t.newNoteTitle}</h4>
+                          <p className="mt-1 text-sm text-muted-foreground">{t.newNoteDesc}</p>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="rounded-xl"
+                          onClick={() => setIsNoteFormOpen((current) => !current)}
+                        >
+                          {t.addNewClinicalNote}
+                        </Button>
+                      </div>
+
+                      {isNoteFormOpen ? (
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="clinical-note-diagnosis">{t.diagnosis}</Label>
+                            <Textarea id="clinical-note-diagnosis" value={diagnosis} onChange={(e) => setDiagnosis(e.target.value)} className="rounded-xl text-sm" rows={3} />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="clinical-note-treatment">{t.treatment}</Label>
+                            <Textarea id="clinical-note-treatment" value={treatment} onChange={(e) => setTreatment(e.target.value)} className="rounded-xl text-sm" rows={3} />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="clinical-note-prescription">{t.prescription}</Label>
+                            <Textarea id="clinical-note-prescription" value={prescription} onChange={(e) => setPrescription(e.target.value)} className="rounded-xl text-sm" rows={3} />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="clinical-note-notes">{t.generalNote}</Label>
+                            <Textarea id="clinical-note-notes" value={notes} onChange={(e) => setNotes(e.target.value)} className="rounded-xl text-sm" rows={4} />
+                          </div>
+
+                          <Button
+                            type="button"
+                            className="w-full rounded-xl"
+                            onClick={() => createClinicalNote.mutate()}
+                            disabled={!hasAtLeastOneField || createClinicalNote.isPending}
+                          >
+                            {createClinicalNote.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                            {t.save}
+                          </Button>
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          </>
+        ) : null}
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+```
+
+## FILE: src/utils/calendarUtils.ts
+
+```ts
+import {
+  addDays,
+  format,
+  parseISO,
+  setHours,
+  setMinutes,
+  startOfWeek,
+  subDays,
+} from "date-fns";
+import {
+  Appointment,
+  AvailabilityOverride,
+  AvailabilitySlot,
+  CalendarEvent,
+} from "@/types/calendar";
+
+function parseTimeToDate(baseDate: Date, time: string) {
+  const [hours, minutes] = time.slice(0, 5).split(":").map(Number);
+  return setMinutes(setHours(baseDate, hours), minutes);
+}
+
+export function parseDateOnly(value: string) {
+  return parseISO(`${value}T00:00:00`);
+}
+
+export function availabilityToEvents(
+  slots: AvailabilitySlot[],
+  weekStart: Date,
+): CalendarEvent[] {
+  const sundayBase = startOfWeek(subDays(weekStart, 1), { weekStartsOn: 0 });
+
+  return slots.flatMap((slot) => {
+    const slotDate = slot.specific_date
+      ? parseDateOnly(slot.specific_date)
+      : Number.isInteger(slot.day_of_week)
+        ? addDays(sundayBase, slot.day_of_week)
+        : null;
+
+    if (!slotDate) {
+      return [];
+    }
+
+    return [
+      {
+        id: `availability-${slot.id}-${format(slotDate, "yyyy-MM-dd")}`,
+        title: "Musait",
+        start: parseTimeToDate(slotDate, slot.start_time),
+        end: parseTimeToDate(slotDate, slot.end_time),
+        type: "availability" as const,
+        resource: slot,
+      },
+    ];
+  });
+}
+
+export function appointmentsToEvents(
+  appointments: Appointment[],
+): CalendarEvent[] {
+  return appointments.map((appointment) => {
+    const baseDate = parseISO(appointment.appointment_date);
+    return {
+      id: appointment.id,
+      title: `${appointment.patient.firstName} ${appointment.patient.lastName}`.trim(),
+      start: parseTimeToDate(baseDate, appointment.start_time),
+      end: parseTimeToDate(baseDate, appointment.end_time),
+      type: "appointment",
+      resource: appointment,
+    };
+  });
+}
+
+export function overridesToEvents(
+  overrides: AvailabilityOverride[],
+): CalendarEvent[] {
+  return overrides.map((override) => {
+    const baseDate = parseISO(override.date);
+
+    if (override.type === "blackout") {
+      const blackoutDate = new Date(override.date);
+      return {
+        id: override.id,
+        title: override.reason ?? "Kapali",
+        start: blackoutDate,
+        end: blackoutDate,
+        allDay: true,
+        type: override.type,
+        resource: override,
+      };
+    }
+
+    const start =
+      override.start_time
+        ? parseTimeToDate(baseDate, override.start_time)
+        : setMinutes(setHours(baseDate, 0), 0);
+    const end =
+      override.end_time
+        ? parseTimeToDate(baseDate, override.end_time)
+        : setMinutes(setHours(baseDate, 23), 59);
+
+    return {
+      id: override.id,
+      title: override.reason ?? "Özel Mesai",
+      start,
+      end,
+      type: override.type,
+      resource: override,
+    };
+  });
+}
+
+```
+
+## FILE: src/types/calendar.ts
+
+```ts
+export interface AvailabilitySlot {
+  id: string;
+  doctor_id: string;
+  day_of_week: number | null;
+  specific_date?: string | null;
+  start_time: string;
+  end_time: string;
+  slot_duration: number;
+  is_active: boolean;
+}
+
+export interface AvailabilityOverride {
+  id: string;
+  doctor_id: string;
+  date: string;
+  type: "blackout" | "custom_hours";
+  start_time: string | null;
+  end_time: string | null;
+  reason: string | null;
+}
+
+export interface Appointment {
+  id: string;
+  doctor_id: string;
+  patient_id: string;
+  appointment_date: string;
+  start_time: string;
+  end_time: string;
+  status: string;
+  type: string;
+  notes?: string;
+  patient: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    fullName?: string;
+    email?: string;
+    phone?: string;
+  };
+}
+
+export interface ClinicalNote {
+  id: string;
+  patient_id: string;
+  doctor_id: string;
+  appointment_id: string | null;
+  diagnosis: string | null;
+  treatment: string | null;
+  prescription: string | null;
+  notes: string | null;
+  created_at: string;
+  doctor: {
+    firstName: string;
+    lastName: string;
+    title: string;
+  };
+}
+
+export interface CalendarEvent {
+  id: string;
+  title: string;
+  start: Date;
+  end: Date;
+  allDay?: boolean;
+  type: "availability" | "appointment" | "blackout" | "custom_hours";
+  resource?: Appointment | AvailabilitySlot | AvailabilityOverride;
+}
+
+```
+
+## FILE: src/services/api.ts
+
+```ts
+  doctors: {
+    list: (params?: { specialization_id?: string; status?: "active" | "inactive" | "all" }) => {
+      const search = new URLSearchParams();
+      if (params?.specialization_id) {
+        search.set("specialization_id", params.specialization_id);
+      }
+      if (params?.status) {
+        search.set("status", params.status);
+      }
+      return request<any[]>(`/doctors${search.toString() ? `?${search.toString()}` : ""}`);
+    },
+    publicDiscovery: () =>
+      request<
+        Array<{
+          id: string;
+          firstName?: string | null;
+          lastName?: string | null;
+          title?: string | null;
+          bio?: string | null;
+          specialization?: {
+            id?: string | null;
+            name?: string | null;
+          } | null;
+        }>
+      >("/doctors/public-discovery"),
+    get: (id: string) => request<any>(`/doctors/${id}`),
+    me: () => request<any>("/doctors/me"),
+    create: (data: unknown) =>
+      request<any>("/doctors", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    update: (id: string, data: unknown) =>
+      request<any>(`/doctors/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
+    delete: (id: string) =>
+      request<any>(`/doctors/${id}`, {
+        method: "DELETE",
+      }),
+  },
+
+  availability: {
+    listByDoctor: (doctorId: string) => request<any[]>(`/availability/${doctorId}`),
+    getDoctorSlots: (doctorId: string, date: string) =>
+      request<Array<{ startTime: string; endTime: string; duration: number }>>(
+        `/availability/slots?doctor_id=${encodeURIComponent(doctorId)}&date=${encodeURIComponent(date)}`,
+        { omitAuth: true },
+      ),
+    create: (data: {
+      doctorId: string;
+      dayOfWeek?: number;
+      specificDate?: string;
+      startTime: string;
+      endTime: string;
+      slotDuration?: number;
+    }) =>
+      request<any>("/availability", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    update: (id: string, data: object) =>
+      request<any>(`/availability/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
+    remove: (id: string) =>
+      request<any>(`/availability/${id}`, {
+        method: "DELETE",
+      }),
+    delete: (id: string) =>
+      request<any>(`/availability/${id}`, {
+        method: "DELETE",
+      }),
+  },
+
+  availabilityOverrides: {
+    listByDoctor: (doctorId: string, dateFrom: string, dateTo: string) =>
+      request<any[]>(
+        `/availability-overrides?doctor_id=${encodeURIComponent(doctorId)}&date_from=${encodeURIComponent(dateFrom)}&date_to=${encodeURIComponent(dateTo)}`,
+      ),
+    create: (data: {
+      doctor_id: string;
+      date: string;
+      type: "blackout" | "custom_hours";
+      start_time?: string;
+      end_time?: string;
+      reason?: string;
+    }) =>
+      request<any>("/availability-overrides", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    update: (id: string, data: object) =>
+      request<any>(`/availability-overrides/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
+    remove: (id: string) =>
+      request<any>(`/availability-overrides/${id}`, {
+        method: "DELETE",
+      }),
+  },
+
+  appointments: {
+    list: (params?: {
+      doctor_id?: string;
+      patient_id?: string;
+      date_from?: string;
+      date_to?: string;
+      status?: string;
+    }) => {
+      const search = new URLSearchParams();
+      if (params?.doctor_id) search.set("doctor_id", params.doctor_id);
+      if (params?.patient_id) search.set("patient_id", params.patient_id);
+      if (params?.date_from) search.set("date_from", params.date_from);
+      if (params?.date_to) search.set("date_to", params.date_to);
+      if (params?.status) search.set("status", params.status);
+      return request<any[]>(
+        `/appointments${search.toString() ? `?${search.toString()}` : ""}`,
+      );
+    },
+    get: (id: string) => request<any>(`/appointments/${id}`),
+    create: (data: unknown) =>
+      request<any>("/appointments", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    update: (id: string, data: unknown) =>
+      request<any>(`/appointments/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }),
+    updateStatus: (id: string, status: string) =>
+      request<any>(`/appointments/${id}/status`, {
+        method: "PATCH",
+        body: JSON.stringify({ status }),
+      }),
+    delete: (id: string) =>
+      request<any>(`/appointments/${id}`, {
+        method: "DELETE",
+      }),
+    notes: {
+      list: (appointmentId: string) =>
+        request<any[]>(`/appointments/${appointmentId}/notes`),
+      create: (appointmentId: string, data: unknown) =>
+        request<any>(`/appointments/${appointmentId}/notes`, {
+          method: "POST",
+          body: JSON.stringify(data),
+        }),
+      update: (appointmentId: string, noteId: string, data: unknown) =>
+        request<any>(`/appointments/${appointmentId}/notes/${noteId}`, {
+          method: "PATCH",
+          body: JSON.stringify(data),
+        }),
+      delete: (appointmentId: string, noteId: string) =>
+        request<any>(`/appointments/${appointmentId}/notes/${noteId}`, {
+          method: "DELETE",
+        }),
+    },
+  },
+```

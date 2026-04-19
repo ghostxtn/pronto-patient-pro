@@ -95,7 +95,8 @@ export default function DoctorProfile() {
     onError: (err: any) => toast.error(err.message || t.bookingFailed),
   });
 
-  const availableDays = availability?.map((a) => a.day_of_week) || [];
+  const weeklyAvailability = availability?.filter((slot) => !slot.specific_date) || [];
+  const availableDays = weeklyAvailability.map((a) => a.day_of_week);
   const isDateDisabled = (date: Date) => { if (isBefore(date, new Date()) && !isToday(date)) return true; return !availableDays.includes(date.getDay()); };
   const availableSlots = slots;
 
@@ -153,7 +154,7 @@ export default function DoctorProfile() {
               <h3 className="font-display font-semibold mb-3 flex items-center gap-2" style={{ color: "#1a2e3b", fontFamily: "Manrope, sans-serif", fontWeight: 600, marginBottom: "8px", display: "flex", alignItems: "center", gap: "8px" }}><Clock style={{ color: "#4f8fe6", width: 16, height: 16 }} /> {t.weeklySchedule}</h3>
               <div className="space-y-2">
                 {dayNames.map((day, idx) => {
-                  const daySlots = availability?.filter((a) => a.day_of_week === idx);
+                  const daySlots = weeklyAvailability.filter((a) => a.day_of_week === idx);
                   return (
                     <div key={day} className="flex items-center justify-between text-sm">
                       <span className={cn("font-medium", daySlots && daySlots.length > 0 ? "text-foreground" : "text-muted-foreground")} style={daySlots && daySlots.length > 0 ? { color: "#1a2e3b", fontWeight: 600 } : { color: "#b5d1cc" }}>{day}</span>
