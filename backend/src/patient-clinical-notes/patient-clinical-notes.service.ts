@@ -3,6 +3,7 @@ import {
   ForbiddenException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { isUUID } from 'class-validator';
@@ -22,6 +23,7 @@ import { UpdateClinicalNoteDto } from './dto/update-clinical-note.dto';
 
 @Injectable()
 export class PatientClinicalNotesService {
+  private readonly logger = new Logger(PatientClinicalNotesService.name);
   private readonly ENCRYPTED_FIELDS = ['diagnosis', 'treatment', 'prescription', 'notes'];
 
   constructor(
@@ -33,6 +35,16 @@ export class PatientClinicalNotesService {
   private omitClinicId<T extends { clinic_id?: unknown }>(row: T) {
     const { clinic_id: _cid, ...rest } = row;
     return rest;
+  }
+
+  private redactEncryptedFields<T extends Record<string, any>>(row: T) {
+    const redacted = { ...row } as Record<string, any>;
+    for (const field of this.ENCRYPTED_FIELDS) {
+      if (redacted[field]) {
+        redacted[field] = '[REDACTED]';
+      }
+    }
+    return redacted as T;
   }
 
   async listByPatient(patientId: string, clinicId: string, role: string) {
@@ -74,16 +86,29 @@ export class PatientClinicalNotesService {
       .orderBy(desc(patientClinicalNotes.created_at));
 
     return Promise.all(
-      results.map(async (row: any) => ({
-        ...this.omitClinicId(
-          await this.encryptionService.decryptFields(
-            row,
-            this.ENCRYPTED_FIELDS,
-            clinicId,
-          ),
-        ),
-        doctor: row.doctor,
-      })),
+      results.map(async (row: any) => {
+        try {
+          return {
+            ...this.omitClinicId(
+              await this.encryptionService.decryptFields(
+                row,
+                this.ENCRYPTED_FIELDS,
+                clinicId,
+              ),
+            ),
+            doctor: row.doctor,
+          };
+        } catch (err) {
+          this.logger.error(
+            `Decryption failed for record ${row.id} - returning redacted`,
+            err instanceof Error ? err.constructor.name : 'UnknownError',
+          );
+          return {
+            ...this.omitClinicId(this.redactEncryptedFields(row)),
+            doctor: row.doctor,
+          };
+        }
+      }),
     );
   }
 

@@ -1,4 +1,4 @@
-import { ConflictException, ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { and, eq, gt, gte, lt, lte, ne } from 'drizzle-orm';
 import {
   AvailabilityService,
@@ -19,6 +19,7 @@ import { UpdateAppointmentDto } from './dto/update-appointment.dto';
 
 @Injectable()
 export class AppointmentsService {
+  private readonly logger = new Logger(AppointmentsService.name);
   private readonly NOTE_ENCRYPTED_FIELDS = ['diagnosis', 'treatment', 'prescription', 'notes'];
   private readonly PATIENT_ENCRYPTED_FIELDS = ['firstName', 'lastName', 'email'];
 
@@ -32,6 +33,16 @@ export class AppointmentsService {
   private omitClinicId<T extends { clinic_id?: unknown }>(row: T) {
     const { clinic_id: _cid, ...rest } = row;
     return rest;
+  }
+
+  private redactFields<T extends Record<string, any>>(row: T, fields: string[]) {
+    const redacted = { ...row } as Record<string, any>;
+    for (const field of fields) {
+      if (redacted[field]) {
+        redacted[field] = '[REDACTED]';
+      }
+    }
+    return redacted as T;
   }
 
   private async getDoctorIdByUserId(userId: string, clinicId: string): Promise<string> {
@@ -241,16 +252,31 @@ export class AppointmentsService {
       .where(and(...conditions));
 
     return Promise.all(
-      results.map(async (row: any) => ({
-        ...this.omitClinicId(row),
-        patient: row.patient
-          ? await this.encryptionService.decryptFields(
-              row.patient,
-              this.PATIENT_ENCRYPTED_FIELDS,
-              clinicId,
-            )
-          : row.patient,
-      })),
+      results.map(async (row: any) => {
+        try {
+          return {
+            ...this.omitClinicId(row),
+            patient: row.patient
+              ? await this.encryptionService.decryptFields(
+                  row.patient,
+                  this.PATIENT_ENCRYPTED_FIELDS,
+                  clinicId,
+                )
+              : row.patient,
+          };
+        } catch (err) {
+          this.logger.error(
+            `Decryption failed for record ${row.id} - returning redacted`,
+            err instanceof Error ? err.constructor.name : 'UnknownError',
+          );
+          return {
+            ...this.omitClinicId(row),
+            patient: row.patient
+              ? this.redactFields(row.patient, this.PATIENT_ENCRYPTED_FIELDS)
+              : row.patient,
+          };
+        }
+      }),
     );
   }
 
@@ -515,15 +541,23 @@ export class AppointmentsService {
       );
 
     return Promise.all(
-      results.map(async (n: any) =>
-        this.omitClinicId(
-          await this.encryptionService.decryptFields(
-            n,
-            this.NOTE_ENCRYPTED_FIELDS,
-            clinicId,
-          ),
-        ),
-      ),
+      results.map(async (n: any) => {
+        try {
+          return this.omitClinicId(
+            await this.encryptionService.decryptFields(
+              n,
+              this.NOTE_ENCRYPTED_FIELDS,
+              clinicId,
+            ),
+          );
+        } catch (err) {
+          this.logger.error(
+            `Decryption failed for record ${n.id} - returning redacted`,
+            err instanceof Error ? err.constructor.name : 'UnknownError',
+          );
+          return this.omitClinicId(this.redactFields(n, this.NOTE_ENCRYPTED_FIELDS));
+        }
+      }),
     );
   }
 
