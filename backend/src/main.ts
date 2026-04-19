@@ -2,7 +2,7 @@ import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import { NestExpressApplication } from '@nestjs/platform-express';
-import cookieParser = require('cookie-parser');
+import * as cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { join } from 'path';
 import { AppModule } from './app.module';
@@ -11,6 +11,37 @@ async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   app.getHttpAdapter().getInstance().set('trust proxy', 1);
   const configService = app.get(ConfigService);
+  const jwtSecret = configService.get<string>('JWT_SECRET') ?? '';
+  const WEAK_JWT_SECRETS = [
+    'changeme',
+    'secret',
+    'jwt_secret',
+    'your-secret-key',
+    'password',
+    'mysecret',
+    'topsecret',
+    'supersecret',
+  ];
+
+  if (
+    jwtSecret.length < 32 ||
+    WEAK_JWT_SECRETS.includes(jwtSecret.toLowerCase())
+  ) {
+    process.stderr.write(
+      '[FATAL] JWT_SECRET is missing, too short (min 32 chars), or a known weak value. ' +
+        'Set a strong random secret in .env before starting the application.\n',
+    );
+    process.exit(1);
+  }
+
+  const encKey = configService.get<string>('ENCRYPTION_MASTER_KEY') ?? '';
+  if (encKey.length < 64) {
+    process.stderr.write(
+      '[FATAL] ENCRYPTION_MASTER_KEY must be at least 64 hex characters.\n',
+    );
+    process.exit(1);
+  }
+
   const port = configService.get<number>('API_PORT', 3000);
   const fallbackOrigin = configService.get<string>(
     'CORS_ORIGIN',

@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Query,
@@ -14,6 +15,7 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { AppointmentsService } from './appointments.service';
 import { CreateAppointmentNoteDto } from './dto/create-appointment-note.dto';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
+import { GetAppointmentsQueryDto } from './dto/get-appointments-query.dto';
 import { UpdateAppointmentNoteDto } from './dto/update-appointment-note.dto';
 import { UpdateAppointmentDto } from './dto/update-appointment.dto';
 import { UpdateStatusDto } from './dto/update-status.dto';
@@ -34,29 +36,19 @@ export class AppointmentsController {
 
   @Get()
   @Audit('LIST_APPOINTMENTS', 'appointment')
+  @Roles('owner', 'admin', 'doctor', 'staff', 'patient')
   findAll(
     @CurrentUser() user: { clinicId: string; userId: string; role: string },
-    @Query()
-    filters: {
-      doctorId?: string;
-      patientId?: string;
-      doctor_id?: string;
-      patient_id?: string;
-      date?: string;
-      date_from?: string;
-      date_to?: string;
-      status?: string;
-    },
+    @Query() query: GetAppointmentsQueryDto,
   ) {
     return this.appointmentsService.findAllByClinic(
       user.clinicId,
       {
-        doctorId: filters.doctorId ?? filters.doctor_id,
-        patientId: filters.patientId ?? filters.patient_id,
-        date: filters.date,
-        dateFrom: filters.date_from,
-        dateTo: filters.date_to,
-        status: filters.status,
+        doctorId: query.doctorId,
+        patientId: query.patientId,
+        dateFrom: query.dateFrom,
+        dateTo: query.dateTo,
+        status: query.status,
       },
       {
         userId: user.userId,
@@ -67,8 +59,9 @@ export class AppointmentsController {
 
   @Get(':id')
   @Audit('VIEW_APPOINTMENT', 'appointment')
+  @Roles('owner', 'admin', 'doctor', 'staff', 'patient')
   findById(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: { clinicId: string; userId: string; role: string },
   ) {
     return this.appointmentsService.findById(
@@ -83,7 +76,7 @@ export class AppointmentsController {
   @Audit('UPDATE_APPOINTMENT', 'appointment')
   @Roles('owner', 'admin', 'doctor', 'staff')
   update(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateAppointmentDto,
     @CurrentUser() user: { clinicId: string },
   ) {
@@ -94,7 +87,7 @@ export class AppointmentsController {
   @Audit('UPDATE_APPOINTMENT_STATUS', 'appointment')
   @Roles('owner', 'admin', 'doctor', 'staff')
   updateStatus(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateStatusDto,
     @CurrentUser() user: { clinicId: string },
   ) {
@@ -105,7 +98,7 @@ export class AppointmentsController {
   @Audit('DELETE_APPOINTMENT', 'appointment')
   @Roles('owner', 'admin')
   softDelete(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: { clinicId: string },
   ) {
     return this.appointmentsService.softDelete(id, user.clinicId);
@@ -115,7 +108,7 @@ export class AppointmentsController {
   @Audit('CREATE_APPOINTMENT_NOTE', 'appointment_note')
   @Roles('doctor')
   createNote(
-    @Param('appointmentId') appointmentId: string,
+    @Param('appointmentId', ParseUUIDPipe) appointmentId: string,
     @Body() dto: CreateAppointmentNoteDto,
     @CurrentUser() user: { userId: string; clinicId: string },
   ) {
@@ -131,12 +124,16 @@ export class AppointmentsController {
   @Audit('LIST_APPOINTMENT_NOTES', 'appointment_note')
   @Roles('owner', 'admin', 'doctor')
   findNotesByAppointment(
-    @Param('appointmentId') appointmentId: string,
-    @CurrentUser() user: { clinicId: string },
+    @Param('appointmentId', ParseUUIDPipe) appointmentId: string,
+    @CurrentUser() user: { clinicId: string; userId: string; role: string },
   ) {
     return this.appointmentsService.findNotesByAppointment(
       appointmentId,
       user.clinicId,
+      {
+        userId: user.userId,
+        role: user.role,
+      },
     );
   }
 
@@ -144,20 +141,25 @@ export class AppointmentsController {
   @Audit('UPDATE_APPOINTMENT_NOTE', 'appointment_note')
   @Roles('doctor')
   updateNote(
-    @Param('noteId') noteId: string,
+    @Param('noteId', ParseUUIDPipe) noteId: string,
     @Body() dto: UpdateAppointmentNoteDto,
-    @CurrentUser() user: { clinicId: string },
+    @CurrentUser() user: { userId: string; clinicId: string },
   ) {
-    return this.appointmentsService.updateNote(noteId, dto, user.clinicId);
+    return this.appointmentsService.updateNote(
+      noteId,
+      dto,
+      user.clinicId,
+      user.userId,
+    );
   }
 
   @Delete('notes/:noteId')
   @Audit('DELETE_APPOINTMENT_NOTE', 'appointment_note')
   @Roles('owner', 'doctor')
   deleteNote(
-    @Param('noteId') noteId: string,
-    @CurrentUser() user: { clinicId: string },
+    @Param('noteId', ParseUUIDPipe) noteId: string,
+    @CurrentUser() user: { userId: string; clinicId: string },
   ) {
-    return this.appointmentsService.deleteNote(noteId, user.clinicId);
+    return this.appointmentsService.deleteNote(noteId, user.clinicId, user.userId);
   }
 }

@@ -5,6 +5,7 @@ import {
   Get,
   NotFoundException,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Query,
@@ -17,7 +18,7 @@ import { TenantRequest } from '../common/interfaces/tenant-request.interface';
 import { Roles } from '../common/decorators/roles.decorator';
 import { AdminSetDoctorStatusDto } from './dto/admin-set-doctor-status.dto';
 import { AdminUpdateDoctorDto } from './dto/admin-update-doctor.dto';
-import { CreateDoctorDto } from './dto/create-doctor.dto';
+import { DoctorsQueryDto } from './dto/doctors-query.dto';
 import { OnboardDoctorDto } from './dto/onboard-doctor.dto';
 import { UpdateDoctorDto } from './dto/update-doctor.dto';
 import { DoctorsService } from './doctors.service';
@@ -25,16 +26,6 @@ import { DoctorsService } from './doctors.service';
 @Controller('doctors')
 export class DoctorsController {
   constructor(private readonly doctorsService: DoctorsService) {}
-
-  @Audit('CREATE_DOCTOR', 'doctor')
-  @Post()
-  @Roles('owner', 'admin')
-  create(
-    @Body() dto: CreateDoctorDto,
-    @CurrentUser() user: { clinicId: string },
-  ) {
-    return this.doctorsService.create(dto, user.clinicId);
-  }
 
   @Post('onboard')
   @Roles('owner', 'admin')
@@ -58,15 +49,20 @@ export class DoctorsController {
   }
 
   @Get()
+  @Roles('owner', 'admin', 'doctor', 'staff')
   findAll(
     @CurrentUser() user: { clinicId: string },
-    @Query('specialization_id') specializationId?: string,
-    @Query('status') status?: string,
+    @Query() query: DoctorsQueryDto,
   ) {
-    return this.doctorsService.findAllByClinic(user.clinicId, specializationId, status);
+    return this.doctorsService.findAllByClinic(
+      user.clinicId,
+      query.specialization_id,
+      query.status,
+    );
   }
 
   @Get('me')
+  @Roles('owner', 'doctor')
   findMyDoctorProfile(
     @CurrentUser() user: { userId: string; clinicId: string },
   ) {
@@ -74,7 +70,11 @@ export class DoctorsController {
   }
 
   @Get(':id')
-  findById(@Param('id') id: string, @CurrentUser() user: { clinicId: string }) {
+  @Roles('owner', 'admin', 'doctor', 'staff')
+  findById(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: { clinicId: string },
+  ) {
     return this.doctorsService.findById(id, user.clinicId);
   }
 
@@ -82,7 +82,7 @@ export class DoctorsController {
   @Patch(':id')
   @Roles('owner', 'admin')
   update(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateDoctorDto,
     @CurrentUser() user: { clinicId: string },
   ) {
@@ -92,7 +92,7 @@ export class DoctorsController {
   @Patch(':id/admin')
   @Roles('admin')
   adminUpdateDoctor(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: AdminUpdateDoctorDto,
     @CurrentUser() user: { clinicId: string },
   ) {
@@ -103,7 +103,7 @@ export class DoctorsController {
   @Patch(':id/status')
   @Roles('admin')
   adminSetDoctorStatus(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: AdminSetDoctorStatusDto,
     @CurrentUser() user: { clinicId: string },
   ) {
@@ -114,7 +114,7 @@ export class DoctorsController {
   @Delete(':id')
   @Roles('owner', 'admin')
   softDelete(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: { clinicId: string },
   ) {
     return this.doctorsService.softDelete(id, user.clinicId);

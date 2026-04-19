@@ -1,12 +1,13 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { and, desc, eq, ilike, or } from 'drizzle-orm';
-import { doctors, users } from '../database/schema';
+import { doctors, specializations, users } from '../database/schema';
 import { CreateAdminUserDto } from './dto/create-admin-user.dto';
 import { SetStaffStatusDto } from './dto/set-staff-status.dto';
 import { UpdateStaffDto } from './dto/update-staff.dto';
@@ -21,6 +22,11 @@ export class StaffService {
   constructor(@Inject('DRIZZLE') private readonly db: any) {}
 
   async createUser(dto: CreateAdminUserDto, clinicId: string) {
+    const FORBIDDEN_ROLES = ['owner', 'admin'];
+    if (FORBIDDEN_ROLES.includes(dto.role)) {
+      throw new ForbiddenException('Cannot create users with elevated roles through this endpoint');
+    }
+
     await this.ensureUniqueEmail(dto.email, clinicId);
 
     const passwordHash = await bcrypt.hash(dto.password, 12);
@@ -51,6 +57,21 @@ export class StaffService {
       });
 
     if (dto.doctorProfile) {
+      const [spec] = await this.db
+        .select({ id: specializations.id })
+        .from(specializations)
+        .where(
+          and(
+            eq(specializations.id, dto.doctorProfile.specializationId),
+            eq(specializations.clinic_id, clinicId),
+          ),
+        )
+        .limit(1);
+
+      if (!spec) {
+        throw new BadRequestException('Invalid specialization');
+      }
+
       await this.db.insert(doctors).values({
         user_id: createdUser.id,
         specialization_id: dto.doctorProfile.specializationId,
@@ -109,6 +130,11 @@ export class StaffService {
   }
 
   async create(dto: CreateAdminUserDto, clinicId: string) {
+    const FORBIDDEN_ROLES = ['owner', 'admin'];
+    if (FORBIDDEN_ROLES.includes(dto.role)) {
+      throw new ForbiddenException('Cannot create users with elevated roles through this endpoint');
+    }
+
     await this.ensureUniqueEmail(dto.email, clinicId);
 
     const passwordHash = await bcrypt.hash(dto.password, 12);
@@ -139,6 +165,21 @@ export class StaffService {
       });
 
     if (dto.doctorProfile) {
+      const [spec] = await this.db
+        .select({ id: specializations.id })
+        .from(specializations)
+        .where(
+          and(
+            eq(specializations.id, dto.doctorProfile.specializationId),
+            eq(specializations.clinic_id, clinicId),
+          ),
+        )
+        .limit(1);
+
+      if (!spec) {
+        throw new BadRequestException('Invalid specialization');
+      }
+
       await this.db.insert(doctors).values({
         user_id: createdUser.id,
         specialization_id: dto.doctorProfile.specializationId,

@@ -32,10 +32,15 @@ type CustomHoursOverride = {
 export class AvailabilityOverridesService {
   constructor(@Inject('DRIZZLE') private readonly db: any) {}
 
+  private omitClinicId<T extends { clinic_id?: unknown }>(row: T) {
+    const { clinic_id: _cid, ...rest } = row;
+    return rest;
+  }
+
   async listByDoctor(doctorId: string, clinicId: string) {
     await this.ensureDoctorInClinic(doctorId, clinicId);
 
-    return this.db
+    const overrides = await this.db
       .select()
       .from(doctorAvailabilityOverrides)
       .where(
@@ -44,6 +49,8 @@ export class AvailabilityOverridesService {
           eq(doctorAvailabilityOverrides.clinic_id, clinicId),
         ),
       );
+
+    return overrides.map((override: any) => this.omitClinicId(override));
   }
 
   async listByDateRange(
@@ -54,7 +61,7 @@ export class AvailabilityOverridesService {
   ) {
     await this.ensureDoctorInClinic(doctorId, clinicId);
 
-    return this.db
+    const overrides = await this.db
       .select()
       .from(doctorAvailabilityOverrides)
       .where(
@@ -65,6 +72,8 @@ export class AvailabilityOverridesService {
           lte(doctorAvailabilityOverrides.date, dateTo),
         ),
       );
+
+    return overrides.map((override: any) => this.omitClinicId(override));
   }
 
   async create(dto: CreateAvailabilityOverrideDto, clinicId: string) {
@@ -99,7 +108,7 @@ export class AvailabilityOverridesService {
         })
         .returning();
 
-      return override;
+      return this.omitClinicId(override);
     }
 
     return this.normalizeCustomHoursOverlap({
@@ -174,7 +183,7 @@ export class AvailabilityOverridesService {
       .where(eq(doctorAvailabilityOverrides.id, id))
       .returning();
 
-    return override;
+    return this.omitClinicId(override);
   }
 
   async remove(id: string, clinicId: string) {
@@ -185,7 +194,7 @@ export class AvailabilityOverridesService {
       .where(eq(doctorAvailabilityOverrides.id, id))
       .returning();
 
-    return override;
+    return this.omitClinicId(override);
   }
 
   private async ensureDoctorInClinic(doctorId: string, clinicId: string) {
@@ -384,7 +393,7 @@ export class AvailabilityOverridesService {
           .where(inArray(doctorAvailabilityOverrides.id, redundantIds));
       }
 
-      return override;
+      return this.omitClinicId(override);
     });
   }
 

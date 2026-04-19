@@ -6,6 +6,7 @@ import {
   Get,
   NotFoundException,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Req,
@@ -43,8 +44,8 @@ export class SpecializationsController {
     return this.specializationsService.create(dto, user.clinicId);
   }
 
-  @Get('public-discovery')
   @Public()
+  @Get('public-discovery')
   findPublicDiscovery(@Req() request: TenantRequest) {
     const clinicId = request.tenant?.clinicId;
 
@@ -55,20 +56,37 @@ export class SpecializationsController {
     return this.specializationsService.findPublicDiscoveryByClinic(clinicId);
   }
 
+  @Public()
   @Get()
-  findAll(@CurrentUser() user: { clinicId: string }) {
-    return this.specializationsService.findAllByClinic(user.clinicId);
+  findAll(@Req() request: TenantRequest) {
+    const clinicId = request.tenant?.clinicId;
+
+    if (!clinicId) {
+      throw new BadRequestException('Clinic could not be resolved');
+    }
+
+    return this.specializationsService.findAllByClinic(clinicId);
   }
 
+  @Public()
   @Get(':id')
-  findById(@Param('id') id: string, @CurrentUser() user: { clinicId: string }) {
-    return this.specializationsService.findById(id, user.clinicId);
+  findById(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() request: TenantRequest,
+  ) {
+    const clinicId = request.tenant?.clinicId;
+
+    if (!clinicId) {
+      throw new BadRequestException('Clinic could not be resolved');
+    }
+
+    return this.specializationsService.findById(id, clinicId);
   }
 
   @Patch(':id')
   @Roles('owner', 'admin')
   update(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateSpecializationDto,
     @CurrentUser() user: { clinicId: string },
   ) {
@@ -84,7 +102,7 @@ export class SpecializationsController {
     }),
   )
   async updateImage(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: { clinicId: string },
     @UploadedFile() file?: Express.Multer.File,
   ) {
@@ -123,7 +141,7 @@ export class SpecializationsController {
   @Delete(':id')
   @Roles('owner', 'admin')
   softDelete(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: { clinicId: string },
   ) {
     return this.specializationsService.softDelete(id, user.clinicId);

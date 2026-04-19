@@ -6,6 +6,7 @@ import {
   Get,
   Inject,
   Param,
+  ParseUUIDPipe,
   Post,
   Res,
   UploadedFile,
@@ -15,6 +16,7 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { and, eq } from 'drizzle-orm';
 import { Response } from 'express';
+import { Throttle } from '@nestjs/throttler';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Audit } from '../common/decorators/audit.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -37,6 +39,8 @@ export class StorageController {
 
   @Post('avatar')
   @Audit('UPLOAD_AVATAR', 'file')
+  @Roles('owner', 'admin', 'doctor', 'staff', 'patient')
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @UseInterceptors(FileInterceptor('file', avatarMulterOptions))
   async uploadAvatar(
     @CurrentUser() user: { userId: string },
@@ -53,9 +57,10 @@ export class StorageController {
   @Audit('UPLOAD_AVATAR', 'file')
   @UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
   @Roles('owner', 'admin')
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @UseInterceptors(FileInterceptor('avatar', avatarMulterOptions))
   async uploadAvatarForUser(
-    @Param('userId') userId: string,
+    @Param('userId', ParseUUIDPipe) userId: string,
     @CurrentUser() user: { clinicId: string },
     @UploadedFile() file?: Express.Multer.File,
   ) {
@@ -79,9 +84,10 @@ export class StorageController {
   @Post('appointments/:appointmentId/files')
   @Audit('UPLOAD_FILE', 'file')
   @Roles('owner', 'admin', 'doctor')
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @UseInterceptors(FileInterceptor('file', appointmentFileMulterOptions))
   async uploadAppointmentFile(
-    @Param('appointmentId') appointmentId: string,
+    @Param('appointmentId', ParseUUIDPipe) appointmentId: string,
     @CurrentUser() user: { clinicId: string; userId: string },
     @UploadedFile() file?: Express.Multer.File,
   ) {
@@ -99,8 +105,9 @@ export class StorageController {
 
   @Get('appointments/:appointmentId/files')
   @Roles('owner', 'admin', 'doctor')
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
   getAppointmentFiles(
-    @Param('appointmentId') appointmentId: string,
+    @Param('appointmentId', ParseUUIDPipe) appointmentId: string,
     @CurrentUser() user: { clinicId: string },
   ) {
     return this.storageService.getFilesByAppointment(
@@ -111,9 +118,11 @@ export class StorageController {
 
   @Get('files/:fileId/download')
   @Audit('DOWNLOAD_FILE', 'file')
+  @Roles('owner', 'doctor', 'staff')
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
   async downloadFile(
-    @Param('fileId') fileId: string,
-    @CurrentUser() user: { clinicId: string; userId: string; role: string },
+    @Param('fileId', ParseUUIDPipe) fileId: string,
+    @CurrentUser() user: { clinicId: string; role: string; userId: string },
     @Res() response: Response,
   ) {
     const file = await this.storageService.getFileById(
@@ -129,7 +138,7 @@ export class StorageController {
   @Audit('DELETE_FILE', 'file')
   @Roles('owner', 'admin', 'doctor')
   deleteFile(
-    @Param('fileId') fileId: string,
+    @Param('fileId', ParseUUIDPipe) fileId: string,
     @CurrentUser() user: { clinicId: string },
   ) {
     return this.storageService.deleteFile(fileId, user.clinicId);

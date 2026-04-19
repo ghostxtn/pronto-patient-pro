@@ -3,6 +3,7 @@ import {
   ConflictException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -57,6 +58,8 @@ const DEFAULT_TRUSTED_DEVICE_TTL_DAYS = 30;
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     @Inject('DRIZZLE') private readonly db: any,
     private readonly redisService: RedisService,
@@ -66,6 +69,30 @@ export class AuthService {
     private readonly emailService: EmailService,
     private readonly patientsService: PatientsService,
   ) {}
+
+  private maskEmail(email?: string | null) {
+    if (!email) {
+      return '';
+    }
+
+    return email.replace(/^(.{2}).*(@.*)$/, '$1***$2');
+  }
+
+  private maskGoogleId(googleId?: string | null) {
+    if (!googleId) {
+      return '';
+    }
+
+    return `***${googleId.slice(-4)}`;
+  }
+
+  private summarizeUser(user: typeof users.$inferSelect) {
+    return {
+      id: user.id,
+      role: user.role,
+      clinicId: user.clinic_id,
+    };
+  }
 
   async register(dto: RegisterDto, clinicId: string, ctx?: RequestContext) {
     const [existingUser] = await this.db
@@ -194,7 +221,7 @@ export class AuthService {
       };
     }
 
-    if (this.configService.get('NODE_ENV') === 'development') {
+    if (process.env.APP_ENV === 'development') {
       return this.issueTokensForUser(user);
     }
 
@@ -222,7 +249,7 @@ export class AuthService {
     }
 
     if (
-      this.configService.get('NODE_ENV') === 'development' &&
+      process.env.APP_ENV === 'development' &&
       dto.code === '000000'
     ) {
       // skip OTP validation in dev mode
@@ -416,11 +443,29 @@ export class AuthService {
       throw new UnauthorizedException('Invalid refresh token');
     }
 
-    const isValid = await this.redisService.compareRefreshToken(
-      payload.sub,
-      token,
+    const redisKey = `refresh:${payload.sub}`;
+    const hashedIncomingToken = createHash('sha256')
+      .update(token)
+      .digest('hex');
+    const luaScript = `
+      local stored = redis.call('GET', KEYS[1])
+      if stored == false then return -1 end
+      if stored ~= ARGV[1] then return -2 end
+      redis.call('DEL', KEYS[1])
+      return 1
+    `;
+    const result = await this.redisService.eval(
+      luaScript,
+      1,
+      redisKey,
+      hashedIncomingToken,
     );
-    if (!isValid) {
+
+    if (result === -1) {
+      throw new UnauthorizedException('Token not found');
+    }
+
+    if (result === -2) {
       throw new UnauthorizedException('Invalid refresh token');
     }
 
@@ -433,8 +478,6 @@ export class AuthService {
     if (!user) {
       throw new UnauthorizedException('Invalid refresh token');
     }
-
-    await this.redisService.deleteRefreshToken(payload.sub);
 
     const { accessToken, refreshToken } = await this.generateTokens(
       user.id,
@@ -488,9 +531,13 @@ export class AuthService {
     lastName: string;
     avatar: string;
   }, clinicId: string, ctx?: RequestContext) {
-    console.log('[auth][googleLogin] start', {
-      clinicId,
-    });
+    this.logger.log(
+      `[auth][googleLogin] start ${JSON.stringify({
+        clinicId,
+        email: this.maskEmail(googleUser.email),
+        googleId: this.maskGoogleId(googleUser.googleId),
+      })}`,
+    );
 
     const [googleUserRecord] = await this.db
       .select()
@@ -504,10 +551,11 @@ export class AuthService {
       .limit(1);
 
     if (googleUserRecord) {
-      console.log('[auth][googleLogin] found existing google user', {
-        userId: googleUserRecord.id,
-        role: googleUserRecord.role,
-      });
+      this.logger.log(
+        `[auth][googleLogin] found existing google user ${JSON.stringify(
+          this.summarizeUser(googleUserRecord),
+        )}`,
+      );
       const normalizedGoogleUser = await this.ensureGooglePatientUser(
         googleUserRecord,
         clinicId,
@@ -548,11 +596,13 @@ export class AuthService {
       .limit(1);
 
     if (emailUser) {
-      console.log('[auth][googleLogin] found existing user by email', {
-        userId: emailUser.id,
-        role: emailUser.role,
-        hasPassword: Boolean(emailUser.password_hash),
-      });
+      this.logger.log(
+        `[auth][googleLogin] found existing user by email ${JSON.stringify({
+          ...this.summarizeUser(emailUser),
+          hasPassword: Boolean(emailUser.password_hash),
+          email: this.maskEmail(emailUser.email),
+        })}`,
+      );
       const [updatedUser] = await this.db
         .update(users)
         .set({
@@ -567,10 +617,11 @@ export class AuthService {
         .returning();
 
       if (updatedUser.role === 'patient') {
-        console.log('[auth][googleLogin] ensuring patient profile for email-matched user', {
-          userId: updatedUser.id,
-          role: updatedUser.role,
-        });
+        this.logger.log(
+          `[auth][googleLogin] ensuring patient profile for email-matched user ${JSON.stringify(
+            this.summarizeUser(updatedUser),
+          )}`,
+        );
         await this.ensurePatientProfile(updatedUser, clinicId);
       }
 
@@ -615,10 +666,11 @@ export class AuthService {
       })
       .returning();
 
-    console.log('[auth][googleLogin] created new google user', {
-      userId: newUser.id,
-      role: newUser.role,
-    });
+    this.logger.log(
+      `[auth][googleLogin] created new google user ${JSON.stringify(
+        this.summarizeUser(newUser),
+      )}`,
+    );
     await this.ensurePatientProfile(newUser, clinicId);
 
     return this.createOtpChallenge(
@@ -714,7 +766,7 @@ export class AuthService {
       flow.clinicId,
     );
 
-    if (this.configService.get('NODE_ENV') === 'development') {
+    if (process.env.APP_ENV === 'development') {
       return this.issueTokensForUser(user);
     }
 
@@ -1072,9 +1124,11 @@ export class AuthService {
     let nextUser = user;
 
     if (user.role === 'staff' && !user.password_hash) {
-      console.log('[auth][googleLogin] converting social-only staff user to patient', {
-        userId: user.id,
-      });
+      this.logger.log(
+        `[auth][googleLogin] converting social-only staff user to patient ${JSON.stringify(
+          this.summarizeUser(user),
+        )}`,
+      );
       const [updatedUser] = await this.db
         .update(users)
         .set({
@@ -1101,9 +1155,11 @@ export class AuthService {
     }
 
     if (nextUser.role === 'patient') {
-      console.log('[auth][googleLogin] ensuring patient profile for google user', {
-        userId: nextUser.id,
-      });
+      this.logger.log(
+        `[auth][googleLogin] ensuring patient profile for google user ${JSON.stringify(
+          this.summarizeUser(nextUser),
+        )}`,
+      );
       await this.ensurePatientProfile(nextUser, clinicId);
     }
 
@@ -1126,10 +1182,11 @@ export class AuthService {
     user: typeof users.$inferSelect,
     clinicId: string,
   ) {
-    console.log('[auth][googleLogin] ensurePatientProfile start', {
-      userId: user.id,
-      clinicId,
-    });
+    this.logger.log(
+      `[auth][googleLogin] ensurePatientProfile start ${JSON.stringify(
+        this.summarizeUser(user),
+      )}`,
+    );
 
     const [existingPatient] = await this.db
       .select()
@@ -1138,10 +1195,13 @@ export class AuthService {
       .limit(1);
 
     if (existingPatient) {
-      console.log('[auth][googleLogin] patient profile already exists', {
-        patientId: existingPatient.id,
-        userId: user.id,
-      });
+      this.logger.log(
+        `[auth][googleLogin] patient profile already exists ${JSON.stringify({
+          patientId: existingPatient.id,
+          userId: user.id,
+          clinicId,
+        })}`,
+      );
       return existingPatient;
     }
 
@@ -1155,17 +1215,22 @@ export class AuthService {
         clinicId,
       );
 
-      console.log('[auth][googleLogin] patient profile created', {
-        patientId: patient.id,
-        userId: user.id,
-      });
+      this.logger.log(
+        `[auth][googleLogin] patient profile created ${JSON.stringify({
+          patientId: patient.id,
+          userId: user.id,
+          clinicId,
+        })}`,
+      );
       return patient;
     } catch (error) {
-      console.error('[auth][googleLogin] ensurePatientProfile failed', {
-        userId: user.id,
-        clinicId,
-        error: error instanceof Error ? error.message : String(error),
-      });
+      this.logger.error(
+        `[auth][googleLogin] ensurePatientProfile failed ${JSON.stringify({
+          userId: user.id,
+          clinicId,
+          errorName: error instanceof Error ? error.name : 'UnknownError',
+        })}`,
+      );
       throw error;
     }
   }

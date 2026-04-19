@@ -43,8 +43,8 @@ export class CreateAdminUserDto {
   @IsString()
   phone?: string;
 
-  @IsIn(['owner', 'admin', 'doctor', 'staff'])
-  role!: 'owner' | 'admin' | 'doctor' | 'staff';
+  @IsIn(['doctor', 'staff'])
+  role!: 'doctor' | 'staff';
 
   @IsOptional()
   @IsObject()

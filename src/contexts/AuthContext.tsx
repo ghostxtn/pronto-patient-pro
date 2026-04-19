@@ -4,9 +4,8 @@ import api, {
   ApiError,
   type AuthOtpChallengeResponse,
   type AuthSuccessResponse,
-  clearTokens,
-  getAccessToken,
-  setTokens,
+  clearAccessToken,
+  setAccessToken,
 } from "@/services/api";
 import type { AppRole } from "@/lib/auth-routing";
 
@@ -63,7 +62,7 @@ function isOtpChallenge(result: unknown): result is AuthOtpChallengeResponse {
 }
 
 function applyAuthSuccess(result: AuthSuccessResponse, setUser: (user: User) => void) {
-  setTokens(result.accessToken ?? null, result.refreshToken ?? null);
+  setAccessToken(result.accessToken ?? null);
   const normalizedUser = normalizeUser(result.user);
   setUser(normalizedUser);
   return normalizedUser;
@@ -76,34 +75,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const bootstrap = async () => {
-      const token = getAccessToken();
-      console.debug("[auth][context] bootstrap start", {
-        hasAccessToken: Boolean(token),
-      });
-
-      if (!token) {
-        console.debug("[auth][context] bootstrap skipped, no access token");
-        setLoading(false);
-        return;
-      }
-
       try {
-        const me = await api.auth.me();
+        const { accessToken } = await api.auth.refresh();
+        setAccessToken(accessToken);
+        const me = await api.profiles.me();
         const normalizedUser = normalizeUser(me.user ?? me);
-        console.debug("[auth][context] bootstrap /auth/me success", {
-          userId: normalizedUser.id,
-          role: normalizedUser.role,
-        });
         setUser(normalizedUser);
       } catch (err) {
-        console.debug("[auth][context] bootstrap failed", err);
-        if (err instanceof ApiError && err.status === 401) {
-          console.debug("[auth][context] bootstrap received 401, clearing tokens");
-          clearTokens();
+        clearAccessToken();
+        setUser(null);
+        if (!(err instanceof ApiError && err.status === 401)) {
+          console.error("Auth bootstrap failed");
+          setError(err instanceof Error ? err.message : "Authentication failed");
         }
-        setError(err instanceof Error ? err.message : "Authentication failed");
       } finally {
-        console.debug("[auth][context] bootstrap complete");
         setLoading(false);
       }
     };
@@ -119,21 +104,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login: async (email: string, pass: string) => {
         setLoading(true);
         setError(null);
-        console.debug("[auth][context] login start", { email });
         try {
           const result = await api.auth.login(email, pass);
           if (isOtpChallenge(result)) {
-            console.debug("[auth][context] login otp challenge issued", { email });
             return result;
           }
 
-          const normalizedUser = applyAuthSuccess(result, setUser);
-          console.debug("[auth][context] login success", {
-            userId: normalizedUser.id,
-            role: normalizedUser.role,
-          });
+          setAccessToken(result.accessToken ?? null);
+          const me = await api.profiles.me();
+          setUser(normalizeUser(me.user ?? me));
         } catch (err) {
-          console.debug("[auth][context] login failed", err);
+          console.error("Login failed");
           setError(err instanceof Error ? err.message : "Login failed");
           throw err;
         } finally {
@@ -143,21 +124,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       register: async (data: { email: string; password: string; firstName: string; lastName: string }) => {
         setLoading(true);
         setError(null);
-        console.debug("[auth][context] register start", { email: data.email });
         try {
           const result = await api.auth.register(data);
           if (isOtpChallenge(result)) {
-            console.debug("[auth][context] register otp challenge issued", { email: data.email });
             return result;
           }
 
-          const normalizedUser = applyAuthSuccess(result, setUser);
-          console.debug("[auth][context] register success", {
-            userId: normalizedUser.id,
-            role: normalizedUser.role,
-          });
+          applyAuthSuccess(result, setUser);
         } catch (err) {
-          console.debug("[auth][context] register failed", err);
+          console.error("Registration failed");
           setError(err instanceof Error ? err.message : "Registration failed");
           throw err;
         } finally {
@@ -167,18 +142,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       googleLogin: async (idToken: string) => {
         setLoading(true);
         setError(null);
-        console.debug("[auth][context] googleLogin start");
         try {
           const result = await api.auth.googleLogin(idToken);
-          setTokens(result.accessToken ?? null, result.refreshToken ?? null);
-          const normalizedUser = normalizeUser(result.user);
-          console.debug("[auth][context] googleLogin success", {
-            userId: normalizedUser.id,
-            role: normalizedUser.role,
-          });
-          setUser(normalizedUser);
+          setAccessToken(result.accessToken ?? null);
+          setUser(normalizeUser(result.user));
         } catch (err) {
-          console.debug("[auth][context] googleLogin failed", err);
+          console.error("Google login failed");
           setError(err instanceof Error ? err.message : "Google login failed");
           throw err;
         } finally {
@@ -190,13 +159,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setError(null);
         try {
           const result = await api.auth.verifyOtp(flowToken, code);
-          const normalizedUser = applyAuthSuccess(result, setUser);
-          console.debug("[auth][context] otp verification success", {
-            userId: normalizedUser.id,
-            role: normalizedUser.role,
-          });
+          setAccessToken(result.accessToken ?? null);
+          const me = await api.profiles.me();
+          setUser(normalizeUser(me.user ?? me));
         } catch (err) {
-          console.debug("[auth][context] otp verification failed", err);
+          console.error("OTP verification failed");
           setError(err instanceof Error ? err.message : "OTP verification failed");
           throw err;
         } finally {
@@ -209,7 +176,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         try {
           return await api.auth.resendOtp(flowToken);
         } catch (err) {
-          console.debug("[auth][context] resend otp failed", err);
+          console.error("Resend OTP failed");
           setError(err instanceof Error ? err.message : "Resend OTP failed");
           throw err;
         } finally {
@@ -219,14 +186,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       logout: async () => {
         setLoading(true);
         setError(null);
-        console.debug("[auth][context] logout start");
         try {
           await api.auth.logout();
         } finally {
-          console.debug("[auth][context] logout clearing local session");
-          clearTokens();
+          clearAccessToken();
           setUser(null);
           setLoading(false);
+          if (typeof window !== "undefined") {
+            window.location.href = "/auth";
+          }
         }
       },
       clearError: () => setError(null),

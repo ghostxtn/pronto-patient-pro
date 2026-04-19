@@ -37,6 +37,11 @@ export type PublicSlotEntry = Pick<SlotEntry, 'startTime' | 'endTime' | 'duratio
 export class AvailabilityService {
   constructor(@Inject('DRIZZLE') private readonly db: any) {}
 
+  private omitClinicId<T extends { clinic_id?: unknown }>(row: T) {
+    const { clinic_id: _cid, ...rest } = row;
+    return rest;
+  }
+
   async getBookableSlots(
     clinicId: string,
     doctorId: string,
@@ -79,7 +84,7 @@ export class AvailabilityService {
         })
         .returning();
 
-      return availability;
+      return this.omitClinicId(availability);
     }
 
     return this.normalizeAvailabilityOverlap({
@@ -92,7 +97,7 @@ export class AvailabilityService {
   }
 
   async findByDoctor(doctorId: string, clinicId: string) {
-    return this.db
+    const availabilityRows = await this.db
       .select()
       .from(doctorAvailability)
       .where(
@@ -101,6 +106,8 @@ export class AvailabilityService {
           eq(doctorAvailability.clinic_id, clinicId),
         ),
       );
+
+    return availabilityRows.map((row: any) => this.omitClinicId(row));
   }
 
   async findById(id: string, clinicId: string) {
@@ -119,7 +126,7 @@ export class AvailabilityService {
       throw new NotFoundException('Availability not found');
     }
 
-    return availability;
+    return this.omitClinicId(availability);
   }
 
   async update(id: string, dto: UpdateAvailabilityDto, clinicId: string) {
@@ -481,7 +488,7 @@ export class AvailabilityService {
           .where(inArray(doctorAvailability.id, redundantIds));
       }
 
-      return availability;
+      return this.omitClinicId(availability);
     });
   }
 
@@ -515,7 +522,7 @@ export class AvailabilityService {
       .set(updateData)
       .where(eq(doctorAvailability.id, id))
       .returning()
-      .then((rows: DoctorAvailability[]) => rows[0]);
+      .then((rows: DoctorAvailability[]) => this.omitClinicId(rows[0]));
   }
 
   private generateSlotEntries(
