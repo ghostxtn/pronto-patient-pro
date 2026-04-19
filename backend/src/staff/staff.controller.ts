@@ -17,7 +17,7 @@ import { UpdateStaffDto } from './dto/update-staff.dto';
 import { StaffService } from './staff.service';
 
 @Controller('users')
-@Roles('owner', 'admin')
+@Roles('owner')
 export class StaffController {
   constructor(private readonly staffService: StaffService) {}
 

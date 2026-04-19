@@ -10,29 +10,12 @@ import * as bcrypt from 'bcrypt';
 import { doctors, specializations, users } from '../database/schema';
 import { AdminSetDoctorStatusDto } from './dto/admin-set-doctor-status.dto';
 import { AdminUpdateDoctorDto } from './dto/admin-update-doctor.dto';
-import { CreateDoctorDto } from './dto/create-doctor.dto';
 import { OnboardDoctorDto } from './dto/onboard-doctor.dto';
 import { UpdateDoctorDto } from './dto/update-doctor.dto';
 
 @Injectable()
 export class DoctorsService {
   constructor(@Inject('DRIZZLE') private readonly db: any) {}
-
-  async create(dto: CreateDoctorDto, clinicId: string) {
-    const [doctor] = await this.db
-      .insert(doctors)
-      .values({
-        user_id: dto.userId,
-        specialization_id: dto.specializationId,
-        clinic_id: clinicId,
-        title: dto.title,
-        bio: dto.bio,
-        phone: dto.phone,
-      })
-      .returning();
-
-    return doctor;
-  }
 
   async onboardDoctor(dto: OnboardDoctorDto, clinicId: string) {
     const [existingUser] = await this.db

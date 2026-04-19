@@ -13,8 +13,8 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
     private readonly authService: AuthService,
   ) {
     super({
-      clientID: configService.get<string>('GOOGLE_CLIENT_ID', '443771828527-25b30fovsvcrqg9717g4r3le1119f4kb.apps.googleusercontent.com'),
-      clientSecret: configService.get<string>('GOOGLE_CLIENT_SECRET', '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'),
+      clientID: configService.get<string>('GOOGLE_CLIENT_ID') ?? (() => { throw new Error('GOOGLE_CLIENT_ID is not set'); })(),
+      clientSecret: configService.get<string>('GOOGLE_CLIENT_SECRET') ?? (() => { throw new Error('GOOGLE_CLIENT_SECRET is not set'); })(),
       callbackURL: configService.get<string>(
         'GOOGLE_CALLBACK_URL',
         'http://localhost/api/auth/google/callback',

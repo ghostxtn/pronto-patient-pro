@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Inject,
   Injectable,
   NotFoundException,
@@ -21,6 +22,11 @@ export class StaffService {
   constructor(@Inject('DRIZZLE') private readonly db: any) {}
 
   async createUser(dto: CreateAdminUserDto, clinicId: string) {
+    const FORBIDDEN_ROLES = ['owner', 'admin'];
+    if (FORBIDDEN_ROLES.includes(dto.role)) {
+      throw new ForbiddenException('Cannot create users with elevated roles through this endpoint');
+    }
+
     await this.ensureUniqueEmail(dto.email, clinicId);
 
     const passwordHash = await bcrypt.hash(dto.password, 12);
@@ -109,6 +115,11 @@ export class StaffService {
   }
 
   async create(dto: CreateAdminUserDto, clinicId: string) {
+    const FORBIDDEN_ROLES = ['owner', 'admin'];
+    if (FORBIDDEN_ROLES.includes(dto.role)) {
+      throw new ForbiddenException('Cannot create users with elevated roles through this endpoint');
+    }
+
     await this.ensureUniqueEmail(dto.email, clinicId);
 
     const passwordHash = await bcrypt.hash(dto.password, 12);

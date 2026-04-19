@@ -10,6 +10,12 @@ import { TenantResolverService } from '../services/tenant-resolver.service';
 
 @Injectable()
 export class TenantMiddleware implements NestMiddleware {
+  private static readonly TRUSTED_PROXIES = [
+    '127.0.0.1',
+    '::1',
+    '::ffff:127.0.0.1',
+  ];
+
   constructor(
     private readonly tenantResolverService: TenantResolverService,
     private readonly configService: ConfigService,
@@ -20,16 +26,16 @@ export class TenantMiddleware implements NestMiddleware {
     _response: Response,
     next: NextFunction,
   ) {
-    const clinicDomainHeader = request.headers['x-clinic-domain'];
     const forwardedHost = request.headers['x-forwarded-host'];
-    const rawHost =
-      (Array.isArray(clinicDomainHeader)
-        ? clinicDomainHeader[0]
-        : clinicDomainHeader) ||
-      (Array.isArray(forwardedHost)
-        ? forwardedHost[0]
-        : forwardedHost) ||
-      request.headers.host;
+    const isTrustedProxy = TenantMiddleware.TRUSTED_PROXIES.includes(
+      request.socket.remoteAddress ?? '',
+    );
+    const trustedForwardedHost = isTrustedProxy
+      ? (Array.isArray(forwardedHost) ? forwardedHost[0] : forwardedHost)
+          ?.split(',')[0]
+          ?.trim()
+      : null;
+    const rawHost = trustedForwardedHost ?? request.headers.host;
 
     let host = rawHost?.toLowerCase().split(':')[0];
 

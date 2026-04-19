@@ -47,6 +47,14 @@ export class RedisService implements OnModuleDestroy {
     await this.client.del(key);
   }
 
+  async eval(
+    script: string,
+    numkeys: number,
+    ...args: string[]
+  ): Promise<any> {
+    return this.client.eval(script, numkeys, ...args);
+  }
+
   private hashToken(token: string): string {
     return createHash('sha256').update(token).digest('hex');
   }

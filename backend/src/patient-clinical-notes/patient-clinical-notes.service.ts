@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Inject,
   Injectable,
   NotFoundException,
@@ -29,7 +30,11 @@ export class PatientClinicalNotesService {
     private readonly encryptionService: EncryptionService,
   ) {}
 
-  async listByPatient(patientId: string, clinicId: string) {
+  async listByPatient(patientId: string, clinicId: string, role: string) {
+    if (role === 'staff') {
+      throw new ForbiddenException('Staff cannot access clinical notes');
+    }
+
     await this.ensurePatientInClinic(patientId, clinicId);
 
     const results = await this.db

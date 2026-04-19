@@ -103,6 +103,10 @@ export class StorageService {
       throw new NotFoundException('File not found');
     }
 
+    if (file.clinic_id !== clinicId) {
+      throw new ForbiddenException('File does not belong to this clinic');
+    }
+
     if (role === 'patient' && userId) {
       const [appointment] = await this.db
         .select()

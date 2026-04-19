@@ -434,11 +434,6 @@ const api = {
       >("/doctors/public-discovery"),
     get: (id: string) => request<any>(`/doctors/${id}`),
     me: () => request<any>("/doctors/me"),
-    create: (data: unknown) =>
-      request<any>("/doctors", {
-        method: "POST",
-        body: JSON.stringify(data),
-      }),
     update: (id: string, data: unknown) =>
       request<any>(`/doctors/${id}`, {
         method: "PATCH",

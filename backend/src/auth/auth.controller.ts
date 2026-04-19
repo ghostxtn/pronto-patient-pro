@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   HttpCode,
+  InternalServerErrorException,
   Post,
   Req,
   Res,
@@ -130,10 +131,15 @@ export class AuthController {
     @Body() dto: ForgotPasswordDto,
     @Req() req: TenantRequest & Request,
   ) {
+    const frontendUrl = this.configService.get<string>('FRONTEND_URL');
+    if (!frontendUrl) {
+      throw new InternalServerErrorException('FRONTEND_URL is not configured');
+    }
+
     return this.authService.forgotPassword(
       dto,
       req.tenant!.clinicId,
-      this.resolveFrontendUrl(req),
+      frontendUrl,
       {
         ipAddress:
           req.headers['x-forwarded-for']?.toString().split(',')[0]?.trim() ||
@@ -237,17 +243,6 @@ export class AuthController {
     return res.redirect(
       `${frontendUrl}/auth/callback?code=${encodeURIComponent(code)}`,
     );
-  }
-
-  private resolveFrontendUrl(req: TenantRequest & Request) {
-    const originHeader = req.headers.origin;
-    const origin = Array.isArray(originHeader) ? originHeader[0] : originHeader;
-
-    if (origin) {
-      return origin;
-    }
-
-    return this.configService.get<string>('FRONTEND_URL', 'http://localhost:5173');
   }
 
   private getTrustedDeviceToken(req: Request) {

@@ -17,7 +17,6 @@ import { TenantRequest } from '../common/interfaces/tenant-request.interface';
 import { Roles } from '../common/decorators/roles.decorator';
 import { AdminSetDoctorStatusDto } from './dto/admin-set-doctor-status.dto';
 import { AdminUpdateDoctorDto } from './dto/admin-update-doctor.dto';
-import { CreateDoctorDto } from './dto/create-doctor.dto';
 import { OnboardDoctorDto } from './dto/onboard-doctor.dto';
 import { UpdateDoctorDto } from './dto/update-doctor.dto';
 import { DoctorsService } from './doctors.service';
@@ -25,16 +24,6 @@ import { DoctorsService } from './doctors.service';
 @Controller('doctors')
 export class DoctorsController {
   constructor(private readonly doctorsService: DoctorsService) {}
-
-  @Audit('CREATE_DOCTOR', 'doctor')
-  @Post()
-  @Roles('owner', 'admin')
-  create(
-    @Body() dto: CreateDoctorDto,
-    @CurrentUser() user: { clinicId: string },
-  ) {
-    return this.doctorsService.create(dto, user.clinicId);
-  }
 
   @Post('onboard')
   @Roles('owner', 'admin')

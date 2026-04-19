@@ -194,7 +194,7 @@ export class AuthService {
       };
     }
 
-    if (this.configService.get('NODE_ENV') === 'development') {
+    if (process.env.APP_ENV === 'development') {
       return this.issueTokensForUser(user);
     }
 
@@ -222,7 +222,7 @@ export class AuthService {
     }
 
     if (
-      this.configService.get('NODE_ENV') === 'development' &&
+      process.env.APP_ENV === 'development' &&
       dto.code === '000000'
     ) {
       // skip OTP validation in dev mode
@@ -416,11 +416,29 @@ export class AuthService {
       throw new UnauthorizedException('Invalid refresh token');
     }
 
-    const isValid = await this.redisService.compareRefreshToken(
-      payload.sub,
-      token,
+    const redisKey = `refresh:${payload.sub}`;
+    const hashedIncomingToken = createHash('sha256')
+      .update(token)
+      .digest('hex');
+    const luaScript = `
+      local stored = redis.call('GET', KEYS[1])
+      if stored == false then return -1 end
+      if stored ~= ARGV[1] then return -2 end
+      redis.call('DEL', KEYS[1])
+      return 1
+    `;
+    const result = await this.redisService.eval(
+      luaScript,
+      1,
+      redisKey,
+      hashedIncomingToken,
     );
-    if (!isValid) {
+
+    if (result === -1) {
+      throw new UnauthorizedException('Token not found');
+    }
+
+    if (result === -2) {
       throw new UnauthorizedException('Invalid refresh token');
     }
 
@@ -433,8 +451,6 @@ export class AuthService {
     if (!user) {
       throw new UnauthorizedException('Invalid refresh token');
     }
-
-    await this.redisService.deleteRefreshToken(payload.sub);
 
     const { accessToken, refreshToken } = await this.generateTokens(
       user.id,
@@ -714,7 +730,7 @@ export class AuthService {
       flow.clinicId,
     );
 
-    if (this.configService.get('NODE_ENV') === 'development') {
+    if (process.env.APP_ENV === 'development') {
       return this.issueTokensForUser(user);
     }
 

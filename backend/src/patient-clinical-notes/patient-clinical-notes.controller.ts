@@ -27,20 +27,21 @@ export class PatientClinicalNotesController {
 
   @Get()
   @Audit('LIST_CLINICAL_NOTES', 'clinical_note')
-  @Roles('owner', 'admin', 'doctor', 'staff')
+  @Roles('owner', 'doctor')
   listByPatient(
     @Query('patient_id') patientId: string,
-    @CurrentUser() user: { clinicId: string },
+    @CurrentUser() user: { clinicId: string; role: string },
   ) {
     return this.patientClinicalNotesService.listByPatient(
       patientId,
       user.clinicId,
+      user.role,
     );
   }
 
   @Post()
   @Audit('CREATE_CLINICAL_NOTE', 'clinical_note')
-  @Roles('owner', 'admin', 'doctor')
+  @Roles('owner', 'doctor')
   create(
     @Body() dto: CreateClinicalNoteDto,
     @CurrentUser() user: { clinicId: string },
@@ -50,7 +51,7 @@ export class PatientClinicalNotesController {
 
   @Patch(':id')
   @Audit('UPDATE_CLINICAL_NOTE', 'clinical_note')
-  @Roles('owner', 'admin', 'doctor')
+  @Roles('owner', 'doctor')
   update(
     @Param('id') id: string,
     @Body() dto: UpdateClinicalNoteDto,
@@ -61,7 +62,7 @@ export class PatientClinicalNotesController {
 
   @Delete(':id')
   @Audit('DELETE_CLINICAL_NOTE', 'clinical_note')
-  @Roles('owner', 'admin', 'doctor')
+  @Roles('owner', 'doctor')
   remove(
     @Param('id') id: string,
     @CurrentUser() user: { clinicId: string },

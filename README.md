@@ -64,6 +64,9 @@ Recommended flow for a fresh database
    > ⚠️ Production deploy: use `npm run prod:up` — postgres port is NOT exposed
    - Before first startup on a fresh machine, make sure the Postgres init script is executable:
      - `chmod +x postgres/init/01_audit_user.sh`
+   - Windows'ta daha once `CRLF` ile checkout alinmis bir kopyada Docker init script'i bozulduysa, Git'in dosyalari `.gitattributes` kurallarina gore yeniden yazmasi icin bir kerelik sunu calistirabilirsiniz:
+     - `git rm --cached -r . && git reset --hard`
+     - Bu komut tracked dosyalari silmez; index'i temizleyip calisma agacini yeniden olusturarak `.sh` dosyalarinin `LF` satir sonlariyla geri gelmesini saglar.
 4. Apply database migrations:
    - `npm run db:migrate`
    - Migrations that run from the host require `docker-compose.dev.yml` to be active so PostgreSQL is exposed on `5432`
