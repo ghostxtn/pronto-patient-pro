@@ -1,20 +1,16 @@
-import { useEffect, useMemo, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState, type ElementType } from "react";
 import { format, parseISO } from "date-fns";
 import { enUS, tr as trLocale } from "date-fns/locale";
-import { AlertCircle, CheckCircle2, FileText, Loader2, XCircle } from "lucide-react";
-import { toast } from "sonner";
-import { useAuth } from "@/contexts/AuthContext";
+import { AlertCircle, CheckCircle2, XCircle } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
-import api from "@/services/api";
-import type { Appointment, ClinicalNote } from "@/types/calendar";
+import type { Appointment } from "@/types/calendar";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+} from "@/components/ui/dialog";
 
 const STATUS_COLORS: Record<string, string> = {
   pending: "#d4943a",
@@ -22,6 +18,22 @@ const STATUS_COLORS: Record<string, string> = {
   completed: "#65a98f",
   cancelled: "#5a7a8a",
 };
+
+const AVATAR_PALETTE = [
+  { bg: "#DBEAFE", text: "#1E40AF" },
+  { bg: "#D1FAE5", text: "#065F46" },
+  { bg: "#EDE9FE", text: "#5B21B6" },
+  { bg: "#FEF3C7", text: "#92400E" },
+  { bg: "#FCE7F3", text: "#9D174D" },
+  { bg: "#FFEDD5", text: "#9A3412" },
+  { bg: "#E0F2FE", text: "#075985" },
+];
+
+function getAvatarColor(seed: string): { bg: string; text: string } {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = ((h * 31) + seed.charCodeAt(i)) >>> 0;
+  return AVATAR_PALETTE[h % AVATAR_PALETTE.length];
+}
 
 export interface AppointmentDetailSheetProps {
   appointment: Appointment | null;
@@ -36,291 +48,199 @@ export function AppointmentDetailSheet({
   onClose,
   onStatusUpdate,
 }: AppointmentDetailSheetProps) {
-  const { user } = useAuth();
   const { lang, t } = useLanguage();
-  const queryClient = useQueryClient();
   const locale = lang === "tr" ? trLocale : enUS;
-  const isStaff = user?.role === "staff";
-  const [isNoteFormOpen, setIsNoteFormOpen] = useState(false);
-  const [diagnosis, setDiagnosis] = useState("");
-  const [treatment, setTreatment] = useState("");
-  const [prescription, setPrescription] = useState("");
-  const [notes, setNotes] = useState("");
+
+  // Normalize "canceled" (backend typo) to "cancelled"
+  const statusKey = appointment?.status === "canceled" ? "cancelled" : appointment?.status;
+
+  // Smart transitions: only show valid next states
+  const VALID_TRANSITIONS: Record<string, string[]> = {
+    pending: ["confirmed", "cancelled"],
+    confirmed: ["completed", "cancelled"],
+    completed: [],
+    cancelled: [],
+  };
+
+  // Visual config for each transition button
+  const TRANSITION_META: Record<string, { label: string; base: string; selected: string }> = {
+    confirmed: {
+      label: "Onayla",
+      base: "border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100",
+      selected: "border-emerald-600 bg-emerald-600 text-white",
+    },
+    completed: {
+      label: "Tamamland\u0131",
+      base: "border-blue-200 bg-blue-50 text-blue-800 hover:bg-blue-100",
+      selected: "border-blue-600 bg-blue-600 text-white",
+    },
+    cancelled: {
+      label: "\u0130ptal Et",
+      base: "border-red-200 bg-red-50 text-red-800 hover:bg-red-100",
+      selected: "border-red-600 bg-red-600 text-white",
+    },
+  };
+
+  const validTransitions = VALID_TRANSITIONS[statusKey ?? ""] ?? [];
+  const [pendingStatus, setPendingStatus] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!open) {
-      setIsNoteFormOpen(false);
-      setDiagnosis("");
-      setTreatment("");
-      setPrescription("");
-      setNotes("");
-    }
+    setPendingStatus(null);
   }, [appointment?.id, open]);
 
-  const statusConfig: Record<string, { color: string; icon: React.ElementType; label: string }> = {
+  const statusConfig: Record<string, { color: string; icon: ElementType; label: string }> = {
     pending: { color: STATUS_COLORS.pending, icon: AlertCircle, label: t.pending },
     confirmed: { color: STATUS_COLORS.confirmed, icon: CheckCircle2, label: t.confirmed },
     completed: { color: STATUS_COLORS.completed, icon: CheckCircle2, label: t.completed },
     cancelled: { color: STATUS_COLORS.cancelled, icon: XCircle, label: t.cancelled },
   };
 
-  const { data: clinicalNotes, isLoading: isClinicalNotesLoading } = useQuery<ClinicalNote[]>({
-    queryKey: ["clinical-notes", appointment?.patient.id],
-    queryFn: async () => api.clinicalNotes.listByPatient(appointment!.patient.id),
-    enabled: !isStaff && open && Boolean(appointment?.patient.id),
-  });
-
-  const hasAtLeastOneField = useMemo(
-    () => [diagnosis, treatment, prescription, notes].some((value) => value.trim().length > 0),
-    [diagnosis, notes, prescription, treatment],
-  );
-
-  const createClinicalNote = useMutation({
-    mutationFn: async () => {
-      if (!appointment?.id || !appointment?.patient.id || !appointment.doctor_id) {
-        throw new Error(t.missingData);
-      }
-
-      return api.clinicalNotes.create({
-        patient_id: appointment.patient.id,
-        doctor_id: appointment.doctor_id,
-        appointment_id: appointment.id,
-        diagnosis: diagnosis.trim() || undefined,
-        treatment: treatment.trim() || undefined,
-        prescription: prescription.trim() || undefined,
-        notes: notes.trim() || undefined,
-      });
-    },
-    onSuccess: () => {
-      toast.success(t.clinicalNoteSaved);
-      setIsNoteFormOpen(false);
-      setDiagnosis("");
-      setTreatment("");
-      setPrescription("");
-      setNotes("");
-      queryClient.invalidateQueries({ queryKey: ["clinical-notes", appointment?.patient.id] });
-    },
-    onError: (err: unknown) => {
-      toast.error(err instanceof Error ? err.message : t.clinicalNoteSaveFailed);
-    },
-  });
-
   const patientName = (
     appointment?.patient.fullName
     ?? [appointment?.patient.firstName, appointment?.patient.lastName].filter(Boolean).join(" ").trim()
   ) || t.patient;
-  const statusKey = appointment?.status === "canceled" ? "cancelled" : appointment?.status;
   const status = statusKey ? statusConfig[statusKey] : null;
   const StatusIcon = status?.icon;
 
+  const handleSave = () => {
+    if (!pendingStatus || !appointment) return;
+    onStatusUpdate?.(appointment.id, pendingStatus);
+    onClose();
+  };
+
   return (
-    <Sheet open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
-      <SheetContent side="right" className="w-[480px] sm:max-w-[480px] overflow-y-auto">
+    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent className="max-w-[520px] w-full p-0 overflow-hidden rounded-[28px] gap-0 border border-border/60 shadow-2xl">
         {appointment && status && StatusIcon ? (
           <>
-            <SheetHeader>
-              <SheetTitle className="font-display">{t.appointmentDetails}</SheetTitle>
-              <div>
-                <Badge
-                  className={cn("mt-2 rounded-full border")}
-                  variant="outline"
-                  style={{
-                    backgroundColor: `${status.color}26`,
-                    borderColor: `${status.color}26`,
-                    color: status.color,
-                  }}
-                >
-                  <StatusIcon className="mr-1 h-3 w-3" /> {status.label}
-                </Badge>
-              </div>
-            </SheetHeader>
+            <DialogHeader className="p-0 text-left">
+              {/* HEADER */}
+              <div className="px-6 pt-6 pb-5">
+                {/* Status badge */}
+                <div className="mb-5">
+                  <Badge
+                    variant="outline"
+                    className="rounded-full border text-[12px] font-medium px-3 py-1"
+                    style={{
+                      backgroundColor: `${status.color}18`,
+                      borderColor: `${status.color}40`,
+                      color: status.color,
+                    }}
+                  >
+                    <StatusIcon className="mr-1.5 h-3.5 w-3.5" />
+                    {status.label}
+                  </Badge>
+                </div>
 
-            <div className="space-y-4">
-              <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-secondary to-success">
-                  <span className="font-display font-bold text-secondary-foreground">{patientName[0] || "P"}</span>
-                </div>
-                <div>
-                  <div className="font-semibold">{patientName}</div>
-                  {appointment.patient.email ? <div className="text-sm text-muted-foreground">{appointment.patient.email}</div> : null}
-                  {appointment.patient.phone ? <div className="text-sm text-muted-foreground">{appointment.patient.phone}</div> : null}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3 text-sm">
-                <div className="rounded-xl bg-muted p-3">
-                  <div className="mb-1 text-muted-foreground">{t.date}</div>
-                  <div className="font-medium">{format(parseISO(appointment.appointment_date), "EEE, MMM d, yyyy", { locale })}</div>
-                </div>
-                <div className="rounded-xl bg-muted p-3">
-                  <div className="mb-1 text-muted-foreground">{t.time}</div>
-                  <div className="font-medium">{appointment.start_time.slice(0, 5)} - {appointment.end_time.slice(0, 5)}</div>
-                </div>
-              </div>
-
-              {appointment.notes ? (
-                <div className="rounded-xl bg-muted p-3">
-                  <div className="mb-1 flex items-center gap-1 text-sm text-muted-foreground">
-                    <FileText className="h-3 w-3" /> {t.patientNotes}
+                {/* Patient */}
+                <div className="flex items-center gap-4">
+                  {(() => {
+                    const av = getAvatarColor(appointment.patient.id ?? patientName);
+                    return (
+                      <div
+                        className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl text-xl font-bold select-none"
+                        style={{ backgroundColor: av.bg, color: av.text }}
+                      >
+                        {patientName[0]?.toUpperCase() ?? "P"}
+                      </div>
+                    );
+                  })()}
+                  <div className="min-w-0">
+                    <p className="text-xl font-semibold text-foreground truncate leading-tight">{patientName}</p>
+                    {appointment.patient.email ? (
+                      <p className="text-sm text-muted-foreground truncate mt-0.5">{appointment.patient.email}</p>
+                    ) : null}
+                    {appointment.patient.phone ? (
+                      <p className="text-sm text-muted-foreground mt-0.5">{appointment.patient.phone}</p>
+                    ) : null}
                   </div>
-                  <p className="text-sm">{appointment.notes}</p>
+                </div>
+              </div>
+            </DialogHeader>
+
+            {/* INFO GRID */}
+            <div className="px-6 pb-5 grid grid-cols-2 gap-3">
+              <div className="rounded-2xl bg-muted/50 p-3.5">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground mb-1.5">Tarih</p>
+                <p className="text-sm font-semibold text-foreground leading-snug">
+                  {format(parseISO(appointment.appointment_date), "EEE, d MMM yyyy", { locale })}
+                </p>
+              </div>
+              <div className="rounded-2xl bg-muted/50 p-3.5">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground mb-1.5">Saat</p>
+                <p className="text-sm font-semibold text-foreground leading-snug">
+                  {appointment.start_time.slice(0, 5)} {"\u2013"} {appointment.end_time.slice(0, 5)}
+                </p>
+                {(() => {
+                  const [sh, sm] = appointment.start_time.split(":").map(Number);
+                  const [eh, em] = appointment.end_time.split(":").map(Number);
+                  const dur = (eh * 60 + em) - (sh * 60 + sm);
+                  return dur > 0 ? (
+                    <p className="text-[11px] text-muted-foreground mt-0.5">{dur} dk</p>
+                  ) : null;
+                })()}
+              </div>
+              {appointment.notes ? (
+                <div className="col-span-2 rounded-2xl bg-muted/50 p-3.5">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground mb-1.5">Not</p>
+                  <p className="text-sm text-foreground leading-relaxed">{appointment.notes}</p>
                 </div>
               ) : null}
+            </div>
 
-              {onStatusUpdate ? (
-                <div className="space-y-2">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                    Durumu Güncelle
+            {/* STATUS SECTION */}
+            <div className="border-t border-border/50" />
+            <div className="px-6 py-5">
+              {validTransitions.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-1">
+                  {statusKey === "completed"
+                    ? "Bu randevu tamamland\u0131, durum de\u011fi\u015ftirilemez."
+                    : "Bu randevu iptal edildi, durum de\u011fi\u015ftirilemez."}
+                </p>
+              ) : (
+                <>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground mb-3">
+                    Durum G\u00fcncelle
                   </p>
-                  <div className="grid grid-cols-2 gap-2">
-                    {[
-                      { key: "pending", label: "Bekleyen", color: "#f59e0b" },
-                      { key: "confirmed", label: "Onaylanan", color: "#2563eb" },
-                      { key: "completed", label: "Tamamlanan", color: "#16a34a" },
-                      { key: "cancelled", label: "İptal Edilen", color: "#dc2626" },
-                    ].map(({ key, label, color }) => {
-                      const isActive = appointment.status === key;
-
+                  <div className="flex gap-2 flex-wrap">
+                    {validTransitions.map((s) => {
+                      const meta = TRANSITION_META[s];
+                      if (!meta) return null;
+                      const isSelected = pendingStatus === s;
                       return (
                         <button
-                          key={key}
+                          key={s}
                           type="button"
-                          disabled={isActive}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onStatusUpdate(appointment.id, key);
-                          }}
+                          onClick={() => setPendingStatus(isSelected ? null : s)}
                           className={cn(
-                            "flex items-center justify-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-medium transition-all",
-                            isActive
-                              ? "cursor-default opacity-100"
-                              : "opacity-60 hover:opacity-90",
+                            "flex-1 min-w-[110px] rounded-xl border px-4 py-2.5 text-sm font-semibold transition-all duration-150",
+                            isSelected ? meta.selected : meta.base,
                           )}
-                          style={
-                            isActive
-                              ? {
-                                  backgroundColor: `${color}18`,
-                                  borderColor: `${color}50`,
-                                  color,
-                                }
-                              : {
-                                  backgroundColor: "transparent",
-                                  borderColor: "var(--border)",
-                                  color: "var(--muted-foreground)",
-                                }
-                          }
                         >
-                          {isActive ? (
-                            <span
-                              className="h-1.5 w-1.5 rounded-full"
-                              style={{ backgroundColor: color }}
-                            />
-                          ) : null}
-                          {label}
+                          {meta.label}
                         </button>
                       );
                     })}
                   </div>
-                </div>
-              ) : null}
-
-              {!isStaff ? (
-                <div className="border-t pt-4">
-                  <div className="space-y-4">
-                    <div>
-                      <h4 className="font-display font-semibold">{t.previousNotes}</h4>
-                      <p className="mt-1 text-sm text-muted-foreground">{t.previousNotesDesc}</p>
-                    </div>
-
-                    {isClinicalNotesLoading ? (
-                      <div className="flex items-center gap-2 rounded-xl bg-muted p-3 text-sm text-muted-foreground">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        {t.clinicalNotesLoading}
-                      </div>
-                    ) : clinicalNotes && clinicalNotes.length > 0 ? (
-                      <div className="space-y-3">
-                        {clinicalNotes.map((note) => (
-                          <Card key={note.id} className="rounded-2xl border-border/60 shadow-none">
-                            <CardHeader className="space-y-2 pb-3">
-                              <div className="flex items-start justify-between gap-3">
-                                <CardTitle className="text-base font-semibold">
-                                  {[note.doctor.title, note.doctor.firstName, note.doctor.lastName].filter(Boolean).join(" ")}
-                                </CardTitle>
-                                <span className="text-xs text-muted-foreground">
-                                  {format(new Date(note.created_at), "d MMMM yyyy, HH:mm", { locale })}
-                                </span>
-                              </div>
-                            </CardHeader>
-                            <CardContent className="space-y-2 text-sm">
-                              {note.diagnosis ? <p><span className="font-medium">{t.diagnosis}:</span> {note.diagnosis}</p> : null}
-                              {note.treatment ? <p><span className="font-medium">{t.treatment}:</span> {note.treatment}</p> : null}
-                              {note.prescription ? <p><span className="font-medium">{t.prescription}:</span> {note.prescription}</p> : null}
-                              {note.notes ? <p><span className="font-medium">{t.notes}:</span> {note.notes}</p> : null}
-                            </CardContent>
-                          </Card>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">{t.noClinicalNotesYet}</p>
+                  <button
+                    type="button"
+                    disabled={!pendingStatus}
+                    onClick={handleSave}
+                    className={cn(
+                      "mt-3 w-full rounded-xl px-4 py-3 text-sm font-semibold transition-all duration-150",
+                      pendingStatus
+                        ? "bg-foreground text-background hover:opacity-90 cursor-pointer"
+                        : "bg-muted text-muted-foreground cursor-not-allowed opacity-60",
                     )}
-
-                    <div className="space-y-3 rounded-2xl bg-muted/40 p-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <h4 className="font-display font-semibold">{t.newNoteTitle}</h4>
-                          <p className="mt-1 text-sm text-muted-foreground">{t.newNoteDesc}</p>
-                        </div>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="rounded-xl"
-                          onClick={() => setIsNoteFormOpen((current) => !current)}
-                        >
-                          {t.addNewClinicalNote}
-                        </Button>
-                      </div>
-
-                      {isNoteFormOpen ? (
-                        <div className="space-y-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="clinical-note-diagnosis">{t.diagnosis}</Label>
-                            <Textarea id="clinical-note-diagnosis" value={diagnosis} onChange={(e) => setDiagnosis(e.target.value)} className="rounded-xl text-sm" rows={3} />
-                          </div>
-
-                          <div className="space-y-2">
-                            <Label htmlFor="clinical-note-treatment">{t.treatment}</Label>
-                            <Textarea id="clinical-note-treatment" value={treatment} onChange={(e) => setTreatment(e.target.value)} className="rounded-xl text-sm" rows={3} />
-                          </div>
-
-                          <div className="space-y-2">
-                            <Label htmlFor="clinical-note-prescription">{t.prescription}</Label>
-                            <Textarea id="clinical-note-prescription" value={prescription} onChange={(e) => setPrescription(e.target.value)} className="rounded-xl text-sm" rows={3} />
-                          </div>
-
-                          <div className="space-y-2">
-                            <Label htmlFor="clinical-note-notes">{t.generalNote}</Label>
-                            <Textarea id="clinical-note-notes" value={notes} onChange={(e) => setNotes(e.target.value)} className="rounded-xl text-sm" rows={4} />
-                          </div>
-
-                          <Button
-                            type="button"
-                            className="w-full rounded-xl"
-                            onClick={() => createClinicalNote.mutate()}
-                            disabled={!hasAtLeastOneField || createClinicalNote.isPending}
-                          >
-                            {createClinicalNote.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                            {t.save}
-                          </Button>
-                        </div>
-                      ) : null}
-                    </div>
-                  </div>
-                </div>
-              ) : null}
+                  >
+                    {pendingStatus ? "De\u011fi\u015fikli\u011fi Kaydet" : "Bir durum se\u00e7in"}
+                  </button>
+                </>
+              )}
             </div>
           </>
         ) : null}
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -24,6 +24,22 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import type { AvailabilitySlot } from "@/types/calendar";
 
+const DOCTOR_AVATAR_PALETTE = [
+  { bg: "#DBEAFE", text: "#1E40AF" },
+  { bg: "#D1FAE5", text: "#065F46" },
+  { bg: "#EDE9FE", text: "#5B21B6" },
+  { bg: "#FEF3C7", text: "#92400E" },
+  { bg: "#FCE7F3", text: "#9D174D" },
+  { bg: "#FFEDD5", text: "#9A3412" },
+  { bg: "#E0F2FE", text: "#075985" },
+];
+
+function getDoctorAvatarColor(id: string): { bg: string; text: string } {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = ((h * 31) + id.charCodeAt(i)) >>> 0;
+  return DOCTOR_AVATAR_PALETTE[h % DOCTOR_AVATAR_PALETTE.length];
+}
+
 const fadeUp = {
   hidden: { opacity: 0, y: 20 },
   visible: (i: number) => ({
@@ -87,7 +103,7 @@ function DoctorSelectionList({
   }
 
   if (!doctors.length) {
-    return <p className="py-8 text-center text-sm text-muted-foreground">Filtreyle eslesen doktor bulunmuyor.</p>;
+    return <p className="py-8 text-center text-sm text-muted-foreground">Filtreyle eşleşen doktor bulunamadı.</p>;
   }
 
   return (
@@ -102,49 +118,42 @@ function DoctorSelectionList({
             onClick={() => onSelect(doctor.id)}
             className={cn(
               "block w-full max-w-full overflow-hidden rounded-[22px] border px-3 py-3 text-left transition-all duration-200",
-              !doctor.isAvailableToday && "opacity-50",
               isSelected
-                ? "border-primary/20 bg-primary/10 shadow-soft"
-                : "border-border/60 bg-background/70 hover:border-primary/15 hover:bg-accent/35",
+                ? "border-primary/30 bg-primary/8 shadow-soft"
+                : "border-border/60 bg-background/70 hover:border-primary/20 hover:bg-accent/30",
             )}
           >
-            <div className="flex items-start gap-2.5 overflow-hidden">
-              <div
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[11px] font-semibold text-white"
-                style={{ backgroundColor: isSelected ? "#2563eb" : "#65a98f" }}
-              >
-                {getDoctorInitials(doctor)}
-              </div>
-
-              <div className="min-w-0 flex-1 space-y-1.5 overflow-hidden">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold text-foreground">
-                      {getDoctorDisplayName(doctor)}
-                    </p>
-                    <p className="truncate text-xs text-muted-foreground">
-                      {doctor.specialization?.name ?? "Brans belirtilmedi"}
-                    </p>
+            <div className="flex items-center gap-3 overflow-hidden">
+              {(() => {
+                const av = getDoctorAvatarColor(doctor.id);
+                return (
+                  <div
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-[11px] font-bold select-none"
+                    style={{ backgroundColor: av.bg, color: av.text }}
+                  >
+                    {getDoctorInitials(doctor)}
                   </div>
-                  {doctor.isAvailableToday ? (
-                    <span
-                      style={{
-                        width: 6,
-                        height: 6,
-                        borderRadius: "9999px",
-                        backgroundColor: "#16a34a",
-                        display: "inline-block",
-                        flexShrink: 0,
-                      }}
-                    />
-                  ) : null}
-                </div>
+                );
+              })()}
 
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <span className="max-w-full truncate rounded-full bg-accent/70 px-2 py-0.5 text-[10px] font-medium text-foreground/80">
-                    {doctor.todaySlotCount} bugunku slot
-                  </span>
+              <div className="min-w-0 flex-1 overflow-hidden">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="truncate text-sm font-semibold text-foreground">
+                    {getDoctorDisplayName(doctor)}
+                  </p>
+                  {doctor.isAvailableToday ? (
+                    <span className="shrink-0 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 leading-none">
+                      {doctor.todaySlotCount} slot
+                    </span>
+                  ) : (
+                    <span className="shrink-0 rounded-full border border-border/60 bg-muted/60 px-2 py-0.5 text-[10px] font-medium text-muted-foreground leading-none">
+                      Bugün Pasif
+                    </span>
+                  )}
                 </div>
+                <p className="truncate text-xs text-muted-foreground mt-0.5">
+                  {doctor.specialization?.name ?? "Branş belirtilmedi"}
+                </p>
               </div>
             </div>
           </button>
@@ -158,7 +167,7 @@ function SelectedDoctorContext({ doctor }: { doctor: DoctorSummary | null }) {
   if (!doctor) {
     return (
       <div className="rounded-[24px] border border-dashed border-border/60 bg-background/60 px-4 py-5 text-sm text-muted-foreground">
-        Takvimi odaga almak icin bir doktor secin.
+        Takvimi odağa almak için bir doktor seçin.
       </div>
     );
   }
@@ -175,20 +184,20 @@ function SelectedDoctorContext({ doctor }: { doctor: DoctorSummary | null }) {
 
         <div className="min-w-0 space-y-1">
           <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-primary">
-            Secili doktor
+            Seçili Doktor
           </p>
           <h2 className="truncate text-lg font-display font-semibold text-foreground">
             {getDoctorDisplayName(doctor)}
           </h2>
           <p className="truncate text-sm text-muted-foreground">
-            {doctor.specialization?.name ?? "Brans belirtilmedi"}
+            {doctor.specialization?.name ?? "Branş belirtilmedi"}
           </p>
         </div>
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
         <Badge variant="outline" className="rounded-full border-border/60 bg-card text-foreground">
-          {doctor.todaySlotCount} aktif slot
+          {doctor.isAvailableToday ? `${doctor.todaySlotCount} aktif slot` : "Bugün Pasif"}
         </Badge>
         <Badge
           variant="outline"
@@ -199,7 +208,7 @@ function SelectedDoctorContext({ doctor }: { doctor: DoctorSummary | null }) {
               : "border-border/60 bg-card text-muted-foreground",
           )}
         >
-          {doctor.isAvailableToday ? "Bugun musait" : "Bugun pasif"}
+          {doctor.isAvailableToday ? "Bugün Müsait" : "Bugün Pasif"}
         </Badge>
       </div>
     </div>
@@ -265,7 +274,7 @@ function StaffSchedulerRail({
                 className="rounded-full border-border/60 bg-card"
                 onClick={onToday}
               >
-                Bugun
+                Bugün
               </Button>
             </div>
 
@@ -305,7 +314,7 @@ function StaffSchedulerRail({
               <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
                 Doktorlar
               </p>
-              <h2 className="text-lg font-display font-semibold text-foreground">Arama ve filtreler</h2>
+              <h2 className="text-lg font-display font-semibold text-foreground">Arama ve Filtreler</h2>
             </div>
 
             <div className="relative">
@@ -313,7 +322,7 @@ function StaffSchedulerRail({
               <Input
                 value={searchValue}
                 onChange={(event) => onSearchChange(event.target.value)}
-                placeholder="Doktor veya brans ara"
+                placeholder="Doktor veya branş ara"
                 className="rounded-full border-border/60 bg-background/70 pl-9"
               />
             </div>
@@ -329,7 +338,7 @@ function StaffSchedulerRail({
                 )}
                 onClick={() => onFilterModeChange("all")}
               >
-                Tum doktorlar
+                Tüm Doktorlar
               </Button>
               <Button
                 type="button"
@@ -341,7 +350,7 @@ function StaffSchedulerRail({
                 )}
                 onClick={() => onFilterModeChange("available")}
               >
-                Bugun musait
+                Bugün Müsait
               </Button>
             </div>
           </div>
@@ -494,21 +503,21 @@ export default function StaffDoctors() {
         ...doctorAvailabilityMap[doctor.id],
       }))
       .filter((doctor) => {
-      if (filterMode === "available" && !doctor.isAvailableToday) {
-        return false;
-      }
+        if (filterMode === "available" && !doctor.isAvailableToday) {
+          return false;
+        }
 
-      if (!normalizedQuery) {
-        return true;
-      }
+        if (!normalizedQuery) {
+          return true;
+        }
 
-      const haystack = [
-        getDoctorDisplayName(doctor),
-        doctor.specialization?.name ?? "",
-        doctor.email ?? "",
-      ]
-        .join(" ")
-        .toLocaleLowerCase("tr-TR");
+        const haystack = [
+          getDoctorDisplayName(doctor),
+          doctor.specialization?.name ?? "",
+          doctor.email ?? "",
+        ]
+          .join(" ")
+          .toLocaleLowerCase("tr-TR");
 
         return haystack.includes(normalizedQuery);
       });
