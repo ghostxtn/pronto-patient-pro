@@ -13,11 +13,11 @@ export class ClinicsService {
     return clinic;
   }
 
-  async findAll() {
+  async findAll(clinicId: string) {
     return this.db
       .select()
       .from(clinics)
-      .where(eq(clinics.is_active, true));
+      .where(and(eq(clinics.is_active, true), eq(clinics.id, clinicId)));
   }
 
   async findById(id: string) {

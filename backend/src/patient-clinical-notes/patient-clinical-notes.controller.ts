@@ -14,6 +14,7 @@ import { Audit } from '../common/decorators/audit.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
 import { TenantGuard } from '../common/guards/tenant.guard';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { ClinicalNotesQueryDto } from './dto/clinical-notes-query.dto';
 import { CreateClinicalNoteDto } from './dto/create-clinical-note.dto';
 import { UpdateClinicalNoteDto } from './dto/update-clinical-note.dto';
 import { PatientClinicalNotesService } from './patient-clinical-notes.service';
@@ -29,11 +30,11 @@ export class PatientClinicalNotesController {
   @Audit('LIST_CLINICAL_NOTES', 'clinical_note')
   @Roles('owner', 'doctor')
   listByPatient(
-    @Query('patient_id') patientId: string,
+    @Query() query: ClinicalNotesQueryDto,
     @CurrentUser() user: { clinicId: string; role: string },
   ) {
     return this.patientClinicalNotesService.listByPatient(
-      patientId,
+      query.patient_id,
       user.clinicId,
       user.role,
     );

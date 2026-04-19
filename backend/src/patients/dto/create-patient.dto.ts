@@ -1,4 +1,5 @@
 import {
+  IsDateString,
   IsEmail,
   IsIn,
   IsOptional,
@@ -22,7 +23,7 @@ export class CreatePatientDto {
   tcNo?: string;
 
   @IsOptional()
-  @IsString()
+  @IsDateString()
   birthDate?: string;
 
   @IsOptional()

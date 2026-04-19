@@ -1,7 +1,14 @@
 const API_BASE = import.meta.env.VITE_API_URL || "/api";
 
-const ACCESS_TOKEN_KEY = "access_token";
-const REFRESH_TOKEN_KEY = "refresh_token";
+let _accessToken: string | null = null;
+
+export const setAccessToken = (token: string | null) => {
+  _accessToken = token;
+};
+
+export const getAccessToken = () => _accessToken;
+
+export const clearAccessToken = () => setAccessToken(null);
 
 export class ApiError extends Error {
   constructor(
@@ -16,39 +23,6 @@ export class ApiError extends Error {
 
 function debugAuthLog(message: string, details?: unknown) {
   console.debug(`[auth][api] ${message}`, details ?? "");
-}
-
-export function setTokens(access?: string | null, refresh?: string | null) {
-  debugAuthLog("setTokens", {
-    hasAccessToken: Boolean(access),
-    hasRefreshToken: Boolean(refresh),
-  });
-
-  if (access) {
-    localStorage.setItem(ACCESS_TOKEN_KEY, access);
-  } else {
-    localStorage.removeItem(ACCESS_TOKEN_KEY);
-  }
-
-  if (refresh) {
-    localStorage.setItem(REFRESH_TOKEN_KEY, refresh);
-  } else {
-    localStorage.removeItem(REFRESH_TOKEN_KEY);
-  }
-}
-
-export function clearTokens() {
-  debugAuthLog("clearTokens");
-  localStorage.removeItem(ACCESS_TOKEN_KEY);
-  localStorage.removeItem(REFRESH_TOKEN_KEY);
-}
-
-export function getAccessToken() {
-  return localStorage.getItem(ACCESS_TOKEN_KEY);
-}
-
-function getRefreshToken() {
-  return localStorage.getItem(REFRESH_TOKEN_KEY);
 }
 
 type ApiRequestOptions = RequestInit & {
@@ -81,22 +55,11 @@ async function parseResponse(response: Response) {
 }
 
 async function refreshAccessToken() {
-  const refreshToken = getRefreshToken();
-
-  if (!refreshToken) {
-    debugAuthLog("refreshAccessToken missing refresh token");
-    throw new ApiError(401, "Missing refresh token");
-  }
-
   debugAuthLog("refreshAccessToken start");
 
   const response = await fetch(`${API_BASE}/auth/refresh`, {
     method: "POST",
     credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ refreshToken }),
   });
 
   const body = await parseResponse(response);
@@ -113,17 +76,13 @@ async function refreshAccessToken() {
     "accessToken" in body && typeof body.accessToken === "string"
       ? body.accessToken
       : null;
-  const nextRefreshToken =
-    "refreshToken" in body && typeof body.refreshToken === "string"
-      ? body.refreshToken
-      : refreshToken;
 
   if (!accessToken) {
     debugAuthLog("refreshAccessToken missing access token in response", body);
     throw new ApiError(response.status, "Missing access token in refresh response", body);
   }
 
-  setTokens(accessToken, nextRefreshToken);
+  setAccessToken(accessToken);
   debugAuthLog("refreshAccessToken success");
   return accessToken;
 }
@@ -170,7 +129,7 @@ export async function request<T>(
         endpoint,
         error,
       });
-      clearTokens();
+      clearAccessToken();
       if (typeof window !== "undefined") {
         window.location.href = "/auth";
       }
@@ -200,7 +159,7 @@ export async function request<T>(
         endpoint,
         body: retryBody,
       });
-      clearTokens();
+      clearAccessToken();
       if (typeof window !== "undefined") {
         window.location.href = "/auth";
       }
@@ -246,7 +205,6 @@ export async function request<T>(
 
 export type AuthSuccessResponse = {
   accessToken?: string;
-  refreshToken?: string;
   user?: unknown;
 };
 
@@ -278,6 +236,11 @@ const api = {
       request<AuthSuccessResponse>("/auth/verify-otp", {
         method: "POST",
         body: JSON.stringify({ flowToken, code }),
+      }),
+    refresh: () =>
+      request<{ accessToken: string }>("/auth/refresh", {
+        method: "POST",
+        omitAuth: true,
       }),
     resendOtp: (flowToken: string) =>
       request<AuthOtpChallengeResponse>("/auth/resend-otp", {

@@ -13,6 +13,7 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CreateAdminUserDto } from './dto/create-admin-user.dto';
 import { SetStaffStatusDto } from './dto/set-staff-status.dto';
+import { StaffQueryDto } from './dto/staff-query.dto';
 import { UpdateStaffDto } from './dto/update-staff.dto';
 import { StaffService } from './staff.service';
 
@@ -24,10 +25,10 @@ export class StaffController {
   @Get()
   findAll(
     @CurrentUser() user: { clinicId: string },
-    @Query('role') role?: string,
-    @Query('search') search?: string,
-    @Query('status') status?: string,
+    @Query() query: StaffQueryDto,
   ) {
+    const { role, search, status } = query;
+
     if (role && role !== 'staff') {
       return [];
     }
