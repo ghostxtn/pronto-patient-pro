@@ -146,35 +146,50 @@ const APPOINTMENT_STATUS_STYLES: Record<
   }
 > = {
   pending: {
-    background: "#FFF7ED",
-    text: "#9A3412",
-    accent: "#EA580C",
+    background: "hsl(var(--calendar-appointment-pending-bg))",
+    text: "hsl(var(--calendar-appointment-pending-fg))",
+    accent: "hsl(var(--calendar-appointment-pending-accent))",
   },
   confirmed: {
-    background: "#DBEAFE",
-    text: "#1E40AF",
-    accent: "#2563EB",
+    background: "hsl(var(--calendar-appointment-confirmed-bg))",
+    text: "hsl(var(--calendar-appointment-confirmed-fg))",
+    accent: "hsl(var(--calendar-appointment-confirmed-accent))",
   },
   completed: {
-    background: "#DCFCE7",
-    text: "#166534",
-    accent: "#16A34A",
+    background: "hsl(var(--calendar-appointment-completed-bg))",
+    text: "hsl(var(--calendar-appointment-completed-fg))",
+    accent: "hsl(var(--calendar-appointment-completed-accent))",
   },
   cancelled: {
-    background: "#E5E7EB",
-    text: "#6B7280",
-    accent: "#9CA3AF",
+    background: "hsl(var(--calendar-appointment-cancelled-bg))",
+    text: "hsl(var(--calendar-appointment-cancelled-fg))",
+    accent: "hsl(var(--calendar-appointment-cancelled-accent))",
   },
   blocked: {
-    background: "#FEE2E2",
-    text: "#991B1B",
-    accent: "#DC2626",
+    background: "hsl(var(--calendar-appointment-blocked-bg))",
+    text: "hsl(var(--calendar-appointment-blocked-fg))",
+    accent: "hsl(var(--calendar-appointment-blocked-accent))",
   },
 };
 
-const OVERRIDE_COLORS: Record<string, string> = {
-  custom_hours: "#ea580c",
-  blackout: "#ea580c",
+const OVERRIDE_EVENT_STYLES: Record<
+  "custom_hours" | "blackout",
+  {
+    background: string;
+    text: string;
+    accent: string;
+  }
+> = {
+  custom_hours: {
+    background: "hsl(var(--calendar-custom-hours-bg))",
+    text: "hsl(var(--calendar-custom-hours-fg))",
+    accent: "hsl(var(--calendar-custom-hours-accent))",
+  },
+  blackout: {
+    background: "hsl(var(--calendar-blackout-bg))",
+    text: "hsl(var(--calendar-blackout-fg))",
+    accent: "hsl(var(--calendar-blackout-accent))",
+  },
 };
 
 interface DoctorCalendarProps {
@@ -388,11 +403,11 @@ function getOverrideBadge(type: AvailabilityOverride["type"]) {
   return type === "blackout"
     ? {
         label: "Kapalı Gün",
-        color: OVERRIDE_COLORS.blackout,
+        color: OVERRIDE_EVENT_STYLES.blackout.accent,
       }
     : {
         label: "Bloklu zaman",
-        color: OVERRIDE_COLORS.custom_hours,
+        color: OVERRIDE_EVENT_STYLES.custom_hours.accent,
       };
 }
 
@@ -749,41 +764,10 @@ function getTimeGridDaySlots(scrollContainer: HTMLElement) {
   );
 }
 
-function getTodayTimeColumn(
-  calendarShell: HTMLElement,
-  scrollContainer: HTMLElement,
-  view: View,
-  currentDate: Date,
-) {
-  const daySlots = getTimeGridDaySlots(scrollContainer);
-
-  if (daySlots.length === 0) {
-    return null;
-  }
-
-  if (view === Views.DAY) {
-    return isToday(currentDate) ? daySlots[0] : null;
-  }
-
-  if (view !== Views.WEEK) {
-    return null;
-  }
-
-  const headerCells = Array.from(
-    calendarShell.querySelectorAll(".rbc-time-header-content .rbc-header"),
-  ).filter((cell): cell is HTMLElement => cell instanceof HTMLElement);
-  const backgroundCells = Array.from(calendarShell.querySelectorAll(".rbc-day-bg")).filter(
-    (cell): cell is HTMLElement => cell instanceof HTMLElement,
-  );
-  const todayIndex = [headerCells, backgroundCells]
-    .map((cells) => cells.findIndex((cell) => cell.classList.contains("rbc-today")))
-    .find((index) => index !== -1);
-
-  if (todayIndex === undefined || todayIndex < 0) {
-    return null;
-  }
-
-  return daySlots[todayIndex] ?? null;
+function clearCalendarActiveDayAttributes(calendarShell: HTMLElement) {
+  calendarShell.querySelectorAll("[data-calendar-active-day]").forEach((element) => {
+    element.removeAttribute("data-calendar-active-day");
+  });
 }
 
 function splitFullName(fullName: string) {
@@ -854,169 +838,106 @@ const CustomToolbar = ({
         </div>
       </div>
 
-      <div className="scheduler-toolbar-center">
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="scheduler-toolbar-nav-button"
-          onClick={() => onNavigate("PREV")}
-        >
-          <ChevronLeft className="h-4 w-4" />
-        </Button>
-        <span className="scheduler-toolbar-title">
-          {formatToolbarRangeLabel(date, view)}
-        </span>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="scheduler-toolbar-nav-button"
-          onClick={() => onNavigate("NEXT")}
-        >
-          <ChevronRight className="h-4 w-4" />
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          className="scheduler-toolbar-today-button"
-          onClick={() => onNavigate("TODAY")}
-        >
-          Bugün
-        </Button>
-      </div>
+      <div className="scheduler-toolbar-controls">
+        <div className="scheduler-toolbar-center">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="scheduler-toolbar-nav-button"
+            onClick={() => onNavigate("PREV")}
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <span className="scheduler-toolbar-title">
+            {formatToolbarRangeLabel(date, view)}
+          </span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="scheduler-toolbar-nav-button"
+            onClick={() => onNavigate("NEXT")}
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            className="scheduler-toolbar-today-button"
+            onClick={() => onNavigate("TODAY")}
+          >
+            Bugün
+          </Button>
+        </div>
 
-      <div className="scheduler-toolbar-actions">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              type="button"
-              variant="outline"
-              className="scheduler-toolbar-view-button"
-            >
-              {toolbarViewLabels[view]}
-              <ChevronDown className="ml-2 h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-40 rounded-2xl">
-            {toolbarViews.map((toolbarView) => (
-              <DropdownMenuItem
-                key={toolbarView}
-                onClick={() => onView(toolbarView)}
-                className={cn(
-                  "rounded-xl",
-                  view === toolbarView && "bg-accent text-foreground",
-                )}
+        <div className="scheduler-toolbar-actions">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                className="scheduler-toolbar-view-button"
               >
-                {toolbarViewLabels[toolbarView]}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
+                {toolbarViewLabels[view]}
+                <ChevronDown className="ml-2 h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-40 rounded-2xl">
+              {toolbarViews.map((toolbarView) => (
+                <DropdownMenuItem
+                  key={toolbarView}
+                  onClick={() => onView(toolbarView)}
+                  className={cn(
+                    "rounded-xl",
+                    view === toolbarView && "bg-accent text-foreground",
+                  )}
+                >
+                  {toolbarViewLabels[toolbarView]}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
 
-        <Button
-          type="button"
-          variant="outline"
-          className="scheduler-toolbar-manage-button"
-          onClick={onManageAvailability}
-        >
-          <Settings2 className="mr-2 h-4 w-4" />
-          Müsaitlik Paneli
-        </Button>
+          <Button
+            type="button"
+            variant="outline"
+            className="scheduler-toolbar-manage-button"
+            onClick={onManageAvailability}
+          >
+            <Settings2 className="mr-2 h-4 w-4" />
+            Müsaitlik Paneli
+          </Button>
+        </div>
       </div>
     </div>
   </div>
 );
 
 function AppointmentStatusIcon({ status }: { status: string }) {
-  if (status === "confirmed") {
-    return (
-      <span
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          justifyContent: "center",
-          width: 13,
-          height: 13,
-          borderRadius: "9999px",
-          backgroundColor: "#2563eb",
-          flexShrink: 0,
-        }}
-      >
-        <svg width="7" height="7" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-          <path
-            d="M2 5l2.5 2.5L8 3"
-            stroke="#fff"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      </span>
-    );
-  }
-
-  if (status === "pending") {
-    return (
-      <span
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          justifyContent: "center",
-          width: 13,
-          height: 13,
-          borderRadius: "9999px",
-          backgroundColor: "#CA8A04",
-          flexShrink: 0,
-          fontSize: 8,
-          color: "#fff",
-          fontWeight: 700,
-          lineHeight: 1,
-        }}
-      >
-        !
-      </span>
-    );
-  }
-
-  if (status === "completed") {
-    return (
-      <span
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          justifyContent: "center",
-          width: 13,
-          height: 13,
-          borderRadius: "9999px",
-          backgroundColor: "#16A34A",
-          flexShrink: 0,
-        }}
-      >
-        <svg width="7" height="7" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-          <path
-            d="M2 5l2.5 2.5L8 3"
-            stroke="#fff"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      </span>
-    );
-  }
-
   return (
-    <span
-      style={{
-        width: 13,
-        height: 13,
-        borderRadius: "9999px",
-        backgroundColor: "#9CA3AF",
-        flexShrink: 0,
-        display: "inline-flex",
-      }}
-    />
+    <span className="scheduler-event-status-icon" aria-hidden="true">
+      {status === "pending" ? (
+        <span className="scheduler-event-status-glyph">!</span>
+      ) : status === "cancelled" || status === "blocked" ? (
+        <Ban className="scheduler-event-status-svg" />
+      ) : (
+        <svg
+          className="scheduler-event-status-svg"
+          viewBox="0 0 10 10"
+          fill="none"
+          aria-hidden="true"
+        >
+          <path
+            d="M2 5l2.5 2.5L8 3"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      )}
+    </span>
   );
 }
 
@@ -1360,11 +1281,6 @@ export function DoctorCalendar({
   const [manualPatientPhone, setManualPatientPhone] = useState("");
   const [manualPatientNote, setManualPatientNote] = useState("");
   const [appointmentNotes, setAppointmentNotes] = useState("");
-  const [currentTime, setCurrentTime] = useState(() => new Date());
-  const [currentTimeIndicatorStyle, setCurrentTimeIndicatorStyle] =
-    useState<CSSProperties | null>(null);
-  const [currentTimeIndicatorPortalTarget, setCurrentTimeIndicatorPortalTarget] =
-    useState<HTMLElement | null>(null);
 
   const resolvedCurrentDate = calendarDate ?? internalCurrentDate;
   const resolvedView = calendarView ?? internalView;
@@ -2161,13 +2077,13 @@ export function DoctorCalendar({
       event.type === "custom_hours" && "scheduler-event-custom-hours",
     );
 
-  const eventPropGetter: EventPropGetter<SchedulerEvent> = (event) => {
+  const backgroundEventPropGetter: EventPropGetter<SchedulerEvent> = (event) => {
     if (event.type === "availability-surface") {
       return {
         className: "scheduler-event scheduler-event-availability-surface",
         style: {
-          backgroundColor: "rgba(148,163,184,0.12)",
-          border: "1px solid rgba(148,163,184,0.20)",
+          backgroundColor: "hsl(var(--calendar-availability-bg))",
+          border: "1px dashed hsl(var(--calendar-availability-border))",
           borderRadius: "4px",
           left: 0,
           right: 0,
@@ -2188,6 +2104,8 @@ export function DoctorCalendar({
       return {
         className: "scheduler-event scheduler-event-blackout-surface",
         style: {
+          background:
+            "repeating-linear-gradient(45deg, hsl(var(--calendar-blackout-hatch) / 0.12) 0 8px, transparent 8px 16px)",
           borderRadius: 0,
           width: "100%",
           margin: 0,
@@ -2205,6 +2123,26 @@ export function DoctorCalendar({
           pointerEvents: "none",
         },
       };
+    }
+
+    return {};
+  };
+
+  const eventPropGetter: EventPropGetter<SchedulerEvent> = (event) => {
+    if (event.type === "draft") {
+      return {
+        className: "scheduler-event scheduler-event-draft",
+        style: {
+          pointerEvents: "none",
+        },
+      };
+    }
+
+    if (
+      event.type === "availability-surface" ||
+      event.type === "blackout-surface"
+    ) {
+      return backgroundEventPropGetter(event);
     }
 
     if (resolvedView === Views.AGENDA) {
@@ -2225,22 +2163,26 @@ export function DoctorCalendar({
           "--scheduler-event-accent": tone.accent,
           backgroundColor: tone.background,
           color: tone.text,
-          border: "1px solid rgba(0, 0, 0, 0.08)",
+          border: "1px solid hsl(var(--calendar-event-outline))",
+          borderLeft: `3px solid ${tone.accent}`,
           borderRadius: "6px",
         } as CSSProperties,
       };
     }
 
     if (event.type === "blackout" || event.type === "custom_hours") {
-      const color = OVERRIDE_COLORS[event.type];
+      const tone = OVERRIDE_EVENT_STYLES[event.type];
 
       return {
         className: getSchedulerEventClassName(event),
         style: {
-          "--scheduler-event-color": color,
-          background:
-            "linear-gradient(rgba(234, 88, 12, 0.15), rgba(234, 88, 12, 0.15)), white",
-          color: "#ea580c",
+          "--scheduler-event-background": tone.background,
+          "--scheduler-event-foreground": tone.text,
+          "--scheduler-event-accent": tone.accent,
+          backgroundColor: tone.background,
+          color: tone.text,
+          border: "1px solid hsl(var(--calendar-event-outline))",
+          borderLeft: `3px solid ${tone.accent}`,
           borderRadius: "6px",
         } as CSSProperties,
       };
@@ -2519,24 +2461,6 @@ export function DoctorCalendar({
   }, [resolvedCurrentDate, resolvedView, doctorId]);
 
   useEffect(() => {
-    if (resolvedView !== Views.WEEK && resolvedView !== Views.DAY) {
-      setCurrentTimeIndicatorPortalTarget(null);
-      setCurrentTimeIndicatorStyle(null);
-      return;
-    }
-
-    setCurrentTime(new Date());
-
-    const intervalId = window.setInterval(() => {
-      setCurrentTime(new Date());
-    }, 60_000);
-
-    return () => {
-      window.clearInterval(intervalId);
-    };
-  }, [resolvedView]);
-
-  useEffect(() => {
     if (!activeDraftPreview || (resolvedView !== Views.WEEK && resolvedView !== Views.DAY)) {
       return;
     }
@@ -2577,6 +2501,73 @@ export function DoctorCalendar({
     activeDraftPreview?.end.getTime(),
     activeDraftPreview?.id,
     activeDraftPreview?.start.getTime(),
+    resolvedView,
+  ]);
+
+  useLayoutEffect(() => {
+    const calendarShell = calendarShellRef.current;
+
+    if (!calendarShell) {
+      return;
+    }
+
+    let rafId = 0;
+
+    const syncActiveDayColumn = () => {
+      clearCalendarActiveDayAttributes(calendarShell);
+
+      if (resolvedView !== Views.WEEK) {
+        return;
+      }
+
+      const scrollContainer = getCalendarScrollContainer(calendarShell);
+
+      if (!scrollContainer) {
+        return;
+      }
+
+      const activeDayIndex = getRollingWeekRange(resolvedCurrentDate).findIndex((day) =>
+        isSameDay(day, resolvedCurrentDate),
+      );
+
+      if (activeDayIndex < 0) {
+        return;
+      }
+
+      const headerCells = Array.from(
+        calendarShell.querySelectorAll(".rbc-time-header-content .rbc-header"),
+      ).filter((cell): cell is HTMLElement => cell instanceof HTMLElement);
+      const backgroundCells = Array.from(calendarShell.querySelectorAll(".rbc-day-bg")).filter(
+        (cell): cell is HTMLElement => cell instanceof HTMLElement,
+      );
+      const daySlots = getTimeGridDaySlots(scrollContainer);
+
+      [headerCells[activeDayIndex], backgroundCells[activeDayIndex], daySlots[activeDayIndex]]
+        .filter((cell): cell is HTMLElement => Boolean(cell))
+        .forEach((cell) => {
+          cell.setAttribute("data-calendar-active-day", "true");
+        });
+    };
+
+    const scheduleSync = () => {
+      window.cancelAnimationFrame(rafId);
+      rafId = window.requestAnimationFrame(syncActiveDayColumn);
+    };
+
+    scheduleSync();
+    window.addEventListener("resize", scheduleSync);
+
+    return () => {
+      window.cancelAnimationFrame(rafId);
+      window.removeEventListener("resize", scheduleSync);
+      clearCalendarActiveDayAttributes(calendarShell);
+    };
+  }, [
+    activeDraftPreview?.id,
+    availabilitySurfaceEvents.length,
+    blackoutSurfaceEvents.length,
+    events.length,
+    resolvedCurrentDate,
     resolvedView,
   ]);
 
@@ -2629,90 +2620,6 @@ export function DoctorCalendar({
       window.cancelAnimationFrame(rafId);
     };
   }, [isAvailabilityLoading, isCalendarLoading, resolvedView]);
-
-  useEffect(() => {
-    if (isAvailabilityLoading || isCalendarLoading) {
-      setCurrentTimeIndicatorPortalTarget(null);
-      setCurrentTimeIndicatorStyle(null);
-      return;
-    }
-
-    if (resolvedView !== Views.WEEK && resolvedView !== Views.DAY) {
-      setCurrentTimeIndicatorPortalTarget(null);
-      setCurrentTimeIndicatorStyle(null);
-      return;
-    }
-
-    const calendarShell = calendarShellRef.current;
-
-    if (!calendarShell) {
-      setCurrentTimeIndicatorPortalTarget(null);
-      setCurrentTimeIndicatorStyle(null);
-      return;
-    }
-
-    let rafId = 0;
-
-    const syncCurrentTimeIndicator = () => {
-      const scrollContainer = getCalendarScrollContainer(calendarShell);
-
-      if (!scrollContainer) {
-        setCurrentTimeIndicatorPortalTarget(null);
-        setCurrentTimeIndicatorStyle(null);
-        return;
-      }
-
-      setCurrentTimeIndicatorPortalTarget(scrollContainer);
-
-      const targetColumn = getTodayTimeColumn(
-        calendarShell,
-        scrollContainer,
-        resolvedView,
-        resolvedCurrentDate,
-      );
-      const currentMinutes = getMinutesSinceMidnight(currentTime);
-      const totalMinutes = CALENDAR_END_MINUTES - CALENDAR_START_MINUTES;
-
-      if (
-        !targetColumn ||
-        currentMinutes < CALENDAR_START_MINUTES ||
-        currentMinutes > CALENDAR_END_MINUTES
-      ) {
-        setCurrentTimeIndicatorStyle(null);
-        return;
-      }
-
-      const top =
-        ((currentMinutes - CALENDAR_START_MINUTES) / totalMinutes) *
-        targetColumn.scrollHeight;
-
-      setCurrentTimeIndicatorStyle({
-        left: targetColumn.offsetLeft,
-        width: targetColumn.offsetWidth,
-        top,
-      });
-    };
-
-    const scheduleSync = () => {
-      window.cancelAnimationFrame(rafId);
-      rafId = window.requestAnimationFrame(syncCurrentTimeIndicator);
-    };
-
-    scheduleSync();
-    window.addEventListener("resize", scheduleSync);
-
-    return () => {
-      window.cancelAnimationFrame(rafId);
-      window.removeEventListener("resize", scheduleSync);
-    };
-  }, [
-    currentTime,
-    data?.appointments?.length,
-    isAvailabilityLoading,
-    isCalendarLoading,
-    resolvedCurrentDate,
-    resolvedView,
-  ]);
 
   useEffect(() => {
     if (resolvedView !== Views.WEEK && resolvedView !== Views.DAY) {
@@ -3294,12 +3201,14 @@ export function DoctorCalendar({
       (event) => event.type === "appointment" && isSameDay(event.start, date),
     ).length;
     const currentDay = isToday(date);
+    const selectedDay = isSameDay(date, resolvedCurrentDate);
 
     return (
       <div
         onContextMenu={(event) => handleHeaderContextMenu(event, date)}
         className={cn(
           "scheduler-week-header",
+          selectedDay && "scheduler-week-header-active",
           currentDay && "scheduler-week-header-today",
         )}
         title="Sağ tık: günlük istisna ekle."
@@ -3313,18 +3222,20 @@ export function DoctorCalendar({
         <span className="scheduler-week-header-meta">
           {daySlotCount > 0 ? (
             <>
-              <span>{daySlotCount} slot</span>
+              <span className="scheduler-week-header-count">
+                <span className="scheduler-week-header-count-value">{daySlotCount}</span> slot
+              </span>
               {dayApptCount > 0 ? (
                 <>
                   <span className="scheduler-week-header-sep">·</span>
                   <span className="scheduler-week-header-booked">
-                    {dayApptCount} dolu
+                    <span className="scheduler-week-header-count-value">{dayApptCount}</span> dolu
                   </span>
                 </>
               ) : null}
             </>
           ) : (
-            <span style={{ color: "#d1d5db" }}>-</span>
+            <span className="scheduler-week-header-empty">-</span>
           )}
         </span>
       </div>
@@ -3346,16 +3257,32 @@ export function DoctorCalendar({
         }}
         components={{
           header: ({ date }) => renderWeekHeader(date),
-          dateHeader: ({ date, label }) =>
+          dateHeader: ({ date, label, onDrillDown, drilldownView }) =>
             resolvedView === Views.MONTH ? (
-              <div
-                className={cn(
-                  "scheduler-month-date",
-                  isToday(date) && "scheduler-month-date-today",
-                )}
-              >
-                {label}
-              </div>
+              typeof onDrillDown === "function" && drilldownView ? (
+                <button
+                  type="button"
+                  className={cn(
+                    "scheduler-month-date scheduler-month-date-button",
+                    isToday(date) && "scheduler-month-date-today",
+                  )}
+                  onClick={(event) => {
+                    resetCalendarActiveState();
+                    onDrillDown(event);
+                  }}
+                >
+                  {label}
+                </button>
+              ) : (
+                <div
+                  className={cn(
+                    "scheduler-month-date",
+                    isToday(date) && "scheduler-month-date-today",
+                  )}
+                >
+                  {label}
+                </div>
+              )
             ) : (
               renderWeekHeader(date)
             ),
@@ -3402,7 +3329,7 @@ export function DoctorCalendar({
         }}
         messages={calendarMessages}
         eventPropGetter={eventPropGetter}
-        backgroundEventPropGetter={eventPropGetter}
+        backgroundEventPropGetter={backgroundEventPropGetter}
         enableAutoScroll={false}
         slotPropGetter={(date) => {
           const isPast = date < new Date();
@@ -3456,17 +3383,6 @@ export function DoctorCalendar({
         drilldownView={Views.DAY}
         dayLayoutAlgorithm="no-overlap"
       />
-
-      {currentTimeIndicatorPortalTarget && currentTimeIndicatorStyle
-        ? createPortal(
-            <div
-              aria-hidden="true"
-              className="scheduler-current-time-indicator"
-              style={currentTimeIndicatorStyle}
-            />,
-            currentTimeIndicatorPortalTarget,
-          )
-        : null}
 
       {quickActionSlot?.open && !isMobile && typeof document !== "undefined"
         ? createPortal(
