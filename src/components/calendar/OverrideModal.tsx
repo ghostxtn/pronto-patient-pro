@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { Loader2, Trash2 } from "lucide-react";
+import { Loader2, Trash2, CalendarIcon } from "lucide-react";
+import { format, parseISO } from "date-fns";
+import { tr } from "date-fns/locale";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import api, { ApiError } from "@/services/api";
 import type { AvailabilityOverride } from "@/types/calendar";
@@ -16,14 +19,21 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
-import { Input } from "@/components/ui/input";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
+import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -56,9 +66,11 @@ export function OverrideModal({
 }: OverrideModalProps) {
   const { t } = useLanguage();
   const [date, setDate] = useState("");
+  const [calendarOpen, setCalendarOpen] = useState(false);
   const [type, setType] = useState<"blackout" | "custom_hours">("blackout");
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
+  const [reason, setReason] = useState("");
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const allTimes = useMemo(() => {
     const times: string[] = [];
@@ -90,6 +102,7 @@ export function OverrideModal({
       setType(override.type);
       setStartTime(toTimeValue(override.start_time));
       setEndTime(toTimeValue(override.end_time));
+      setReason(override.reason ?? "");
       return;
     }
 
@@ -97,6 +110,7 @@ export function OverrideModal({
     setType(initialType);
     setStartTime("");
     setEndTime("");
+    setReason("");
   }, [initialDate, initialType, mode, open, override]);
 
   const timeError = useMemo(() => {
@@ -116,6 +130,7 @@ export function OverrideModal({
         type,
         start_time: type === "custom_hours" ? startTime : undefined,
         end_time: type === "custom_hours" ? endTime : undefined,
+        reason: reason || undefined,
       };
 
       if (mode === "edit" && override) {
@@ -158,111 +173,148 @@ export function OverrideModal({
 
   return (
     <>
-      <Sheet open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
-        <SheetContent
-          side="right"
-          overlayClassName="bg-foreground/10 backdrop-blur-sm data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
-          className="w-[480px] overflow-y-auto border-l border-border/40 bg-background/95 px-0 shadow-2xl sm:max-w-[480px]"
-        >
-          <SheetHeader className="border-b border-border/50 px-6 pb-5 pt-8">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
-                  {t.overrideType}
-                </p>
-                <SheetTitle className="mt-2 font-display text-[1.45rem]">
-                  {mode === "edit" ? t.overrideEditTitle : t.overrideCreateTitle}
-                </SheetTitle>
-              </div>
-            </div>
-            <SheetDescription className="text-sm">
+      <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
+        <DialogContent className="sm:max-w-lg rounded-2xl">
+          <DialogHeader className="pb-2">
+            <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground mb-1">
+              {t.overrideType}
+            </p>
+            <DialogTitle className="font-display text-xl">
+              {mode === "edit" ? t.overrideEditTitle : t.overrideCreateTitle}
+            </DialogTitle>
+            <DialogDescription className="text-sm">
               {t.overrideModalDesc}
-            </SheetDescription>
-          </SheetHeader>
+            </DialogDescription>
+          </DialogHeader>
 
           <div className="space-y-5 px-6 py-6">
-            <div className="space-y-4 rounded-[24px] border border-border/60 bg-card/90 p-4 shadow-soft">
+            <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="override-date">{t.date}</Label>
-                <Input
-                  id="override-date"
-                  type="date"
-                  value={date}
-                  onChange={(event) => setDate(event.target.value)}
-                  className="rounded-xl"
-                />
-              </div>
-
-              <div className="space-y-3">
-                <Label>{t.overrideType}</Label>
-                <RadioGroup
-                  value={type}
-                  onValueChange={(value) => setType(value as "blackout" | "custom_hours")}
-                  className="gap-3"
-                >
-                  <label
-                    htmlFor="override-blackout"
-                    className="flex items-center gap-3 rounded-[20px] border border-border/70 bg-background/70 p-3"
-                  >
-                    <RadioGroupItem value="blackout" id="override-blackout" />
-                    <span className="text-sm font-medium">{t.closeThisDay}</span>
-                  </label>
-                  <label
-                    htmlFor="override-custom-hours"
-                    className="flex items-center gap-3 rounded-[20px] border border-border/70 bg-background/70 p-3"
-                  >
-                    <RadioGroupItem value="custom_hours" id="override-custom-hours" />
-                    <span className="text-sm font-medium">{t.defineCustomHours}</span>
-                  </label>
-                </RadioGroup>
-              </div>
-
-              {type === "custom_hours" ? (
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-2">
-                    <Label>{t.startTime}</Label>
-                    <Select
-                      value={startTime}
-                      onValueChange={(val) => {
-                        setStartTime(val);
-                        if (endTime) {
-                          const [sh, sm] = val.split(":").map(Number);
-                          const [eh, em] = endTime.split(":").map(Number);
-                          if (eh * 60 + em <= sh * 60 + sm) setEndTime("");
+                <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      id="override-date"
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal rounded-xl h-11",
+                        !date && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {date ? (
+                        format(parseISO(date + "T00:00:00"), "d MMMM yyyy", { locale: tr })
+                      ) : (
+                        <span>Tarih Seçin</span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={date ? parseISO(date + "T00:00:00") : undefined}
+                      onSelect={(nextDate) => {
+                        if (nextDate) {
+                          setDate(format(nextDate, "yyyy-MM-dd"));
+                          setCalendarOpen(false);
                         }
                       }}
-                    >
-                      <SelectTrigger className="rounded-xl">
-                        <SelectValue placeholder="--:--" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {allTimes.map((t) => (
-                          <SelectItem key={t} value={t}>{t}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                      initialFocus
+                      locale={tr}
+                      weekStartsOn={1}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
 
-                  <div className="space-y-2">
-                    <Label>{t.endTime}</Label>
-                    <Select value={endTime} onValueChange={setEndTime} disabled={!startTime}>
-                      <SelectTrigger className="rounded-xl">
-                        <SelectValue placeholder="--:--" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {endTimeOptions.map((t) => (
-                          <SelectItem key={t} value={t}>{t}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+              <div className="space-y-2">
+                <Label>Sebep / Not</Label>
+                <Textarea
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  placeholder="Bu bloğun sebebini yazın..."
+                  className="rounded-xl resize-none text-sm"
+                  rows={3}
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Takvimde görünmez, sadece kayıt amaçlıdır.
+                </p>
+              </div>
+
+              <Separator className="my-1" />
+
+              <div className="rounded-2xl border border-border/60 bg-muted/30 p-4 space-y-4">
+                <div className="space-y-3">
+                  <Label>{t.overrideType}</Label>
+                  <RadioGroup
+                    value={type}
+                    onValueChange={(value) => setType(value as "blackout" | "custom_hours")}
+                    className="gap-3"
+                  >
+                    <label
+                      htmlFor="override-blackout"
+                      className="flex items-center gap-3 rounded-2xl border border-destructive/30 bg-destructive/5 p-3 cursor-pointer hover:bg-destructive/10 transition-colors"
+                    >
+                      <RadioGroupItem value="blackout" id="override-blackout" />
+                      <span className="text-sm font-medium">{t.closeThisDay}</span>
+                    </label>
+                    <label
+                      htmlFor="override-custom-hours"
+                      className="flex items-center gap-3 rounded-2xl border border-blue-200 bg-blue-50/50 dark:border-blue-900 dark:bg-blue-950/30 p-3 cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-950/50 transition-colors"
+                    >
+                      <RadioGroupItem value="custom_hours" id="override-custom-hours" />
+                      <span className="text-sm font-medium">{t.defineCustomHours}</span>
+                    </label>
+                  </RadioGroup>
                 </div>
-              ) : null}
+
+                {type === "custom_hours" ? (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label>{t.startTime}</Label>
+                      <Select
+                        value={startTime}
+                        onValueChange={(val) => {
+                          setStartTime(val);
+                          if (endTime) {
+                            const [sh, sm] = val.split(":").map(Number);
+                            const [eh, em] = endTime.split(":").map(Number);
+                            if (eh * 60 + em <= sh * 60 + sm) setEndTime("");
+                          }
+                        }}
+                      >
+                        <SelectTrigger className="rounded-xl">
+                          <SelectValue placeholder="--:--" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {allTimes.map((t) => (
+                            <SelectItem key={t} value={t}>{t}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>{t.endTime}</Label>
+                      <Select value={endTime} onValueChange={setEndTime} disabled={!startTime}>
+                        <SelectTrigger className="rounded-xl">
+                          <SelectValue placeholder="--:--" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {endTimeOptions.map((t) => (
+                            <SelectItem key={t} value={t}>{t}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
 
               {timeError ? <p className="text-sm text-destructive">{timeError}</p> : null}
             </div>
 
-            <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center justify-between gap-3 pt-2">
               {mode === "edit" && override ? (
                 <Button
                   type="button"
@@ -289,8 +341,8 @@ export function OverrideModal({
               </Button>
             </div>
           </div>
-        </SheetContent>
-      </Sheet>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
         <AlertDialogContent>

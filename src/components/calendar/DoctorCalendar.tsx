@@ -21,6 +21,7 @@ import {
   isSameDay,
   isToday,
   parse,
+  parseISO,
   setHours,
   setMinutes,
   startOfMonth,
@@ -28,7 +29,7 @@ import {
   startOfWeek,
   subDays,
 } from "date-fns";
-import { tr } from "date-fns/locale";
+import { tr } from "date-fns/locale/tr";
 import {
   Ban,
   ChevronDown,
@@ -51,6 +52,7 @@ import { AppointmentDetailSheet } from "@/components/appointments/AppointmentDet
 import api from "@/services/api";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
+  AlertDialogAction,
   AlertDialog,
   AlertDialogCancel,
   AlertDialogContent,
@@ -241,7 +243,8 @@ interface BlockActionState {
   start: Date;
   end: Date;
   dateLabel: string;
-  timeLabel: string;
+  timeLabel?: string;
+  reason?: string;
 }
 
 interface AppointmentComposerState {
@@ -1317,6 +1320,7 @@ export function DoctorCalendar({
   }>({ open: false, mode: "create" });
   const [isAvailabilitySheetOpen, setIsAvailabilitySheetOpen] = useState(false);
   const [slotToDelete, setSlotToDelete] = useState<AvailabilitySlot | null>(null);
+  const [deleteSpecificSlotId, setDeleteSpecificSlotId] = useState<string | null>(null);
   const [overrideToDelete, setOverrideToDelete] =
     useState<AvailabilityOverride | null>(null);
   const [contextMenuState, setContextMenuState] = useState<{
@@ -1345,6 +1349,7 @@ export function DoctorCalendar({
   const [blockActionState, setBlockActionState] = useState<BlockActionState | null>(
     null,
   );
+  const [blockReason, setBlockReason] = useState("");
   const [appointmentComposer, setAppointmentComposer] =
     useState<AppointmentComposerState | null>(null);
   const [appointmentMode, setAppointmentMode] =
@@ -1494,6 +1499,7 @@ export function DoctorCalendar({
     onSuccess: async () => {
       toast.success("Musaitlik silindi");
       setSlotToDelete(null);
+      setDeleteSpecificSlotId(null);
       await queryClient.invalidateQueries({ queryKey: ["availability", doctorId] });
       await queryClient.refetchQueries({ queryKey: ["availability", doctorId] });
       await queryClient.invalidateQueries({ queryKey: ["doctor-calendar", doctorId] });
@@ -1546,7 +1552,7 @@ export function DoctorCalendar({
   });
 
   const createQuickBlock = useMutation({
-    mutationFn: async (payload: { start: Date; end: Date }) => {
+    mutationFn: async (payload: { start: Date; end: Date; reason?: string }) => {
       const date = toApiDate(payload.start);
       const sameDayOverrides = (data?.overrides ?? []).filter(
         (override) => override.date === date,
@@ -1602,11 +1608,13 @@ export function DoctorCalendar({
         type: "custom_hours",
         start_time: nextStart,
         end_time: nextEnd,
+        reason: payload.reason,
       });
     },
     onSuccess: async () => {
       toast.success("Zaman bloklamasi eklendi");
       setBlockActionState(null);
+      setBlockReason("");
       closeQuickActionPanel();
       clearCalendarSelection();
       await queryClient.invalidateQueries({
@@ -1866,6 +1874,14 @@ export function DoctorCalendar({
       availabilitySlots.filter(isWeeklyAvailabilitySlot).sort(
         (left, right) => getAvailabilitySortValue(left) - getAvailabilitySortValue(right),
       ),
+    [availabilitySlots],
+  );
+
+  const sortedSpecificDateSlots = useMemo(
+    () =>
+      availabilitySlots
+        .filter((slot) => !!slot.specific_date)
+        .sort((a, b) => (a.specific_date! > b.specific_date! ? 1 : -1)),
     [availabilitySlots],
   );
 
@@ -3983,40 +3999,46 @@ export function DoctorCalendar({
         onOpenChange={(open) => {
           if (!open) {
             setBlockActionState(null);
+            setBlockReason("");
           }
         }}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Bu zaman araligi bloklansin mi?</AlertDialogTitle>
+            <AlertDialogTitle>Zaman Aralığını Blokla</AlertDialogTitle>
             <AlertDialogDescription>
-              Takvimdeki secili aralik duzenlenmez; bu islem o tarih ve saat icin blok istisnasi ekler. Haftalik musaitlik kurali korunur.
+              Bu işlem seçili aralık için blok istisnası oluşturur. Haftalık müsaitlik kuralı korunur.
             </AlertDialogDescription>
           </AlertDialogHeader>
 
           {blockActionState ? (
             <div className="space-y-4">
-              <div className="rounded-2xl border border-border/70 bg-background/80 p-4">
-                <div className="space-y-2 text-sm">
-                  <div className="flex items-center justify-between gap-3">
+              <div className="rounded-2xl border border-border/60 bg-muted/40 p-4 space-y-2 text-sm">
+                {doctorName ? (
+                  <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">Doktor</span>
-                    <span className="text-right font-medium text-foreground">
-                      {doctorName}
-                    </span>
+                    <span className="font-medium">{doctorName}</span>
                   </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-muted-foreground">Tarih</span>
-                    <span className="text-right font-medium text-foreground">
-                      {blockActionState.dateLabel}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-muted-foreground">Saat</span>
-                    <span className="text-right font-medium text-foreground">
-                      {blockActionState.timeLabel}
-                    </span>
-                  </div>
+                ) : null}
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Tarih</span>
+                  <span className="font-medium">{blockActionState.dateLabel}</span>
                 </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Saat</span>
+                  <span className="font-medium">{blockActionState.timeLabel}</span>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm">Not (isteğe bağlı)</Label>
+                <Textarea
+                  value={blockReason}
+                  onChange={(e) => setBlockReason(e.target.value)}
+                  placeholder="Bu bloğun sebebini yazın..."
+                  className="rounded-xl resize-none text-sm"
+                  rows={3}
+                />
               </div>
             </div>
           ) : null}
@@ -4032,11 +4054,12 @@ export function DoctorCalendar({
                   createQuickBlock.mutate({
                     start: blockActionState.start,
                     end: blockActionState.end,
+                    reason: blockReason || undefined,
                   });
                 }
               }}
             >
-              {createQuickBlock.isPending ? "Bloklaniyor..." : "Bu zamani blokla"}
+              {createQuickBlock.isPending ? "Bloklanıyor..." : "Bu Zamanı Blokla"}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -4191,6 +4214,61 @@ export function DoctorCalendar({
               )}
             </section>
 
+            {sortedSpecificDateSlots.length > 0 && (
+              <section className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                      TARİHE ÖZEL MÜSAİTLİKLER
+                    </h3>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Belirli bir tarihe özel eklenen çalışma saatleri.
+                    </p>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  {sortedSpecificDateSlots.map((slot) => (
+                    <div
+                      key={slot.id}
+                      className="flex items-center justify-between gap-3 rounded-2xl border border-border/60 bg-muted/30 px-4 py-3"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 text-xs font-bold">
+                          {format(parseISO(slot.specific_date! + "T00:00:00"), "dd")}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium truncate">
+                            {format(parseISO(slot.specific_date! + "T00:00:00"), "d MMMM yyyy", { locale: tr })}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {slot.start_time.slice(0, 5)} – {slot.end_time.slice(0, 5)}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 rounded-xl text-muted-foreground hover:text-foreground"
+                          onClick={() => setAvailabilityModal({ open: true, mode: "edit", slot })}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          onClick={() => setDeleteSpecificSlotId(slot.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
             <section className="space-y-3">
               <div className="flex items-center justify-between gap-3">
                 <div>
@@ -4330,6 +4408,32 @@ export function DoctorCalendar({
         </AlertDialogContent>
       </AlertDialog>
 
+      <AlertDialog
+        open={!!deleteSpecificSlotId}
+        onOpenChange={(open) => !open && setDeleteSpecificSlotId(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Müsaitliği Sil</AlertDialogTitle>
+            <AlertDialogDescription>Bu tarihe özel müsaitlik silinecek. Emin misiniz?</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Vazgeç</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (deleteSpecificSlotId) {
+                  removeAvailability.mutate(deleteSpecificSlotId);
+                }
+                setDeleteSpecificSlotId(null);
+              }}
+            >
+              Sil
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <AlertDialog open={Boolean(overrideToDelete)} onOpenChange={() => {}}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -4416,3 +4520,4 @@ export function DoctorCalendar({
     </div>
   );
 }
+
