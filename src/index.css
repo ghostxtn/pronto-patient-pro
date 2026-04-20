@@ -1051,6 +1051,13 @@
       0 1px 1px hsl(var(--calendar-shadow) / 0.03) !important;
   }
 
+  .scheduler-calendar-shell .rbc-day-slot .rbc-event.scheduler-event-appointment {
+    left: 8px !important;
+    right: 10px !important;
+    width: auto !important;
+    margin: 1px 0 !important;
+  }
+
   .scheduler-event-appointment .scheduler-event-title,
   .scheduler-event-appointment .scheduler-event-subtitle,
   .scheduler-calendar-shell .rbc-event.appointment .scheduler-event-title,
@@ -1134,13 +1141,13 @@
 
   .scheduler-calendar-shell .rbc-day-slot .rbc-background-event.scheduler-event-availability-surface {
     display: block !important;
-    left: 0 !important;
-    right: 0 !important;
+    left: 4px !important;
+    right: 4px !important;
     width: auto !important;
     border-radius: 6px !important;
     border: 1px dashed hsl(var(--calendar-availability-border)) !important;
     box-shadow: none !important;
-    margin: 0 4px !important;
+    margin: 0 !important;
     padding: 0 !important;
     pointer-events: none !important;
     z-index: 0 !important;
@@ -1153,10 +1160,10 @@
 
   .scheduler-calendar-shell .rbc-day-slot .rbc-background-event.scheduler-event-availability-surface,
   .scheduler-calendar-shell .rbc-event.scheduler-event-availability-surface {
-    left: 0 !important;
-    right: 0 !important;
+    left: 4px !important;
+    right: 4px !important;
     width: auto !important;
-    margin: 0 4px !important;
+    margin: 0 !important;
     padding: 0 !important;
     border-radius: 6px !important;
   }
