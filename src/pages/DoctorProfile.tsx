@@ -53,7 +53,7 @@ export default function DoctorProfile() {
   const { data: doctor, isLoading } = useQuery({
     queryKey: ["doctor", id],
     queryFn: async () => api.doctors.get(id!),
-    enabled: !!id,
+    enabled: !!id && !!user,
   });
 
   const { data: availability } = useQuery({
@@ -62,7 +62,7 @@ export default function DoctorProfile() {
       const data = await api.availability.listByDoctor(id!);
       return data.filter((slot: any) => slot.is_active !== false);
     },
-    enabled: !!id,
+    enabled: !!id && !!user,
   });
 
   useEffect(() => {

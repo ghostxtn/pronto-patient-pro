@@ -95,3 +95,8 @@ backend/package-lock.json
 discovery-output.md
 backend/drizzle/meta/0016_snapshot.json
 production-discovery.md
+appointments-doctors-discovery.md
+auth-api-discovery.md
+availability-backend-discovery.md
+calendar-frontend-discovery.md
+infra-config-discovery.md

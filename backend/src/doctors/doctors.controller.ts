@@ -70,7 +70,7 @@ export class DoctorsController {
   }
 
   @Get(':id')
-  @Roles('owner', 'admin', 'doctor', 'staff')
+  @Roles('owner', 'admin', 'doctor', 'staff', 'patient')
   findById(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: { clinicId: string },

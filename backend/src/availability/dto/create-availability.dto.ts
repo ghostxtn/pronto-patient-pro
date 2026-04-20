@@ -1,16 +1,50 @@
 import {
   IsDateString,
   IsInt,
+  IsNotEmpty,
   IsOptional,
+  IsPositive,
   IsString,
-  IsUUID,
   Matches,
   Max,
   Min,
+  ValidationArguments,
+  ValidationOptions,
+  registerDecorator,
 } from 'class-validator';
 
+function HasExactlyOneAvailabilitySelector(
+  validationOptions?: ValidationOptions,
+) {
+  return (object: object, propertyName: string) => {
+    registerDecorator({
+      name: 'hasExactlyOneAvailabilitySelector',
+      target: object.constructor,
+      propertyName,
+      options: validationOptions,
+      validator: {
+        validate(_: unknown, args: ValidationArguments) {
+          const dto = args.object as CreateAvailabilityDto;
+          const hasDayOfWeek =
+            dto.dayOfWeek !== undefined && dto.dayOfWeek !== null;
+          const hasSpecificDate =
+            dto.specificDate !== undefined &&
+            dto.specificDate !== null &&
+            dto.specificDate !== '';
+
+          return hasDayOfWeek !== hasSpecificDate;
+        },
+        defaultMessage() {
+          return 'Exactly one of dayOfWeek or specificDate must be provided';
+        },
+      },
+    });
+  };
+}
+
 export class CreateAvailabilityDto {
-  @IsUUID()
+  @IsString()
+  @IsNotEmpty()
   doctorId!: string;
 
   @IsOptional()
@@ -24,20 +58,22 @@ export class CreateAvailabilityDto {
   specificDate?: string;
 
   @IsString()
-  @Matches(/^([01]\d|2[0-3]):[0-5]\d$/, {
+  @Matches(/^\d{2}:\d{2}$/, {
     message: 'startTime must be HH:mm format',
   })
   startTime!: string;
 
   @IsString()
-  @Matches(/^([01]\d|2[0-3]):[0-5]\d$/, {
+  @Matches(/^\d{2}:\d{2}$/, {
     message: 'endTime must be HH:mm format',
   })
   endTime!: string;
 
   @IsOptional()
   @IsInt()
-  @Min(5)
-  @Max(120)
+  @IsPositive()
   slotDuration?: number;
+
+  @HasExactlyOneAvailabilitySelector()
+  private readonly availabilitySelectorValidation!: never;
 }
