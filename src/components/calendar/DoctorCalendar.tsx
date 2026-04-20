@@ -142,32 +142,38 @@ const APPOINTMENT_STATUS_STYLES: Record<
   {
     background: string;
     text: string;
+    mutedText: string;
     accent: string;
   }
 > = {
   pending: {
     background: "hsl(var(--calendar-appointment-pending-bg))",
     text: "hsl(var(--calendar-appointment-pending-fg))",
+    mutedText: "hsl(var(--calendar-appointment-pending-meta))",
     accent: "hsl(var(--calendar-appointment-pending-accent))",
   },
   confirmed: {
     background: "hsl(var(--calendar-appointment-confirmed-bg))",
     text: "hsl(var(--calendar-appointment-confirmed-fg))",
+    mutedText: "hsl(var(--calendar-appointment-confirmed-meta))",
     accent: "hsl(var(--calendar-appointment-confirmed-accent))",
   },
   completed: {
     background: "hsl(var(--calendar-appointment-completed-bg))",
     text: "hsl(var(--calendar-appointment-completed-fg))",
+    mutedText: "hsl(var(--calendar-appointment-completed-meta))",
     accent: "hsl(var(--calendar-appointment-completed-accent))",
   },
   cancelled: {
     background: "hsl(var(--calendar-appointment-cancelled-bg))",
     text: "hsl(var(--calendar-appointment-cancelled-fg))",
+    mutedText: "hsl(var(--calendar-appointment-cancelled-meta))",
     accent: "hsl(var(--calendar-appointment-cancelled-accent))",
   },
   blocked: {
     background: "hsl(var(--calendar-appointment-blocked-bg))",
     text: "hsl(var(--calendar-appointment-blocked-fg))",
+    mutedText: "hsl(var(--calendar-appointment-blocked-meta))",
     accent: "hsl(var(--calendar-appointment-blocked-accent))",
   },
 };
@@ -177,17 +183,20 @@ const OVERRIDE_EVENT_STYLES: Record<
   {
     background: string;
     text: string;
+    mutedText: string;
     accent: string;
   }
 > = {
   custom_hours: {
     background: "hsl(var(--calendar-custom-hours-bg))",
     text: "hsl(var(--calendar-custom-hours-fg))",
+    mutedText: "hsl(var(--calendar-custom-hours-meta))",
     accent: "hsl(var(--calendar-custom-hours-accent))",
   },
   blackout: {
     background: "hsl(var(--calendar-blackout-bg))",
     text: "hsl(var(--calendar-blackout-fg))",
+    mutedText: "hsl(var(--calendar-blackout-meta))",
     accent: "hsl(var(--calendar-blackout-accent))",
   },
 };
@@ -353,10 +362,10 @@ const toolbarViewLabels = {
 } as const;
 
 const toolbarViews = [Views.WEEK, Views.DAY, Views.MONTH, Views.AGENDA] as const;
-const QUICK_ACTION_TIME_MINUTES_START = 6 * 60;
-const QUICK_ACTION_TIME_MINUTES_END = 23 * 60 + 45;
-const CALENDAR_START_HOUR = 7;
-const CALENDAR_END_HOUR = 21;
+const CALENDAR_START_HOUR = 6;
+const CALENDAR_END_HOUR = 22;
+const QUICK_ACTION_TIME_MINUTES_START = CALENDAR_START_HOUR * 60;
+const QUICK_ACTION_TIME_MINUTES_END = CALENDAR_END_HOUR * 60;
 const CALENDAR_START_MINUTES = CALENDAR_START_HOUR * 60;
 const CALENDAR_END_MINUTES = CALENDAR_END_HOUR * 60;
 
@@ -1051,18 +1060,13 @@ function CalendarEventContent({
         <span
           className={cn(
             "scheduler-event-title",
-            isAppointmentCancelled && "line-through opacity-60",
+            isAppointmentCancelled && "line-through",
           )}
         >
           {title}
         </span>
       </span>
-      <span
-        className="scheduler-event-meta"
-        style={{ opacity: isAppointmentCancelled ? 0.45 : 1 }}
-      >
-        {timeRange}
-      </span>
+      <span className="scheduler-event-meta">{timeRange}</span>
     </div>
   );
 }
@@ -2084,13 +2088,13 @@ export function DoctorCalendar({
         style: {
           backgroundColor: "hsl(var(--calendar-availability-bg))",
           border: "1px dashed hsl(var(--calendar-availability-border))",
-          borderRadius: "4px",
+          borderRadius: "6px",
           left: 0,
           right: 0,
-          width: "100%",
+          width: "auto",
           margin: 0,
-          marginLeft: 0,
-          marginRight: 0,
+          marginLeft: 4,
+          marginRight: 4,
           height: "100%",
           paddingLeft: 0,
           paddingRight: 0,
@@ -2160,12 +2164,12 @@ export function DoctorCalendar({
         style: {
           "--scheduler-event-background": tone.background,
           "--scheduler-event-foreground": tone.text,
+          "--scheduler-event-muted-foreground": tone.mutedText,
           "--scheduler-event-accent": tone.accent,
           backgroundColor: tone.background,
           color: tone.text,
           border: "1px solid hsl(var(--calendar-event-outline))",
-          borderLeft: `3px solid ${tone.accent}`,
-          borderRadius: "6px",
+          borderRadius: "8px",
         } as CSSProperties,
       };
     }
@@ -2178,12 +2182,13 @@ export function DoctorCalendar({
         style: {
           "--scheduler-event-background": tone.background,
           "--scheduler-event-foreground": tone.text,
+          "--scheduler-event-muted-foreground": tone.mutedText,
           "--scheduler-event-accent": tone.accent,
           backgroundColor: tone.background,
           color: tone.text,
           border: "1px solid hsl(var(--calendar-event-outline))",
           borderLeft: `3px solid ${tone.accent}`,
-          borderRadius: "6px",
+          borderRadius: "8px",
         } as CSSProperties,
       };
     }
@@ -2687,7 +2692,7 @@ export function DoctorCalendar({
         const minutes = timeToMinutes(timeValue);
         return (
           minutes >= QUICK_ACTION_TIME_MINUTES_START &&
-          minutes <= QUICK_ACTION_TIME_MINUTES_END
+          minutes < QUICK_ACTION_TIME_MINUTES_END
         );
       }),
     [durationAlignedTimes],
@@ -2819,10 +2824,13 @@ export function DoctorCalendar({
     }
 
     const nextMinutes = timeToMinutes(value);
-    if (
+    const isOutsideRange =
       nextMinutes < QUICK_ACTION_TIME_MINUTES_START ||
-      nextMinutes > QUICK_ACTION_TIME_MINUTES_END
-    ) {
+      (field === "start"
+        ? nextMinutes >= QUICK_ACTION_TIME_MINUTES_END
+        : nextMinutes > QUICK_ACTION_TIME_MINUTES_END);
+
+    if (isOutsideRange) {
       return false;
     }
 
