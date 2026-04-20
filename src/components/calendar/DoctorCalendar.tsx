@@ -3198,13 +3198,22 @@ export function DoctorCalendar({
   };
 
   const renderWeekHeader = (date: Date) => {
-    const dayOfWeek = getDay(date);
-    const daySlotCount = availabilitySlots.filter(
-      (slot) => slot.day_of_week === dayOfWeek,
-    ).length;
-    const dayApptCount = events.filter(
-      (event) => event.type === "appointment" && isSameDay(event.start, date),
-    ).length;
+    const dateKey = toApiDate(date);
+    const totalSlots = availabilityWindows
+      .filter((window) => toApiDate(window.start) === dateKey)
+      .reduce((count, window) => {
+        const windowDurationMinutes = differenceInMinutes(window.end, window.start);
+        return count + Math.max(0, Math.floor(windowDurationMinutes / resolvedDefaultDuration));
+      }, 0);
+    const doluSlots = (data?.appointments ?? []).filter((appointment) => {
+      if (appointment.appointment_date !== dateKey) {
+        return false;
+      }
+
+      const status = normalizeAppointmentStatus(appointment.status);
+      return status === "confirmed" || status === "pending";
+    }).length;
+    const bosSlots = Math.max(0, totalSlots - doluSlots);
     const currentDay = isToday(date);
     const selectedDay = isSameDay(date, resolvedCurrentDate);
 
@@ -3224,17 +3233,44 @@ export function DoctorCalendar({
         <span className="scheduler-week-header-date">
           {format(date, "d", { locale: tr })}
         </span>
-        <span className="scheduler-week-header-meta">
-          {daySlotCount > 0 ? (
+        {totalSlots > 0 ? (
+          <span className="scheduler-week-header-meta">
+            <span className="scheduler-week-header-count">
+              <span className="scheduler-week-header-count-value">{totalSlots}</span> slot
+            </span>
+            <span className="scheduler-week-header-sep">{"\u00B7"}</span>
+            {doluSlots === 0 ? (
+              <span className="scheduler-week-header-booked">
+                <span className="scheduler-week-header-count-value">{totalSlots}</span>{" "}
+                {"bo\u015F"}
+              </span>
+            ) : (
+              <>
+                <span className="scheduler-week-header-booked">
+                  <span className="scheduler-week-header-count-value">{doluSlots}</span> dolu
+                </span>
+                <span className="scheduler-week-header-sep">{"\u00B7"}</span>
+                <span className="scheduler-week-header-booked">
+                  <span className="scheduler-week-header-count-value">{bosSlots}</span>{" "}
+                  {"bo\u015F"}
+                </span>
+              </>
+            )}
+          </span>
+        ) : null}
+        <span
+          className="hidden"
+        >
+          {totalSlots > 0 ? (
             <>
               <span className="scheduler-week-header-count">
-                <span className="scheduler-week-header-count-value">{daySlotCount}</span> slot
+                <span className="scheduler-week-header-count-value">{totalSlots}</span> slot
               </span>
-              {dayApptCount > 0 ? (
+              {doluSlots === 0 ? (
                 <>
                   <span className="scheduler-week-header-sep">·</span>
                   <span className="scheduler-week-header-booked">
-                    <span className="scheduler-week-header-count-value">{dayApptCount}</span> dolu
+                    <span className="scheduler-week-header-count-value">{totalSlots}</span> boÅŸ
                   </span>
                 </>
               ) : null}
