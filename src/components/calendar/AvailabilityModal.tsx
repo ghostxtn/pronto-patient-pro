@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { Loader2, Trash2 } from "lucide-react";
+import { format, parseISO } from "date-fns";
+import { tr } from "date-fns/locale";
+import { CalendarIcon, Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import api, { ApiError } from "@/services/api";
 import type { AvailabilitySlot } from "@/types/calendar";
@@ -16,9 +18,12 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export interface AvailabilityModalProps {
   open: boolean;
@@ -65,7 +70,10 @@ export function AvailabilityModal({
     { value: "6", label: t.saturday },
     { value: "0", label: t.sunday },
   ] as const;
+  const [slotType, setSlotType] = useState<"weekly" | "specific">("weekly");
   const [dayOfWeek, setDayOfWeek] = useState("1");
+  const [specificDate, setSpecificDate] = useState("");
+  const [calendarOpen, setCalendarOpen] = useState(false);
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
@@ -95,13 +103,23 @@ export function AvailabilityModal({
     if (!open) return;
 
     if (mode === "edit" && slot) {
-      setDayOfWeek(String(slot.day_of_week));
+      if (slot.specific_date) {
+        setSlotType("specific");
+        setSpecificDate(slot.specific_date);
+        setDayOfWeek(String(initialDayOfWeek ?? 1));
+      } else {
+        setSlotType("weekly");
+        setSpecificDate("");
+        setDayOfWeek(String(slot.day_of_week ?? initialDayOfWeek ?? 1));
+      }
       setStartTime(initialStartTime ?? to24Hour(slot.start_time));
       setEndTime(initialEndTime ?? to24Hour(slot.end_time));
       return;
     }
 
+    setSlotType("weekly");
     setDayOfWeek(String(initialDayOfWeek ?? 1));
+    setSpecificDate("");
     setStartTime(initialStartTime ?? "");
     setEndTime(initialEndTime ?? "");
   }, [initialDayOfWeek, initialEndTime, initialStartTime, mode, open, slot]);
@@ -111,7 +129,7 @@ export function AvailabilityModal({
       return;
     }
 
-    if (!open || !dayOfWeek || !startTime || !endTime) {
+    if (!open || slotType !== "weekly" || !dayOfWeek || !startTime || !endTime) {
       onDraftChange(null);
       return;
     }
@@ -125,24 +143,34 @@ export function AvailabilityModal({
     return () => {
       onDraftChange(null);
     };
-  }, [dayOfWeek, endTime, onDraftChange, open, startTime]);
+  }, [dayOfWeek, endTime, onDraftChange, open, slotType, startTime]);
 
   const timeError = useMemo(() => {
     if (!startTime || !endTime) return "";
     return endTime <= startTime ? t.invalidTimeRange : "";
   }, [endTime, startTime, t]);
 
-  const isValid = Boolean(dayOfWeek && startTime && endTime) && !timeError;
+  const isValid =
+    slotType === "weekly"
+      ? Boolean(dayOfWeek && startTime && endTime) && !timeError
+      : Boolean(specificDate && startTime && endTime) && !timeError;
 
   const saveMutation = useMutation({
     mutationFn: async () => {
       if (!isValid) throw new Error(t.invalidForm);
 
-      const payload = {
-        dayOfWeek: Number(dayOfWeek),
-        startTime,
-        endTime,
-      };
+      const payload =
+        slotType === "weekly"
+          ? {
+              dayOfWeek: Number(dayOfWeek),
+              startTime,
+              endTime,
+            }
+          : {
+              specificDate,
+              startTime,
+              endTime,
+            };
 
       if (mode === "edit" && slot) {
         return api.availability.update(slot.id, payload);
@@ -189,21 +217,62 @@ export function AvailabilityModal({
           </DialogHeader>
 
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="availability-day">{t.dayOfWeek}</Label>
-              <Select value={dayOfWeek} onValueChange={setDayOfWeek}>
-                <SelectTrigger id="availability-day" className="rounded-xl">
-                  <SelectValue placeholder={t.selectDay} />
-                </SelectTrigger>
-                <SelectContent>
-                  {dayOptions.map((day) => (
-                    <SelectItem key={day.value} value={day.value}>
-                      {day.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {mode !== "edit" ? (
+              <Tabs value={slotType} onValueChange={(value) => setSlotType(value as "weekly" | "specific")}>
+                <TabsList className="w-full rounded-xl">
+                  <TabsTrigger value="weekly" className="flex-1 rounded-xl">Haftalık Tekrar</TabsTrigger>
+                  <TabsTrigger value="specific" className="flex-1 rounded-xl">Tarihe Özel</TabsTrigger>
+                </TabsList>
+              </Tabs>
+            ) : null}
+
+            {slotType === "weekly" ? (
+              <div className="space-y-2">
+                <Label htmlFor="availability-day">{t.dayOfWeek}</Label>
+                <Select value={dayOfWeek} onValueChange={setDayOfWeek}>
+                  <SelectTrigger id="availability-day" className="rounded-xl">
+                    <SelectValue placeholder={t.selectDay} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {dayOptions.map((day) => (
+                      <SelectItem key={day.value} value={day.value}>
+                        {day.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label>Tarih</Label>
+                <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start text-left font-normal rounded-xl"
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {specificDate
+                        ? format(parseISO(specificDate + "T00:00:00"), "d MMMM yyyy", { locale: tr })
+                        : "Tarih seçin"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={specificDate ? parseISO(specificDate + "T00:00:00") : undefined}
+                      onSelect={(date) => {
+                        setSpecificDate(date ? format(date, "yyyy-MM-dd") : "");
+                        setCalendarOpen(false);
+                      }}
+                      disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+                      locale={tr}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">

@@ -173,7 +173,7 @@ function SelectedDoctorContext({ doctor }: { doctor: DoctorSummary | null }) {
   }
 
   return (
-    <div className="rounded-[24px] border border-primary/15 bg-primary/5 px-4 py-4">
+    <div className="scheduler-rail-selected-doctor rounded-[24px] px-4 py-4">
       <div className="flex items-start gap-3">
         <div
           className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg text-sm font-semibold text-white shadow-soft"
@@ -249,14 +249,14 @@ function StaffSchedulerRail({
   mobile?: boolean;
 }) {
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-[32px] border border-border/60 bg-card/95 shadow-soft">
+    <div className="scheduler-rail-shell flex h-full min-h-0 flex-col overflow-hidden rounded-[32px]">
       <div className="min-h-0 flex-1 overflow-y-auto scrollbar-thin">
         <section className="border-b border-border/50 px-4 py-4">
           <div className="mb-2">
             <h2 className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">Doktor Odağı</h2>
           </div>
 
-          <div className="rounded-[26px] border border-border/60 bg-background/72 p-3 shadow-soft">
+          <div className="scheduler-rail-card rounded-[26px] p-3">
             <div className="mb-3 flex items-center justify-between gap-3">
               <div>
                 <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
@@ -271,7 +271,7 @@ function StaffSchedulerRail({
                 type="button"
                 variant="outline"
                 size="sm"
-                className="rounded-full border-border/60 bg-card"
+                className="rounded-full border-[color:hsl(var(--calendar-sidebar-border))] bg-[hsl(var(--card))] hover:bg-[hsl(var(--calendar-mini-hover))]"
                 onClick={onToday}
               >
                 Bugün
@@ -291,14 +291,19 @@ function StaffSchedulerRail({
                 month: "space-y-3",
                 caption: "relative flex items-center justify-center px-8 pt-1",
                 caption_label: "text-sm font-semibold text-foreground",
-                nav_button: "h-8 w-8 rounded-full border border-border/60 bg-card p-0 opacity-100 hover:bg-accent",
+                nav_button:
+                  "h-8 w-8 rounded-full border border-[color:hsl(var(--calendar-sidebar-border))] bg-[hsl(var(--card))] p-0 opacity-100 hover:bg-[hsl(var(--calendar-mini-hover))]",
                 table: "w-full border-collapse",
-                head_cell: "w-9 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground",
+                head_cell:
+                  "w-9 text-[11px] font-medium uppercase tracking-[0.12em] text-[color:hsl(var(--calendar-muted))]",
                 row: "mt-1.5 flex w-full",
                 cell: "h-9 w-9 p-0 text-center text-sm",
-                day: "h-9 w-9 rounded-full p-0 text-sm font-medium text-foreground hover:bg-accent/70",
+                day:
+                  "h-9 w-9 rounded-full p-0 text-sm font-medium text-foreground hover:bg-[hsl(var(--calendar-mini-hover))]",
                 day_today: "bg-accent text-accent-foreground",
                 day_selected: "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground",
+                day_outside: "text-[color:hsl(var(--calendar-disabled))] opacity-100",
+                day_disabled: "text-[color:hsl(var(--calendar-disabled))] opacity-100",
               }}
             />
           </div>

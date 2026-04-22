@@ -53,7 +53,7 @@ export default function DoctorProfile() {
   const { data: doctor, isLoading } = useQuery({
     queryKey: ["doctor", id],
     queryFn: async () => api.doctors.get(id!),
-    enabled: !!id,
+    enabled: !!id && !!user,
   });
 
   const { data: availability } = useQuery({
@@ -62,7 +62,7 @@ export default function DoctorProfile() {
       const data = await api.availability.listByDoctor(id!);
       return data.filter((slot: any) => slot.is_active !== false);
     },
-    enabled: !!id,
+    enabled: !!id && !!user,
   });
 
   useEffect(() => {
@@ -97,7 +97,14 @@ export default function DoctorProfile() {
 
   const weeklyAvailability = availability?.filter((slot) => !slot.specific_date) || [];
   const availableDays = weeklyAvailability.map((a) => a.day_of_week);
-  const isDateDisabled = (date: Date) => { if (isBefore(date, new Date()) && !isToday(date)) return true; return !availableDays.includes(date.getDay()); };
+  const specificDateAvailability = availability?.filter((slot) => !!slot.specific_date) || [];
+  const availableSpecificDates = specificDateAvailability.map((slot) => slot.specific_date);
+  const isDateDisabled = (date: Date) => {
+    if (isBefore(date, new Date()) && !isToday(date)) return true;
+    const dateStr = format(date, "yyyy-MM-dd");
+    if (availableSpecificDates.includes(dateStr)) return false;
+    return !availableDays.includes(date.getDay());
+  };
   const availableSlots = slots;
 
   if (isLoading) return <AppLayout><div className="flex items-center justify-center py-20"><div className="h-8 w-8 rounded-full border-2 border-primary border-t-transparent animate-spin" /></div></AppLayout>;

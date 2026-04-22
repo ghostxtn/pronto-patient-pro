@@ -1,6 +1,5 @@
 import {
   BadRequestException,
-  ForbiddenException,
   Inject,
   Injectable,
   NotFoundException,
@@ -168,15 +167,11 @@ export class DoctorsService {
       .from(doctors)
       .innerJoin(users, eq(doctors.user_id, users.id))
       .leftJoin(specializations, eq(doctors.specialization_id, specializations.id))
-      .where(eq(doctors.id, id))
+      .where(and(eq(doctors.id, id), eq(doctors.clinic_id, clinicId)))
       .limit(1);
 
     if (!doctor) {
       throw new NotFoundException('Doctor not found');
-    }
-
-    if (doctor.clinic_id !== clinicId) {
-      throw new ForbiddenException('Access denied to this clinic');
     }
 
     return this.omitClinicId(doctor);

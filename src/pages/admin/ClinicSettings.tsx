@@ -48,9 +48,9 @@ export default function ClinicSettings() {
   const [uploadingSpecIds, setUploadingSpecIds] = useState<Record<string, boolean>>({});
 
   const { data: clinic, isLoading: isClinicLoading } = useQuery({
-    queryKey: ["clinic", user?.clinic_id],
-    queryFn: async () => api.clinics.get(user!.clinic_id!),
-    enabled: Boolean(user?.clinic_id && canManageClinic),
+    queryKey: ["clinic", "current"],
+    queryFn: async () => api.clinics.current(),
+    enabled: Boolean(canManageClinic),
   });
 
   const { data: specializations } = useQuery({
@@ -92,15 +92,17 @@ export default function ClinicSettings() {
   });
 
   const saveClinicProfile = useMutation({
-    mutationFn: async () =>
-      api.clinics.update(user!.clinic_id!, {
+    mutationFn: async () => {
+      if (!clinic?.id) throw new Error("Clinic not loaded");
+      return api.clinics.update(clinic.id, {
         name: clinicName.trim(),
         phone: clinicPhone.trim() || undefined,
         email: clinicEmail.trim() || undefined,
         address: clinicAddress.trim() || undefined,
-      }),
+      });
+    },
     onSuccess: async () => {
-      await qc.invalidateQueries({ queryKey: ["clinic", user?.clinic_id] });
+      await qc.invalidateQueries({ queryKey: ["clinic", "current"] });
       toast.success(t.settingsSaved);
     },
     onError: (error) => {
@@ -109,15 +111,17 @@ export default function ClinicSettings() {
   });
 
   const saveAppointmentSettings = useMutation({
-    mutationFn: async () =>
-      api.clinics.update(user!.clinic_id!, {
+    mutationFn: async () => {
+      if (!clinic?.id) throw new Error("Clinic not loaded");
+      return api.clinics.update(clinic.id, {
         default_appointment_duration: Number(defaultAppointmentDuration),
         appointment_approval_mode: appointmentApprovalMode,
         max_booking_days_ahead: Number(maxBookingDaysAhead),
         cancellation_hours_before: Number(cancellationHoursBefore),
-      }),
+      });
+    },
     onSuccess: async () => {
-      await qc.invalidateQueries({ queryKey: ["clinic", user?.clinic_id] });
+      await qc.invalidateQueries({ queryKey: ["clinic", "current"] });
       toast.success(t.settingsSaved);
     },
     onError: (error) => {
