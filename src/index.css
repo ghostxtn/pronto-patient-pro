@@ -70,34 +70,34 @@
     --calendar-disabled: 220 9% 70%;
     --calendar-shadow: 220 20% 20%;
     --calendar-event-outline: 220 13% 90%;
-    --calendar-appointment-pending-bg: 38 92% 94%;
+    --calendar-appointment-pending-bg: 38 88% 86%;
     --calendar-appointment-pending-accent: 38 92% 45%;
     --calendar-appointment-pending-fg: 38 92% 25%;
     --calendar-appointment-pending-meta: 38 80% 40%;
-    --calendar-appointment-confirmed-bg: 199 75% 93%;
+    --calendar-appointment-confirmed-bg: 199 70% 86%;
     --calendar-appointment-confirmed-accent: 199 75% 42%;
     --calendar-appointment-confirmed-fg: 199 75% 20%;
     --calendar-appointment-confirmed-meta: 199 65% 35%;
-    --calendar-appointment-completed-bg: 221 83% 94%;
-    --calendar-appointment-completed-accent: 221 83% 50%;
-    --calendar-appointment-completed-fg: 221 83% 28%;
-    --calendar-appointment-completed-meta: 221 70% 43%;
-    --calendar-appointment-cancelled-bg: 220 10% 94%;
+    --calendar-appointment-completed-bg: 172 50% 84%;
+    --calendar-appointment-completed-accent: 172 65% 35%;
+    --calendar-appointment-completed-fg: 172 65% 22%;
+    --calendar-appointment-completed-meta: 172 55% 35%;
+    --calendar-appointment-cancelled-bg: 220 10% 88%;
     --calendar-appointment-cancelled-accent: 220 10% 60%;
     --calendar-appointment-cancelled-fg: 220 8% 45%;
     --calendar-appointment-cancelled-meta: 220 8% 58%;
-    --calendar-appointment-blocked-bg: 0 72% 95%;
+    --calendar-appointment-blocked-bg: 0 72% 88%;
     --calendar-appointment-blocked-accent: 0 72% 56%;
     --calendar-appointment-blocked-fg: 0 72% 32%;
     --calendar-appointment-blocked-meta: 0 60% 47%;
     --calendar-availability-bg: 142 45% 93%;
     --calendar-availability-border: 142 40% 75%;
     --calendar-availability-fg: 142 40% 28%;
-    --calendar-blackout-bg: 14 70% 94%;
-    --calendar-blackout-accent: 14 75% 50%;
-    --calendar-blackout-fg: 14 75% 28%;
-    --calendar-blackout-meta: 14 60% 43%;
-    --calendar-blackout-hatch: 14 70% 70%;
+    --calendar-blackout-bg: 0 72% 88%;
+    --calendar-blackout-accent: 0 72% 56%;
+    --calendar-blackout-fg: 0 72% 32%;
+    --calendar-blackout-meta: 0 60% 47%;
+    --calendar-blackout-hatch: 0 72% 60%;
     --calendar-custom-hours-bg: 32 100% 95%;
     --calendar-custom-hours-accent: 28 92% 50%;
     --calendar-custom-hours-fg: 25 84% 30%;
@@ -642,21 +642,6 @@
     @apply bg-primary/10 text-primary;
   }
 
-  .scheduler-calendar-shell .rbc-time-gutter .rbc-timeslot-group {
-    background: hsl(var(--calendar-gutter));
-  }
-
-  .scheduler-calendar-shell .rbc-label {
-    padding: 0 8px 0 0;
-    font-size: 11px;
-    font-weight: 400;
-    line-height: 1;
-    color: hsl(var(--calendar-gutter-fg));
-    text-align: right;
-    transform: translateY(-6px);
-    font-variant-numeric: tabular-nums;
-  }
-
   .scheduler-calendar-shell .rbc-allday-cell {
     @apply hidden;
   }
@@ -664,6 +649,7 @@
   .scheduler-calendar-shell .rbc-time-content {
     @apply rounded-b-[32px];
     background: hsl(var(--calendar-surface));
+    padding-top: 8px;
     flex: 1 1 auto !important;
     min-height: 0 !important;
     overflow-x: hidden !important;
@@ -673,20 +659,59 @@
     scrollbar-gutter: stable;
   }
 
+  /* ── Slot group height: 1 step = var(--slot-height) ── */
+  .scheduler-calendar-shell .rbc-timeslot-group,
+  .scheduler-calendar-shell .rbc-time-gutter .rbc-timeslot-group {
+    min-height: var(--slot-height, 30px);
+    border: none;
+  }
+
+  /* ── Remove all default slot borders ── */
+  .scheduler-calendar-shell .rbc-time-slot,
+  .scheduler-calendar-shell .rbc-time-gutter .rbc-time-slot,
+  .scheduler-calendar-shell .rbc-day-slot .rbc-time-slot {
+    border-top: none;
+  }
+
+  /* ── Hour boundary: strong line across full grid ── */
+  .scheduler-calendar-shell .rbc-slot-hour {
+    border-top: 1px solid hsl(var(--calendar-grid-strong));
+  }
+
+  /* ── :30 boundary: very faint line ── */
+  .scheduler-calendar-shell .rbc-slot-half {
+    border-top: 1px solid hsl(var(--calendar-grid-soft) / 0.5);
+  }
+
+  /* ── :15 / :45 slots: completely invisible ── */
+  .scheduler-calendar-shell .rbc-slot-sub-invisible {
+    border-top: none;
+  }
+
+  /* ── Gutter background ── */
   .scheduler-calendar-shell .rbc-time-gutter {
     background: hsl(var(--calendar-gutter));
     width: 72px;
     min-width: 72px;
   }
 
-  .scheduler-calendar-shell .rbc-time-gutter .rbc-timeslot-group,
-  .scheduler-calendar-shell .rbc-timeslot-group {
-    @apply min-h-[60px];
-    border-top: 1px solid hsl(var(--calendar-grid-strong));
+  /* ── Hour label: right-aligned, centered on boundary line ── */
+  .scheduler-calendar-shell .rbc-slot-hour .rbc-label {
+    display: block;
+    padding: 0 10px 0 0;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1;
+    color: hsl(var(--calendar-gutter-fg));
+    text-align: right;
+    transform: translateY(-50%);
+    font-variant-numeric: tabular-nums;
   }
 
-  .scheduler-calendar-shell .rbc-timeslot-group {
-    background: hsl(var(--calendar-surface));
+  /* ── Sub-hour labels: hidden ── */
+  .scheduler-calendar-shell .rbc-slot-half .rbc-label,
+  .scheduler-calendar-shell .rbc-slot-sub-invisible .rbc-label {
+    display: none;
   }
 
   .scheduler-calendar-shell .rbc-time-view {
@@ -734,7 +759,6 @@
   .scheduler-calendar-shell .rbc-day-slot .rbc-time-slot,
   .scheduler-calendar-shell .rbc-time-slot {
     @apply transition-colors;
-    border-top: 1px solid hsl(var(--calendar-grid-soft));
   }
 
   .scheduler-slot {
@@ -784,7 +808,7 @@
     @apply text-xs font-medium;
     border: 1px solid hsl(var(--calendar-event-outline));
     border-radius: 8px;
-    padding: 6px 10px;
+    padding: 2px 6px;
     box-shadow:
       0 1px 2px hsl(var(--calendar-shadow) / 0.05),
       0 1px 1px hsl(var(--calendar-shadow) / 0.03);
@@ -797,6 +821,60 @@
     transition:
       box-shadow 150ms ease,
       transform 150ms ease;
+  }
+
+  /* xs: ≤15 min — absolute minimum height, no padding waste */
+  .scheduler-calendar-shell .rbc-event.evt-xs {
+    padding: 0 4px !important;
+    min-height: 0 !important;
+    overflow: hidden;
+  }
+
+  .scheduler-calendar-shell .rbc-event.evt-xs .scheduler-event-title-only {
+    font-size: 10px;
+    font-weight: 500;
+    line-height: 14px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block;
+  }
+
+  /* sm/md: 20-30 min — compact single row */
+  .scheduler-calendar-shell .rbc-event.evt-sm,
+  .scheduler-calendar-shell .rbc-event.evt-md {
+    padding: 1px 6px !important;
+  }
+
+  .scheduler-calendar-shell .scheduler-event-compact-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    overflow: hidden;
+    width: 100%;
+  }
+
+  .scheduler-calendar-shell .scheduler-event-title-compact {
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex-shrink: 1;
+    min-width: 0;
+  }
+
+  .scheduler-calendar-shell .scheduler-event-time-compact {
+    font-size: 10px;
+    font-weight: 400;
+    white-space: nowrap;
+    flex-shrink: 0;
+    opacity: 0.85;
+  }
+
+  /* lg: normal events keep existing styling */
+  .scheduler-calendar-shell .rbc-event.evt-lg {
+    padding: 4px 8px !important;
   }
 
   .scheduler-calendar-shell .rbc-time-header-content .rbc-header.rbc-today::before {
@@ -876,9 +954,9 @@
   }
 
   .scheduler-agenda-event-appointment-completed {
-    border-color: #86efac;
-    background-color: #dcfce7;
-    color: #166534;
+    border-color: #5eead4;
+    background-color: #ccfbf1;
+    color: #0f766e;
   }
 
   .scheduler-agenda-event-appointment-cancelled {
@@ -905,8 +983,8 @@
   }
 
   .scheduler-agenda-event-appointment-completed .scheduler-agenda-event-label {
-    background-color: #bbf7d0;
-    color: #166534;
+    background-color: #99f6e4;
+    color: #0f766e;
   }
 
   .scheduler-agenda-event-appointment-cancelled .scheduler-agenda-event-label {
@@ -920,9 +998,9 @@
   }
 
   .scheduler-agenda-event-blackout {
-    border-color: #fb923c;
-    background-color: #fff7ed;
-    color: #9a3412;
+    border-color: #fca5a5;
+    background-color: #fee2e2;
+    color: #991b1b;
   }
 
   .scheduler-agenda-event-blackout .scheduler-agenda-event-label {
@@ -1111,7 +1189,9 @@
     background-color: var(--scheduler-event-background, hsl(var(--calendar-blackout-bg))) !important;
     color: var(--scheduler-event-foreground, hsl(var(--calendar-blackout-fg))) !important;
     border: 1px solid hsl(var(--calendar-event-outline)) !important;
-    border-left: 3px solid var(--scheduler-event-accent, hsl(var(--calendar-blackout-accent))) !important;
+    border-left: none !important;
+    border-top: 3px solid var(--scheduler-event-accent, hsl(var(--calendar-blackout-accent))) !important;
+    border-radius: 6px !important;
     box-shadow:
       0 1px 2px hsl(var(--calendar-shadow) / 0.05),
       0 1px 1px hsl(var(--calendar-shadow) / 0.03) !important;
@@ -1121,11 +1201,32 @@
     background-color: var(--scheduler-event-background, hsl(var(--calendar-custom-hours-bg))) !important;
     color: var(--scheduler-event-foreground, hsl(var(--calendar-custom-hours-fg))) !important;
     border: 1px solid hsl(var(--calendar-event-outline)) !important;
-    border-left: 3px solid var(--scheduler-event-accent, hsl(var(--calendar-custom-hours-accent))) !important;
+    border-left: none !important;
+    border-top: 3px solid var(--scheduler-event-accent, hsl(var(--calendar-custom-hours-accent))) !important;
     opacity: 1;
     border-radius: 8px;
     overflow: hidden;
     box-sizing: border-box;
+  }
+
+  .scheduler-calendar-shell .rbc-day-slot .rbc-event.scheduler-event-blackout,
+  .scheduler-calendar-shell .rbc-day-slot .rbc-event.scheduler-event-custom-hours {
+    left: 8px !important;
+    right: 8px !important;
+    margin: 2px 0 !important;
+    width: auto !important;
+  }
+
+  .scheduler-calendar-shell .rbc-day-slot .rbc-event.scheduler-event-blackout {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    color: transparent !important;
+    left: 0 !important;
+    right: 0 !important;
+    width: 100% !important;
+    margin: 0 !important;
+    z-index: 2;
   }
 
   .scheduler-event-override-selected,

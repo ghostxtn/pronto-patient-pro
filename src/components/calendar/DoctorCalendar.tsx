@@ -1,3 +1,4 @@
+import type React from "react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -415,7 +416,7 @@ function getOverrideBadge(type: AvailabilityOverride["type"]) {
         color: OVERRIDE_EVENT_STYLES.blackout.accent,
       }
     : {
-        label: "Bloklu zaman",
+        label: "Özel Saat",
         color: OVERRIDE_EVENT_STYLES.custom_hours.accent,
       };
 }
@@ -964,24 +965,7 @@ function CalendarEventContent({
   const timeRange = `${format(event.start, "HH:mm")} - ${format(event.end, "HH:mm")}`;
 
   if (event.type === "availability-surface") {
-    const durationMinutes =
-      (event.end.getTime() - event.start.getTime()) / 60000;
-
-    if (durationMinutes < 45) {
-      return null;
-    }
-
-    const timeLabel = `${format(event.start, "HH:mm")} – ${format(event.end, "HH:mm")}`;
-    const slotCount = Math.floor(durationMinutes / defaultDuration);
-
-    return (
-      <div className="avail-surface-label">
-        <span className="avail-surface-time">{timeLabel}</span>
-        {slotCount > 0 ? (
-          <span className="avail-surface-slots">{slotCount} slot</span>
-        ) : null}
-      </div>
-    );
+    return null;
   }
 
   if (event.type === "blackout-surface") {
@@ -1050,6 +1034,30 @@ function CalendarEventContent({
       const s = (event.resource as Appointment | undefined)?.status;
       return s === "cancelled" || s === "canceled";
     })();
+  const durationMs = (event.end as Date).getTime() - (event.start as Date).getTime();
+  const durationMin = durationMs / 60000;
+  const isXs = durationMin <= 15;
+  const isSm = durationMin <= 20;
+  const isMd = durationMin <= 30;
+
+  if (isXs) {
+    return (
+      <div className="scheduler-event-content-stack">
+        <span className="scheduler-event-title-only">{title}</span>
+      </div>
+    );
+  }
+
+  if (isSm || isMd) {
+    return (
+      <div className="scheduler-event-content-stack">
+        <span className="scheduler-event-compact-row">
+          <span className="scheduler-event-title-compact">{title}</span>
+          <span className="scheduler-event-time-compact">{timeRange}</span>
+        </span>
+      </div>
+    );
+  }
 
   return (
     <div className="scheduler-event-content-stack">
@@ -1070,6 +1078,21 @@ function CalendarEventContent({
     </div>
   );
 }
+
+const TimeSlotWrapper = ({
+  value,
+  children,
+}: {
+  value?: Date;
+  children?: React.ReactNode;
+}) => {
+  if (!(value instanceof Date)) return <>{children}</>;
+  const minutes = value.getMinutes();
+  let cls = "rbc-slot-sub-invisible";
+  if (minutes === 0) cls = "rbc-slot-hour";
+  else if (minutes === 30) cls = "rbc-slot-half";
+  return <div className={cls}>{children}</div>;
+};
 
 function toApiDate(date: Date) {
   return format(date, "yyyy-MM-dd");
@@ -1242,7 +1265,8 @@ export function DoctorCalendar({
     initialDate?: string;
     initialType?: "blackout" | "custom_hours";
     override?: AvailabilityOverride;
-  }>({ open: false, mode: "create" });
+    conflictingAppointments: Appointment[];
+  }>({ open: false, mode: "create", conflictingAppointments: [] });
   const [isAvailabilitySheetOpen, setIsAvailabilitySheetOpen] = useState(false);
   const [slotToDelete, setSlotToDelete] = useState<AvailabilitySlot | null>(null);
   const [deleteSpecificSlotId, setDeleteSpecificSlotId] = useState<string | null>(null);
@@ -2030,6 +2054,17 @@ export function DoctorCalendar({
       return appointmentStart < end && appointmentEnd > start;
     });
 
+  const getConflictingAppointmentsForDate = (dateStr: string) =>
+    (data?.appointments ?? []).filter((apt) => {
+      if (!apt.resource) return false;
+      const appt = apt.resource as Appointment;
+      return (
+        appt.appointment_date === dateStr &&
+        appt.status !== "cancelled" &&
+        appt.status !== "canceled"
+      );
+    });
+
   const getSlotStateForRange = (
     start: Date,
     end: Date,
@@ -2081,6 +2116,18 @@ export function DoctorCalendar({
       event.type === "custom_hours" && "scheduler-event-custom-hours",
     );
 
+  const getSchedulerEventSizeClass = (event: SchedulerEvent) => {
+    const durationMs = (event.end as Date).getTime() - (event.start as Date).getTime();
+    const durationMin = durationMs / 60000;
+
+    let sizeClass = "evt-lg";
+    if (durationMin <= 15) sizeClass = "evt-xs";
+    else if (durationMin <= 20) sizeClass = "evt-sm";
+    else if (durationMin <= 30) sizeClass = "evt-md";
+
+    return sizeClass;
+  };
+
   const backgroundEventPropGetter: EventPropGetter<SchedulerEvent> = (event) => {
     if (event.type === "availability-surface") {
       return {
@@ -2106,8 +2153,9 @@ export function DoctorCalendar({
         className: "scheduler-event scheduler-event-blackout-surface",
         style: {
           background:
-            "repeating-linear-gradient(45deg, hsl(var(--calendar-blackout-hatch) / 0.12) 0 8px, transparent 8px 16px)",
-          borderRadius: 0,
+            "repeating-linear-gradient(45deg, hsl(0 72% 70% / 0.25) 0 8px, transparent 8px 16px) !important",
+          border: "1px dashed hsl(0 60% 75%) !important",
+          borderRadius: "6px !important",
           width: "100%",
           margin: 0,
           height: "100%",
@@ -2119,7 +2167,10 @@ export function DoctorCalendar({
 
     if (event.type === "draft") {
       return {
-        className: "scheduler-event scheduler-event-draft",
+        className: cn(
+          "scheduler-event scheduler-event-draft",
+          getSchedulerEventSizeClass(event),
+        ),
         style: {
           pointerEvents: "none",
         },
@@ -2132,7 +2183,10 @@ export function DoctorCalendar({
   const eventPropGetter: EventPropGetter<SchedulerEvent> = (event) => {
     if (event.type === "draft") {
       return {
-        className: "scheduler-event scheduler-event-draft",
+        className: cn(
+          "scheduler-event scheduler-event-draft",
+          getSchedulerEventSizeClass(event),
+        ),
         style: {
           pointerEvents: "none",
         },
@@ -2157,7 +2211,10 @@ export function DoctorCalendar({
       const tone = APPOINTMENT_STATUS_STYLES[status];
 
       return {
-        className: getSchedulerEventClassName(event),
+        className: cn(
+          getSchedulerEventClassName(event),
+          getSchedulerEventSizeClass(event),
+        ),
         style: {
           "--scheduler-event-background": tone.background,
           "--scheduler-event-foreground": tone.text,
@@ -2175,7 +2232,10 @@ export function DoctorCalendar({
       const tone = OVERRIDE_EVENT_STYLES[event.type];
 
       return {
-        className: getSchedulerEventClassName(event),
+        className: cn(
+          getSchedulerEventClassName(event),
+          getSchedulerEventSizeClass(event),
+        ),
         style: {
           "--scheduler-event-background": tone.background,
           "--scheduler-event-foreground": tone.text,
@@ -2223,6 +2283,7 @@ export function DoctorCalendar({
         open: true,
         mode: "edit",
         override,
+        conflictingAppointments: getConflictingAppointmentsForDate(override.date),
       });
       return;
     }
@@ -2233,6 +2294,7 @@ export function DoctorCalendar({
         open: true,
         mode: "edit",
         override,
+        conflictingAppointments: [],
       });
     }
   };
@@ -2256,11 +2318,17 @@ export function DoctorCalendar({
     type: "blackout" | "custom_hours",
   ) => {
     resetCalendarActiveState();
+    const initialDate = format(date, "yyyy-MM-dd");
+    const conflicts =
+      type === "blackout"
+        ? getConflictingAppointmentsForDate(initialDate)
+        : [];
     setOverrideModal({
       open: true,
       mode: "create",
-      initialDate: format(date, "yyyy-MM-dd"),
+      initialDate,
       initialType: type,
+      conflictingAppointments: conflicts,
     });
   };
 
@@ -2949,11 +3017,17 @@ export function DoctorCalendar({
       return;
     }
 
+    const conflicts =
+      quickActionSlot.override.type === "blackout"
+        ? getConflictingAppointmentsForDate(quickActionSlot.override.date)
+        : [];
+
     resetCalendarActiveState();
     setOverrideModal({
       open: true,
       mode: "edit",
       override: quickActionSlot.override,
+      conflictingAppointments: conflicts,
     });
   };
 
@@ -3287,6 +3361,7 @@ export function DoctorCalendar({
     <div
       ref={calendarShellRef}
       className="scheduler-calendar-shell flex h-full min-h-0 flex-col overflow-hidden rounded-[34px] border border-border/60 bg-card/95 shadow-soft"
+      style={{ "--slot-height": `${resolvedDefaultDuration}px` } as React.CSSProperties}
     >
       <BigCalendar<SchedulerEvent>
         className="scheduler-calendar min-h-0 flex-1 overflow-hidden"
@@ -3346,8 +3421,22 @@ export function DoctorCalendar({
               defaultDuration={resolvedDefaultDuration}
             />
           ),
+          timeSlotWrapper: TimeSlotWrapper as any,
         }}
         localizer={localizer}
+        formats={{
+          timeGutterFormat: (
+            date: Date,
+            culture: string | undefined,
+            localizer: any,
+          ) => {
+            if (date.getMinutes() === 0) {
+              return localizer.format(date, "HH:mm", culture);
+            }
+
+            return "";
+          },
+        }}
         events={events}
         backgroundEvents={[
           ...availabilitySurfaceEvents,
@@ -3420,7 +3509,10 @@ export function DoctorCalendar({
         step={resolvedDefaultDuration}
         timeslots={1}
         min={setMinutes(setHours(new Date(), CALENDAR_START_HOUR), 0)}
-        max={setMinutes(setHours(new Date(), CALENDAR_END_HOUR), 0)}
+        max={addMinutes(
+          setMinutes(setHours(new Date(), CALENDAR_END_HOUR), 0),
+          resolvedDefaultDuration,
+        )}
         drilldownView={Views.DAY}
         dayLayoutAlgorithm="no-overlap"
       />
@@ -4247,6 +4339,9 @@ export function DoctorCalendar({
                       mode: "create",
                       initialDate: format(new Date(), "yyyy-MM-dd"),
                       initialType: "blackout",
+                      conflictingAppointments: getConflictingAppointmentsForDate(
+                        format(new Date(), "yyyy-MM-dd"),
+                      ),
                     })
                   }
                 >
@@ -4305,7 +4400,17 @@ export function DoctorCalendar({
                             variant="ghost"
                             size="icon"
                             className="h-8 w-8 rounded-xl text-muted-foreground hover:text-foreground"
-                            onClick={() => setOverrideModal({ open: true, mode: "edit", override })}
+                            onClick={() =>
+                              setOverrideModal({
+                                open: true,
+                                mode: "edit",
+                                override,
+                                conflictingAppointments:
+                                  override.type === "blackout"
+                                    ? getConflictingAppointmentsForDate(override.date)
+                                    : [],
+                              })
+                            }
                           >
                             <Pencil className="h-3.5 w-3.5" />
                           </Button>
@@ -4447,7 +4552,11 @@ export function DoctorCalendar({
       <OverrideModal
         open={overrideModal.open}
         onClose={() => {
-          setOverrideModal({ open: false, mode: "create" });
+          setOverrideModal({
+            open: false,
+            mode: "create",
+            conflictingAppointments: [],
+          });
           resetCalendarActiveState();
         }}
         mode={overrideModal.mode}
@@ -4456,8 +4565,13 @@ export function DoctorCalendar({
         initialDate={overrideModal.initialDate}
         initialType={overrideModal.initialType}
         override={overrideModal.override}
+        conflictingAppointments={overrideModal.conflictingAppointments}
         onSaved={() => {
-          setOverrideModal({ open: false, mode: "create" });
+          setOverrideModal({
+            open: false,
+            mode: "create",
+            conflictingAppointments: [],
+          });
           resetCalendarActiveState();
           void queryClient.invalidateQueries({
             queryKey: ["availability-overrides", doctorId],

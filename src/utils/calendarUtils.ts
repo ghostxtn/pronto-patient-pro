@@ -99,7 +99,7 @@ export function overridesToEvents(
 
     return {
       id: override.id,
-      title: "Blok İstisnası",
+      title: "Kapalı Gün",
       start,
       end,
       type: override.type,
