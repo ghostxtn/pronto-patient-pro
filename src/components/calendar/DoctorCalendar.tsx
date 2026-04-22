@@ -416,7 +416,7 @@ function getOverrideBadge(type: AvailabilityOverride["type"]) {
         color: OVERRIDE_EVENT_STYLES.blackout.accent,
       }
     : {
-        label: "Bloklu zaman",
+        label: "Özel Saat",
         color: OVERRIDE_EVENT_STYLES.custom_hours.accent,
       };
 }
@@ -1265,7 +1265,8 @@ export function DoctorCalendar({
     initialDate?: string;
     initialType?: "blackout" | "custom_hours";
     override?: AvailabilityOverride;
-  }>({ open: false, mode: "create" });
+    conflictingAppointments: Appointment[];
+  }>({ open: false, mode: "create", conflictingAppointments: [] });
   const [isAvailabilitySheetOpen, setIsAvailabilitySheetOpen] = useState(false);
   const [slotToDelete, setSlotToDelete] = useState<AvailabilitySlot | null>(null);
   const [deleteSpecificSlotId, setDeleteSpecificSlotId] = useState<string | null>(null);
@@ -2053,6 +2054,17 @@ export function DoctorCalendar({
       return appointmentStart < end && appointmentEnd > start;
     });
 
+  const getConflictingAppointmentsForDate = (dateStr: string) =>
+    (data?.appointments ?? []).filter((apt) => {
+      if (!apt.resource) return false;
+      const appt = apt.resource as Appointment;
+      return (
+        appt.appointment_date === dateStr &&
+        appt.status !== "cancelled" &&
+        appt.status !== "canceled"
+      );
+    });
+
   const getSlotStateForRange = (
     start: Date,
     end: Date,
@@ -2141,8 +2153,9 @@ export function DoctorCalendar({
         className: "scheduler-event scheduler-event-blackout-surface",
         style: {
           background:
-            "repeating-linear-gradient(45deg, hsl(var(--calendar-blackout-hatch) / 0.12) 0 8px, transparent 8px 16px)",
-          borderRadius: 0,
+            "repeating-linear-gradient(45deg, hsl(0 72% 70% / 0.25) 0 8px, transparent 8px 16px) !important",
+          border: "1px dashed hsl(0 60% 75%) !important",
+          borderRadius: "6px !important",
           width: "100%",
           margin: 0,
           height: "100%",
@@ -2270,6 +2283,7 @@ export function DoctorCalendar({
         open: true,
         mode: "edit",
         override,
+        conflictingAppointments: getConflictingAppointmentsForDate(override.date),
       });
       return;
     }
@@ -2280,6 +2294,7 @@ export function DoctorCalendar({
         open: true,
         mode: "edit",
         override,
+        conflictingAppointments: [],
       });
     }
   };
@@ -2303,11 +2318,17 @@ export function DoctorCalendar({
     type: "blackout" | "custom_hours",
   ) => {
     resetCalendarActiveState();
+    const initialDate = format(date, "yyyy-MM-dd");
+    const conflicts =
+      type === "blackout"
+        ? getConflictingAppointmentsForDate(initialDate)
+        : [];
     setOverrideModal({
       open: true,
       mode: "create",
-      initialDate: format(date, "yyyy-MM-dd"),
+      initialDate,
       initialType: type,
+      conflictingAppointments: conflicts,
     });
   };
 
@@ -2996,11 +3017,17 @@ export function DoctorCalendar({
       return;
     }
 
+    const conflicts =
+      quickActionSlot.override.type === "blackout"
+        ? getConflictingAppointmentsForDate(quickActionSlot.override.date)
+        : [];
+
     resetCalendarActiveState();
     setOverrideModal({
       open: true,
       mode: "edit",
       override: quickActionSlot.override,
+      conflictingAppointments: conflicts,
     });
   };
 
@@ -4312,6 +4339,9 @@ export function DoctorCalendar({
                       mode: "create",
                       initialDate: format(new Date(), "yyyy-MM-dd"),
                       initialType: "blackout",
+                      conflictingAppointments: getConflictingAppointmentsForDate(
+                        format(new Date(), "yyyy-MM-dd"),
+                      ),
                     })
                   }
                 >
@@ -4370,7 +4400,17 @@ export function DoctorCalendar({
                             variant="ghost"
                             size="icon"
                             className="h-8 w-8 rounded-xl text-muted-foreground hover:text-foreground"
-                            onClick={() => setOverrideModal({ open: true, mode: "edit", override })}
+                            onClick={() =>
+                              setOverrideModal({
+                                open: true,
+                                mode: "edit",
+                                override,
+                                conflictingAppointments:
+                                  override.type === "blackout"
+                                    ? getConflictingAppointmentsForDate(override.date)
+                                    : [],
+                              })
+                            }
                           >
                             <Pencil className="h-3.5 w-3.5" />
                           </Button>
@@ -4512,7 +4552,11 @@ export function DoctorCalendar({
       <OverrideModal
         open={overrideModal.open}
         onClose={() => {
-          setOverrideModal({ open: false, mode: "create" });
+          setOverrideModal({
+            open: false,
+            mode: "create",
+            conflictingAppointments: [],
+          });
           resetCalendarActiveState();
         }}
         mode={overrideModal.mode}
@@ -4521,8 +4565,13 @@ export function DoctorCalendar({
         initialDate={overrideModal.initialDate}
         initialType={overrideModal.initialType}
         override={overrideModal.override}
+        conflictingAppointments={overrideModal.conflictingAppointments}
         onSaved={() => {
-          setOverrideModal({ open: false, mode: "create" });
+          setOverrideModal({
+            open: false,
+            mode: "create",
+            conflictingAppointments: [],
+          });
           resetCalendarActiveState();
           void queryClient.invalidateQueries({
             queryKey: ["availability-overrides", doctorId],

@@ -6,7 +6,7 @@ import { tr } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import api, { ApiError } from "@/services/api";
-import type { AvailabilityOverride } from "@/types/calendar";
+import type { Appointment, AvailabilityOverride } from "@/types/calendar";
 import { useLanguage } from "@/contexts/LanguageContext";
 import {
   AlertDialog,
@@ -46,6 +46,7 @@ export interface OverrideModalProps {
   initialDate?: string;
   initialType?: "blackout" | "custom_hours";
   override?: AvailabilityOverride;
+  conflictingAppointments?: Appointment[];
   onSaved: () => void;
 }
 
@@ -62,6 +63,7 @@ export function OverrideModal({
   initialDate,
   initialType = "blackout",
   override,
+  conflictingAppointments,
   onSaved,
 }: OverrideModalProps) {
   const { t } = useLanguage();
@@ -313,6 +315,20 @@ export function OverrideModal({
 
               {timeError ? <p className="text-sm text-destructive">{timeError}</p> : null}
             </div>
+
+            {type === "blackout" && conflictingAppointments?.length ? (
+              <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-800">
+                <span className="mt-0.5 text-base">⚠️</span>
+                <div>
+                  <p className="font-medium">
+                    Bu günde {conflictingAppointments.length} aktif randevu bulunuyor.
+                  </p>
+                  <p className="mt-0.5 text-amber-700 text-xs">
+                    Blok uygulanırsa mevcut randevular etkilenebilir.
+                  </p>
+                </div>
+              </div>
+            ) : null}
 
             <div className="flex items-center justify-between gap-3 pt-2">
               {mode === "edit" && override ? (
