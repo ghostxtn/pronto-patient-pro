@@ -43,6 +43,7 @@ export class AuditInterceptor implements NestInterceptor {
         let entityId: string | undefined;
         let action: string;
         let entity: string;
+        const clinicId = user?.clinicId ?? request.tenant?.clinicId;
 
         if (auditMeta) {
           action = auditMeta.action;
@@ -63,8 +64,12 @@ export class AuditInterceptor implements NestInterceptor {
           request.headers['x-real-ip'] ||
           request.ip;
 
+        if (!clinicId) {
+          return;
+        }
+
         this.auditService.log({
-          clinicId: user?.clinicId,
+          clinicId,
           userId: user?.userId,
           userRole: user?.role,
           action,

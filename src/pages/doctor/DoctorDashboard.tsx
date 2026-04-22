@@ -18,10 +18,10 @@ const fadeUp = {
 };
 
 const statusColors: Record<string, string> = {
-  pending: "border-[rgba(245,166,35,0.3)] bg-[#fff8e6] text-[#f5a623]",
-  confirmed: "border-[#b5d1cc] bg-[#eaf5ff] text-[#4f8fe6]",
-  completed: "border-[#b5d1cc] bg-[#e6f4ef] text-[#65a98f]",
-  cancelled: "border-[rgba(252,165,165,0.3)] bg-[#fef2f2] text-[#e05252]",
+  pending: "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-200",
+  confirmed: "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-900/60 dark:bg-blue-950/40 dark:text-blue-200",
+  completed: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-200",
+  cancelled: "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-200",
 };
 
 export default function DoctorDashboard() {
@@ -97,12 +97,12 @@ export default function DoctorDashboard() {
 
   return (
     <AppLayout>
-      <motion.div initial="hidden" animate="visible" className="space-y-8 rounded-[28px] bg-[#f4f8fd] p-1">
+      <motion.div initial="hidden" animate="visible" className="space-y-8 rounded-[28px] bg-background/40 p-1">
         <motion.div custom={0} variants={fadeUp}>
-          <h1 className="text-3xl font-bold tracking-tight text-[#1a2e3b]" style={{ fontFamily: "Manrope, sans-serif" }}>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground" style={{ fontFamily: "Manrope, sans-serif" }}>
             {t.doctorDashboard}
           </h1>
-          <p className="mt-2 text-sm text-[#5a7a8a]" style={{ fontFamily: "Inter, sans-serif" }}>
+          <p className="mt-2 text-sm text-muted-foreground" style={{ fontFamily: "Inter, sans-serif" }}>
             {t.doctorDashboardDesc}
           </p>
         </motion.div>
@@ -111,7 +111,7 @@ export default function DoctorDashboard() {
           {stats.map((stat, i) => (
             <motion.div key={stat.label} custom={i + 2} variants={fadeUp}>
               <Card
-                className="cursor-pointer rounded-2xl border border-[#b5d1cc] bg-white shadow-[0_2px_12px_rgba(79,143,230,0.08)] transition-all duration-200 hover:border-[#4f8fe6] hover:shadow-[0_8px_22px_rgba(79,143,230,0.14)]"
+                className="cursor-pointer rounded-2xl border border-border bg-card shadow-soft transition-all duration-200 hover:border-primary/60 hover:shadow-elevated"
                 onClick={stat.onClick}
               >
                 <CardContent className="p-5">
@@ -119,12 +119,12 @@ export default function DoctorDashboard() {
                     <div className="flex h-12 w-12 items-center justify-center rounded-xl" style={{ backgroundColor: stat.iconBg }}>
                       <stat.icon className="h-5 w-5" style={{ color: stat.iconColor }} />
                     </div>
-                    <TrendingUp className="h-4 w-4 shrink-0 text-[#65a98f]" />
+                    <TrendingUp className="h-4 w-4 shrink-0 text-emerald-500 dark:text-emerald-300" />
                   </div>
-                  <div className="text-[2rem] font-bold leading-none text-[#1a2e3b]" style={{ fontFamily: "Manrope, sans-serif" }}>
+                  <div className="text-[2rem] font-bold leading-none text-foreground" style={{ fontFamily: "Manrope, sans-serif" }}>
                     {stat.value}
                   </div>
-                  <div className="mt-3 text-[0.85rem] text-[#5a7a8a]" style={{ fontFamily: "Inter, sans-serif" }}>
+                  <div className="mt-3 text-[0.85rem] text-muted-foreground" style={{ fontFamily: "Inter, sans-serif" }}>
                     {stat.label}
                   </div>
                 </CardContent>
@@ -134,10 +134,10 @@ export default function DoctorDashboard() {
         </div>
 
         <motion.div custom={6} variants={fadeUp}>
-          <Card className="rounded-2xl border border-[#b5d1cc] bg-white shadow-[0_2px_12px_rgba(79,143,230,0.08)]">
+          <Card className="rounded-2xl border border-border bg-card shadow-soft">
             <CardHeader className="flex flex-row items-center justify-between pb-3">
-              <CardTitle className="flex items-center gap-2 text-lg text-[#1a2e3b]" style={{ fontFamily: "Manrope, sans-serif" }}>
-                <CalendarCheck className="h-5 w-5 text-[#4f8fe6]" />
+              <CardTitle className="flex items-center gap-2 text-lg text-foreground" style={{ fontFamily: "Manrope, sans-serif" }}>
+                <CalendarCheck className="h-5 w-5 text-primary" />
                 {t.todaysSchedule}
               </CardTitle>
               <Button variant="ghost" size="sm" asChild><Link to="/doctor/appointments">{t.viewAll} <ArrowRight className="ml-1 h-3 w-3" /></Link></Button>
@@ -146,20 +146,20 @@ export default function DoctorDashboard() {
               {todayAppts.length > 0 ? (
                 <div className="space-y-3">
                   {todayAppts.map((apt) => { const patient = apt.profiles as any; return (
-                    <div key={apt.id} className="flex items-center justify-between rounded-xl bg-[#f4f8fd] p-4 transition-colors hover:bg-[#eaf5ff]">
+                    <div key={apt.id} className="flex items-center justify-between rounded-xl bg-background/70 p-4 transition-colors hover:bg-accent/60">
                       <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl" style={{ backgroundColor: "#eaf5ff" }}>
-                          <span className="text-sm font-bold" style={{ color: "#4f8fe6", fontFamily: "Manrope, sans-serif" }}>
+                        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-primary/10">
+                          <span className="text-sm font-bold text-primary" style={{ fontFamily: "Manrope, sans-serif" }}>
                             {patient?.full_name?.[0] || "P"}
                           </span>
                         </div>
                         <div>
-                          <div className="text-sm font-medium text-[#1a2e3b]" style={{ fontFamily: "Inter, sans-serif" }}>
+                          <div className="text-sm font-medium text-foreground" style={{ fontFamily: "Inter, sans-serif" }}>
                             {patient?.full_name || t.patient}
                           </div>
-                          <div className="flex items-center gap-2 text-xs text-[#5a7a8a]" style={{ fontFamily: "Inter, sans-serif" }}>
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground" style={{ fontFamily: "Inter, sans-serif" }}>
                             <Clock className="h-3 w-3" />
-                            {apt.start_time.slice(0, 5)} — {apt.end_time.slice(0, 5)}
+                            {apt.start_time.slice(0, 5)} - {apt.end_time.slice(0, 5)}
                           </div>
                         </div>
                       </div>
@@ -174,7 +174,7 @@ export default function DoctorDashboard() {
                   ); })}
                 </div>
               ) : (
-                <div className="py-8 text-center text-sm text-[#5a7a8a]" style={{ fontFamily: "Inter, sans-serif" }}>
+                <div className="py-8 text-center text-sm text-muted-foreground" style={{ fontFamily: "Inter, sans-serif" }}>
                   {t.noTodayAppointments}
                 </div>
               )}
@@ -184,20 +184,20 @@ export default function DoctorDashboard() {
 
         <motion.div className="grid md:grid-cols-2 gap-4" custom={7} variants={fadeUp}>
           <Link to="/doctor/schedule">
-            <Card className="group cursor-pointer rounded-2xl border border-[#b5d1cc] bg-white shadow-[0_2px_12px_rgba(79,143,230,0.08)] transition-all duration-200 hover:border-[#4f8fe6] hover:shadow-[0_8px_22px_rgba(79,143,230,0.14)]">
+            <Card className="group cursor-pointer rounded-2xl border border-border bg-card shadow-soft transition-all duration-200 hover:border-primary/60 hover:shadow-elevated">
               <CardContent className="p-6">
-                <Clock className="mb-3 h-8 w-8 group-hover:scale-110 transition-transform" style={{ color: "#4f8fe6" }} />
-                <h3 className="mb-1 font-semibold text-[#1a2e3b]" style={{ fontFamily: "Manrope, sans-serif" }}>{t.manageSchedule}</h3>
-                <p className="text-sm text-[#5a7a8a]" style={{ fontFamily: "Inter, sans-serif" }}>{t.manageScheduleDesc}</p>
+                <Clock className="mb-3 h-8 w-8 text-primary transition-transform group-hover:scale-110" />
+                <h3 className="mb-1 font-semibold text-foreground" style={{ fontFamily: "Manrope, sans-serif" }}>{t.manageSchedule}</h3>
+                <p className="text-sm text-muted-foreground" style={{ fontFamily: "Inter, sans-serif" }}>{t.manageScheduleDesc}</p>
               </CardContent>
             </Card>
           </Link>
           <Link to="/doctor/appointments">
-            <Card className="group cursor-pointer rounded-2xl border border-[#b5d1cc] bg-white shadow-[0_2px_12px_rgba(79,143,230,0.08)] transition-all duration-200 hover:border-[#4f8fe6] hover:shadow-[0_8px_22px_rgba(79,143,230,0.14)]">
+            <Card className="group cursor-pointer rounded-2xl border border-border bg-card shadow-soft transition-all duration-200 hover:border-primary/60 hover:shadow-elevated">
               <CardContent className="p-6">
-                <CalendarCheck className="mb-3 h-8 w-8 group-hover:scale-110 transition-transform" style={{ color: "#65a98f" }} />
-                <h3 className="mb-1 font-semibold text-[#1a2e3b]" style={{ fontFamily: "Manrope, sans-serif" }}>{t.viewAppointments}</h3>
-                <p className="text-sm text-[#5a7a8a]" style={{ fontFamily: "Inter, sans-serif" }}>{t.viewAppointmentsDesc}</p>
+                <CalendarCheck className="mb-3 h-8 w-8 text-emerald-600 transition-transform group-hover:scale-110 dark:text-emerald-400" />
+                <h3 className="mb-1 font-semibold text-foreground" style={{ fontFamily: "Manrope, sans-serif" }}>{t.viewAppointments}</h3>
+                <p className="text-sm text-muted-foreground" style={{ fontFamily: "Inter, sans-serif" }}>{t.viewAppointmentsDesc}</p>
               </CardContent>
             </Card>
           </Link>

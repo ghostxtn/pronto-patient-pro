@@ -173,10 +173,10 @@
     --secondary-foreground: 0 0% 100%;
 
     --muted: 222 20% 16%;
-    --muted-foreground: 220 12% 55%;
+    --muted-foreground: 217 17% 69%;
 
-    --accent: 221 50% 18%;
-    --accent-foreground: 221 83% 75%;
+    --accent: 217 29% 16%;
+    --accent-foreground: 214 32% 84%;
 
     --destructive: 0 62% 30%;
     --destructive-foreground: 220 16% 93%;
@@ -207,34 +207,34 @@
     --landing-card: 222 30% 10%;
     --landing-border: 222 15% 16%;
 
-    --homepage-brand: 14 92 116;
-    --homepage-brand-deep: 10 74 94;
-    --homepage-support: 42 127 132;
-    --homepage-support-tint: 223 243 239;
-    --homepage-shell: 246 251 251;
-    --homepage-shell-cool: 234 244 251;
-    --homepage-skeleton-1: 223 47% 93%;
-    --homepage-skeleton-2: 220 42% 95%;
-    --homepage-skeleton-3: 216 46% 97%;
-    --homepage-card: 255 255 255;
-    --homepage-ink: 16 42 67;
-    --homepage-text: 52 83 105;
-    --homepage-muted: 72 98 113;
-    --homepage-soft: 90 107 123;
-    --homepage-border: 203 218 227;
-    --homepage-info-border: 213 40% 88%;
-    --homepage-border-strong: 190 209 219;
-    --homepage-brand-strong: 211 100% 34%;
-    --homepage-success: 31 111 80;
+    --homepage-brand: 96 165 250;
+    --homepage-brand-deep: 59 130 246;
+    --homepage-support: 94 234 212;
+    --homepage-support-tint: 30 41 59;
+    --homepage-shell: 8 14 24;
+    --homepage-shell-cool: 15 23 42;
+    --homepage-skeleton-1: 222 22% 18%;
+    --homepage-skeleton-2: 222 20% 14%;
+    --homepage-skeleton-3: 222 18% 12%;
+    --homepage-card: 17 24 39;
+    --homepage-ink: 226 232 240;
+    --homepage-text: 191 219 254;
+    --homepage-muted: 148 163 184;
+    --homepage-soft: 100 116 139;
+    --homepage-border: 51 65 85;
+    --homepage-info-border: 71 85 105;
+    --homepage-border-strong: 96 165 250;
+    --homepage-brand-strong: 147 197 253;
+    --homepage-success: 74 222 128;
     --homepage-warning: 138 90 0;
-    --homepage-warning-bg: 255 244 229;
-    --homepage-critical: 166 58 58;
-    --homepage-footer-bg-from: 200 69% 88%;
-    --homepage-footer-bg-mid: 168 30% 82%;
-    --homepage-footer-bg-to: 156 37% 75%;
-    --homepage-footer-border: 168 30% 82%;
-    --homepage-footer-text: 205 54% 23%;
-    --homepage-footer-muted: 200 21% 45%;
+    --homepage-warning-bg: 69 26 3;
+    --homepage-critical: 252 165 165;
+    --homepage-footer-bg-from: 221 42% 8%;
+    --homepage-footer-bg-mid: 218 34% 11%;
+    --homepage-footer-bg-to: 214 28% 14%;
+    --homepage-footer-border: 217 23% 22%;
+    --homepage-footer-text: 215 28% 88%;
+    --homepage-footer-muted: 214 18% 67%;
     --homepage-shell-gradient: linear-gradient(180deg, rgb(var(--homepage-shell)) 0%, rgb(var(--homepage-shell-cool)) 100%);
     --homepage-section-gradient: linear-gradient(180deg, rgb(var(--homepage-shell)) 0%, rgb(var(--homepage-shell-cool) / 0.92) 64%, rgb(var(--homepage-support-tint) / 0.72) 100%);
     --homepage-hero-scrim: linear-gradient(90deg, rgb(var(--homepage-ink) / 0.84) 0%, rgb(var(--homepage-brand-deep) / 0.64) 42%, rgb(var(--homepage-ink) / 0.24) 100%);
@@ -259,6 +259,10 @@
 
   body {
     @apply bg-background text-foreground font-body antialiased;
+    transition:
+      background-color 220ms ease,
+      color 220ms ease,
+      border-color 220ms ease;
   }
 
   html {
@@ -334,11 +338,11 @@
   }
 
   .homepage-focus {
-    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-homepage-brand/30 focus-visible:ring-offset-2 focus-visible:ring-offset-white;
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-homepage-brand/30 focus-visible:ring-offset-2 focus-visible:ring-offset-background;
   }
 
   .homepage-focus-soft {
-    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-homepage-brand/30 focus-visible:ring-offset-2 focus-visible:ring-offset-homepage-shell;
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-homepage-brand/30 focus-visible:ring-offset-2 focus-visible:ring-offset-background;
   }
 
   .homepage-focus-inverse {
@@ -1019,6 +1023,67 @@
     color: hsl(0 42% 36%);
   }
 
+  .dark .scheduler-agenda-event-appointment,
+  .dark .scheduler-agenda-event-appointment-confirmed {
+    border-color: hsl(215 38% 30%);
+    background-color: hsl(217 34% 16%);
+    color: hsl(212 88% 79%);
+  }
+
+  .dark .scheduler-agenda-event-appointment-pending {
+    border-color: hsl(37 48% 30%);
+    background-color: hsl(34 32% 16%);
+    color: hsl(38 78% 72%);
+  }
+
+  .dark .scheduler-agenda-event-appointment-completed {
+    border-color: hsl(152 34% 28%);
+    background-color: hsl(154 28% 16%);
+    color: hsl(151 45% 72%);
+  }
+
+  .dark .scheduler-agenda-event-appointment-cancelled {
+    border-color: hsl(217 16% 28%);
+    background-color: hsl(217 18% 16%);
+    color: hsl(216 15% 70%);
+  }
+
+  .dark .scheduler-agenda-event-appointment-blocked,
+  .dark .scheduler-agenda-event-blackout,
+  .dark .scheduler-agenda-event-custom-hours {
+    border-color: hsl(18 48% 30%);
+    background-color: hsl(18 28% 15%);
+    color: hsl(22 78% 74%);
+  }
+
+  .dark .scheduler-agenda-event-appointment .scheduler-agenda-event-label,
+  .dark .scheduler-agenda-event-appointment-confirmed .scheduler-agenda-event-label {
+    background-color: hsl(217 28% 22%);
+    color: hsl(212 88% 79%);
+  }
+
+  .dark .scheduler-agenda-event-appointment-pending .scheduler-agenda-event-label {
+    background-color: hsl(36 30% 22%);
+    color: hsl(38 78% 72%);
+  }
+
+  .dark .scheduler-agenda-event-appointment-completed .scheduler-agenda-event-label {
+    background-color: hsl(154 26% 22%);
+    color: hsl(151 45% 72%);
+  }
+
+  .dark .scheduler-agenda-event-appointment-cancelled .scheduler-agenda-event-label {
+    background-color: hsl(217 16% 22%);
+    color: hsl(216 15% 70%);
+  }
+
+  .dark .scheduler-agenda-event-appointment-blocked .scheduler-agenda-event-label,
+  .dark .scheduler-agenda-event-blackout .scheduler-agenda-event-label,
+  .dark .scheduler-agenda-event-custom-hours .scheduler-agenda-event-label {
+    background-color: hsl(18 26% 22%);
+    color: hsl(22 78% 74%);
+  }
+
   .scheduler-event-content-stack {
     @apply flex h-full flex-col justify-start;
     overflow: hidden;
@@ -1348,6 +1413,57 @@
   .scheduler-calendar-shell .rbc-event.override,
   .scheduler-calendar-shell .rbc-event.custom_hours {
     cursor: pointer;
+  }
+
+  .dark .scheduler-toolbar-title,
+  .dark .scheduler-toolbar-today-button,
+  .dark .scheduler-toolbar-view-button,
+  .dark .scheduler-toolbar-manage-button,
+  .dark .scheduler-toolbar-nav-button,
+  .dark .scheduler-week-header-day,
+  .dark .scheduler-week-header-date,
+  .dark .scheduler-calendar-shell .rbc-label,
+  .dark .scheduler-current-time-indicator,
+  .dark .scheduler-current-time-indicator::before {
+    color: hsl(var(--foreground));
+  }
+
+  .dark .scheduler-calendar-shell .rbc-header,
+  .dark .scheduler-week-header,
+  .dark .scheduler-calendar-shell .rbc-time-gutter,
+  .dark .scheduler-calendar-shell .rbc-time-gutter .rbc-timeslot-group,
+  .dark .scheduler-calendar-shell .rbc-timeslot-group,
+  .dark .scheduler-calendar-shell .rbc-time-content,
+  .dark .scheduler-calendar-shell .rbc-time-header,
+  .dark .scheduler-calendar-shell .rbc-time-header-content,
+  .dark .scheduler-calendar-shell .rbc-time-header-gutter,
+  .dark .scheduler-slot {
+    background: hsl(var(--card));
+  }
+
+  .dark .scheduler-toolbar-today-button,
+  .dark .scheduler-toolbar-view-button,
+  .dark .scheduler-toolbar-manage-button {
+    border-color: hsl(var(--border));
+    background: hsl(var(--background));
+    color: hsl(var(--foreground));
+  }
+
+  .dark .scheduler-slot:hover,
+  .dark .scheduler-calendar-shell .rbc-today {
+    background-color: hsl(var(--accent) / 0.45);
+  }
+
+  .dark .scheduler-calendar-shell .rbc-header,
+  .dark .scheduler-calendar-shell .rbc-time-header-cell,
+  .dark .scheduler-calendar-shell .rbc-time-content > * + * > .rbc-day-slot,
+  .dark .scheduler-calendar-shell .rbc-time-content > * + * > .rbc-day-bg,
+  .dark .scheduler-calendar-shell .rbc-day-bg + .rbc-day-bg,
+  .dark .scheduler-calendar-shell .rbc-time-view,
+  .dark .scheduler-calendar-shell .rbc-time-content,
+  .dark .scheduler-calendar-shell .rbc-month-view,
+  .dark .scheduler-calendar-shell .rbc-month-row + .rbc-month-row {
+    border-color: hsl(var(--border) / 0.8);
   }
 
   @media (max-width: 1024px) {

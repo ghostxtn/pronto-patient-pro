@@ -7,10 +7,12 @@ import AppLayout from "@/components/AppLayout";
 import { DoctorCalendar } from "@/components/calendar/DoctorCalendar";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
 import api from "@/services/api";
 
 export default function DoctorSchedule() {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const [calendarDate, setCalendarDate] = useState(new Date());
   const [calendarView, setCalendarView] = useState<View>(Views.WEEK);
 
@@ -68,9 +70,9 @@ export default function DoctorSchedule() {
           </div>
         ) : isError ? (
           <Alert className="rounded-2xl">
-            <AlertTitle>Doctor schedule could not be loaded</AlertTitle>
+            <AlertTitle>{t.mySchedule}</AlertTitle>
             <AlertDescription>
-              {error instanceof Error ? error.message : "Unknown error"}
+              {error instanceof Error ? error.message : t.doctorsLoadError}
             </AlertDescription>
           </Alert>
         ) : (

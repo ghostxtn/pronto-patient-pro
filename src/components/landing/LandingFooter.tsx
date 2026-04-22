@@ -57,7 +57,7 @@ export default function LandingFooter() {
   return (
     <footer
       id="footer"
-      className="mt-0 pb-10 pt-12 md:pb-12 md:pt-16"
+      className="mt-0 border-t border-[hsl(var(--homepage-footer-border)/0.6)] pb-10 pt-12 md:pb-12 md:pt-16"
       style={{
         background:
           "linear-gradient(145deg, hsl(var(--homepage-footer-bg-from)) 0%, hsl(var(--homepage-footer-bg-mid)) 40%, hsl(var(--homepage-footer-bg-to)) 100%)",
@@ -67,7 +67,7 @@ export default function LandingFooter() {
       <div className="container">
         <div
           className="grid gap-10 pb-10 lg:grid-cols-[0.9fr_1.1fr]"
-          style={{ borderBottom: "1px solid hsl(var(--homepage-footer-text) / 0.1)" }}
+          style={{ borderBottom: "1px solid hsl(var(--homepage-footer-border) / 0.8)" }}
         >
           <div className="max-w-md">
             <div className="flex items-center gap-3">
@@ -119,7 +119,7 @@ export default function LandingFooter() {
                     <SmartLink
                       key={link.label}
                       href={link.href}
-                      className="homepage-focus block rounded-lg text-sm text-[hsl(var(--homepage-footer-text)/0.7)] transition-colors duration-200 hover:text-[hsl(var(--homepage-footer-text))]"
+                    className="homepage-focus block rounded-lg text-sm text-[hsl(var(--homepage-footer-text)/0.72)] transition-colors duration-200 hover:text-[hsl(var(--homepage-footer-text))]"
                     >
                       {link.label}
                     </SmartLink>
@@ -140,7 +140,7 @@ export default function LandingFooter() {
               <SmartLink
                 key={item.label}
                 href={item.href}
-                className="homepage-focus text-[hsl(var(--homepage-footer-muted))] transition-colors duration-200 hover:text-[hsl(var(--homepage-footer-text)/0.7)]"
+                className="homepage-focus text-[hsl(var(--homepage-footer-muted))] transition-colors duration-200 hover:text-[hsl(var(--homepage-footer-text)/0.85)]"
               >
                 {item.label}
               </SmartLink>

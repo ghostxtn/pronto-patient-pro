@@ -34,12 +34,12 @@ export default function ForgotPassword() {
     <AuthScreen>
       <div className="text-center mb-8">
         <h1
-          className="text-2xl font-medium tracking-tight text-[#1a2e3b]"
+          className="text-2xl font-medium tracking-tight text-foreground"
           style={{ fontFamily: "Manrope, sans-serif" }}
         >
           {t.forgotPasswordTitle}
         </h1>
-        <p className="mt-1 text-sm font-light text-[#5a7a8a]">
+        <p className="mt-1 text-sm font-light text-muted-foreground">
           {t.forgotPasswordDesc}
         </p>
       </div>
@@ -47,11 +47,11 @@ export default function ForgotPassword() {
       {!submitted ? (
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="email" className="text-[11px] font-medium uppercase tracking-widest text-[#5a7a8a]">
+            <Label htmlFor="email" className="text-[11px] font-medium uppercase tracking-widest text-muted-foreground">
               {t.email}
             </Label>
             <div className="relative">
-              <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#7c96a4]" />
+              <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 id="email"
                 type="email"
@@ -65,7 +65,7 @@ export default function ForgotPassword() {
           </div>
 
           {error ? (
-            <p className="rounded-xl border border-[#f3d0d0] bg-[#fff6f6] px-4 py-3 text-sm text-[#a24b4b]">
+            <p className="rounded-xl border border-destructive/25 bg-destructive/10 px-4 py-3 text-sm text-destructive">
               {error}
             </p>
           ) : null}
@@ -81,18 +81,18 @@ export default function ForgotPassword() {
         </form>
       ) : (
         <div className="space-y-5">
-          <div className="rounded-2xl border border-[#d7eadf] bg-[#f6fbf8] px-4 py-4 text-sm text-[#335b4a]">
+          <div className="rounded-2xl border border-emerald-500/25 bg-emerald-500/10 px-4 py-4 text-sm text-emerald-700 dark:text-emerald-300">
             {t.resetEmailSent}
           </div>
-          <p className="text-sm text-[#5a7a8a]">
+          <p className="text-sm text-muted-foreground">
             {t.resetEmailFollowup}
           </p>
         </div>
       )}
 
-      <p className="mt-6 text-center text-sm text-[#5a7a8a]">
+      <p className="mt-6 text-center text-sm text-muted-foreground">
         {t.rememberPassword}{" "}
-        <Link to="/auth" className="font-medium text-[#005cae] hover:underline">
+        <Link to="/auth" className="font-medium text-primary hover:underline">
           {t.loginInstead}
         </Link>
       </p>

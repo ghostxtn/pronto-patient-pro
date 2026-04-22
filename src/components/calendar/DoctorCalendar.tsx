@@ -1,11 +1,9 @@
-import type React from "react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Calendar as BigCalendar,
   Views,
-  dateFnsLocalizer,
   type EventPropGetter,
   type SlotInfo,
   type ToolbarProps,
@@ -22,7 +20,6 @@ import {
   isSameDay,
   isToday,
   parse,
-  parseISO,
   setHours,
   setMinutes,
   startOfMonth,
@@ -30,7 +27,6 @@ import {
   startOfWeek,
   subDays,
 } from "date-fns";
-import { tr } from "date-fns/locale/tr";
 import {
   Ban,
   ChevronDown,
@@ -53,7 +49,6 @@ import { AppointmentDetailSheet } from "@/components/appointments/AppointmentDet
 import api from "@/services/api";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
-  AlertDialogAction,
   AlertDialog,
   AlertDialogCancel,
   AlertDialogContent,
@@ -91,7 +86,17 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { useIsMobile } from "@/hooks/use-mobile";
+import {
+  createCalendarLocalizer,
+  formatCalendarHeaderDay as formatCalendarHeaderDayLabel,
+  getCalendarDayLabels,
+  formatCalendarRangeLabel,
+  getCalendarMessages,
+  getCalendarViewLabels,
+} from "@/lib/calendar-i18n";
+import { getDateFnsLocale, getIntlLocale } from "@/lib/date-localization";
 import { cn } from "@/lib/utils";
 import {
   Appointment,
@@ -106,15 +111,6 @@ import {
 } from "@/utils/calendarUtils";
 import TimeGrid from "react-big-calendar/lib/TimeGrid";
 
-const locales = { tr };
-
-const localizer = dateFnsLocalizer({
-  format,
-  parse,
-  startOfWeek: (date) => startOfWeek(date, { weekStartsOn: 1, locale: tr }),
-  getDay,
-  locales,
-});
 
 const calendarMessages = {
   today: "Bugün",
@@ -143,63 +139,39 @@ const APPOINTMENT_STATUS_STYLES: Record<
   {
     background: string;
     text: string;
-    mutedText: string;
     accent: string;
   }
 > = {
   pending: {
-    background: "hsl(var(--calendar-appointment-pending-bg))",
-    text: "hsl(var(--calendar-appointment-pending-fg))",
-    mutedText: "hsl(var(--calendar-appointment-pending-meta))",
-    accent: "hsl(var(--calendar-appointment-pending-accent))",
+    background: "#FFF7ED",
+    text: "#9A3412",
+    accent: "#EA580C",
   },
   confirmed: {
-    background: "hsl(var(--calendar-appointment-confirmed-bg))",
-    text: "hsl(var(--calendar-appointment-confirmed-fg))",
-    mutedText: "hsl(var(--calendar-appointment-confirmed-meta))",
-    accent: "hsl(var(--calendar-appointment-confirmed-accent))",
+    background: "#DBEAFE",
+    text: "#1E40AF",
+    accent: "#2563EB",
   },
   completed: {
-    background: "hsl(var(--calendar-appointment-completed-bg))",
-    text: "hsl(var(--calendar-appointment-completed-fg))",
-    mutedText: "hsl(var(--calendar-appointment-completed-meta))",
-    accent: "hsl(var(--calendar-appointment-completed-accent))",
+    background: "#DCFCE7",
+    text: "#166534",
+    accent: "#16A34A",
   },
   cancelled: {
-    background: "hsl(var(--calendar-appointment-cancelled-bg))",
-    text: "hsl(var(--calendar-appointment-cancelled-fg))",
-    mutedText: "hsl(var(--calendar-appointment-cancelled-meta))",
-    accent: "hsl(var(--calendar-appointment-cancelled-accent))",
+    background: "#E5E7EB",
+    text: "#6B7280",
+    accent: "#9CA3AF",
   },
   blocked: {
-    background: "hsl(var(--calendar-appointment-blocked-bg))",
-    text: "hsl(var(--calendar-appointment-blocked-fg))",
-    mutedText: "hsl(var(--calendar-appointment-blocked-meta))",
-    accent: "hsl(var(--calendar-appointment-blocked-accent))",
+    background: "#FEE2E2",
+    text: "#991B1B",
+    accent: "#DC2626",
   },
 };
 
-const OVERRIDE_EVENT_STYLES: Record<
-  "custom_hours" | "blackout",
-  {
-    background: string;
-    text: string;
-    mutedText: string;
-    accent: string;
-  }
-> = {
-  custom_hours: {
-    background: "hsl(var(--calendar-custom-hours-bg))",
-    text: "hsl(var(--calendar-custom-hours-fg))",
-    mutedText: "hsl(var(--calendar-custom-hours-meta))",
-    accent: "hsl(var(--calendar-custom-hours-accent))",
-  },
-  blackout: {
-    background: "hsl(var(--calendar-blackout-bg))",
-    text: "hsl(var(--calendar-blackout-fg))",
-    mutedText: "hsl(var(--calendar-blackout-meta))",
-    accent: "hsl(var(--calendar-blackout-accent))",
-  },
+const OVERRIDE_COLORS: Record<string, string> = {
+  custom_hours: "#ea580c",
+  blackout: "#ea580c",
 };
 
 interface DoctorCalendarProps {
@@ -234,6 +206,10 @@ interface CustomToolbarProps extends ToolbarProps<SchedulerEvent, object> {
   onManageAvailability: () => void;
   calendarTitle: string;
   specializationName?: string;
+  todayLabel: string;
+  manageLabel: string;
+  rangeLabel: string;
+  viewLabels: Record<string, string>;
 }
 
 interface AvailabilityDraftPreview {
@@ -268,8 +244,7 @@ interface BlockActionState {
   start: Date;
   end: Date;
   dateLabel: string;
-  timeLabel?: string;
-  reason?: string;
+  timeLabel: string;
 }
 
 interface AppointmentComposerState {
@@ -363,14 +338,14 @@ const toolbarViewLabels = {
 } as const;
 
 const toolbarViews = [Views.WEEK, Views.DAY, Views.MONTH, Views.AGENDA] as const;
-const CALENDAR_START_HOUR = 6;
-const CALENDAR_END_HOUR = 22;
-const QUICK_ACTION_TIME_MINUTES_START = CALENDAR_START_HOUR * 60;
-const QUICK_ACTION_TIME_MINUTES_END = CALENDAR_END_HOUR * 60;
+const QUICK_ACTION_TIME_MINUTES_START = 6 * 60;
+const QUICK_ACTION_TIME_MINUTES_END = 23 * 60 + 45;
+const CALENDAR_START_HOUR = 7;
+const CALENDAR_END_HOUR = 21;
 const CALENDAR_START_MINUTES = CALENDAR_START_HOUR * 60;
 const CALENDAR_END_MINUTES = CALENDAR_END_HOUR * 60;
 
-const dayLabels: Record<number, string> = {
+const fallbackDayLabels: Record<number, string> = {
   0: "Pazar",
   1: "Pazartesi",
   2: "Sali",
@@ -413,11 +388,11 @@ function getOverrideBadge(type: AvailabilityOverride["type"]) {
   return type === "blackout"
     ? {
         label: "Kapalı Gün",
-        color: OVERRIDE_EVENT_STYLES.blackout.accent,
+        color: OVERRIDE_COLORS.blackout,
       }
     : {
-        label: "Özel Saat",
-        color: OVERRIDE_EVENT_STYLES.custom_hours.accent,
+        label: "Bloklu zaman",
+        color: OVERRIDE_COLORS.custom_hours,
       };
 }
 
@@ -450,8 +425,8 @@ function compareOverrides(left: AvailabilityOverride, right: AvailabilityOverrid
   return left.id.localeCompare(right.id);
 }
 
-function getRollingWeekRange(date: Date) {
-  const anchor = startOfWeek(startOfDay(date), { weekStartsOn: 1, locale: tr });
+function getRollingWeekRange(date: Date, locale: ReturnType<typeof getDateFnsLocale>) {
+  const anchor = startOfWeek(startOfDay(date), { weekStartsOn: 1, locale });
   return Array.from({ length: 7 }, (_, index) => addDays(anchor, index));
 }
 
@@ -479,6 +454,16 @@ function minutesToTime(totalMinutes: number) {
   const hours = String(Math.floor(totalMinutes / 60)).padStart(2, "0");
   const minutes = String(totalMinutes % 60).padStart(2, "0");
   return `${hours}:${minutes}`;
+}
+
+function applyTemplate(
+  template: string,
+  values: Record<string, string | number>,
+) {
+  return Object.entries(values).reduce(
+    (result, [key, value]) => result.replaceAll(`{{${key}}}`, String(value)),
+    template,
+  );
 }
 
 function subtractBlockedRange(
@@ -659,7 +644,7 @@ function formatDurationLabel(durationMinutes: number) {
   return minutes === 0 ? `${hours} sa` : `${hours} sa ${minutes} dk`;
 }
 
-function getDateRange(date: Date, view: View) {
+function getDateRange(date: Date, view: View, locale: ReturnType<typeof getDateFnsLocale>) {
   switch (view) {
     case Views.MONTH:
       return {
@@ -668,8 +653,8 @@ function getDateRange(date: Date, view: View) {
       };
     case Views.WEEK:
       return {
-        rangeStart: getRollingWeekRange(date)[0],
-        rangeEnd: getRollingWeekRange(date)[6],
+        rangeStart: getRollingWeekRange(date, locale)[0],
+        rangeEnd: getRollingWeekRange(date, locale)[6],
       };
     case Views.DAY:
       return {
@@ -683,43 +668,10 @@ function getDateRange(date: Date, view: View) {
       };
     default:
       return {
-        rangeStart: startOfWeek(date, { weekStartsOn: 1, locale: tr }),
-        rangeEnd: endOfWeek(date, { weekStartsOn: 1, locale: tr }),
+        rangeStart: startOfWeek(date, { weekStartsOn: 1, locale }),
+        rangeEnd: endOfWeek(date, { weekStartsOn: 1, locale }),
       };
   }
-}
-
-function formatToolbarRangeLabel(date: Date, view: View) {
-  if (view === Views.WEEK) {
-    const [weekStart, , , , , , weekEnd] = getRollingWeekRange(date);
-
-    if (
-      format(weekStart, "MMMM yyyy", { locale: tr }) ===
-      format(weekEnd, "MMMM yyyy", { locale: tr })
-    ) {
-      return `${format(weekStart, "d", { locale: tr })} - ${format(
-        weekEnd,
-        "d MMMM yyyy",
-        { locale: tr },
-      )}`;
-    }
-
-    return `${format(weekStart, "d MMM", { locale: tr })} - ${format(
-      weekEnd,
-      "d MMM yyyy",
-      { locale: tr },
-    )}`;
-  }
-
-  if (view === Views.DAY) {
-    return format(date, "d MMMM yyyy, EEEE", { locale: tr });
-  }
-
-  if (view === Views.MONTH) {
-    return format(date, "MMMM yyyy", { locale: tr });
-  }
-
-  return `Ajanda - ${format(date, "d MMMM yyyy", { locale: tr })}`;
 }
 
 const TimeGridComponent =
@@ -730,30 +682,6 @@ interface RollingWeekViewProps {
   [key: string]: unknown;
 }
 
-const RollingWeekView = Object.assign(
-  function RollingWeekView(props: RollingWeekViewProps) {
-    const range = getRollingWeekRange(props.date);
-    return <TimeGridComponent {...props} range={range} eventOffset={15} />;
-  },
-  {
-    range: getRollingWeekRange,
-    navigate(date: Date, action: string) {
-      switch (action) {
-        case "PREV":
-          return addDays(date, -7);
-        case "NEXT":
-          return addDays(date, 7);
-        case "TODAY":
-          return new Date();
-        default:
-          return date;
-      }
-    },
-    title(date: Date) {
-      return formatToolbarRangeLabel(date, Views.WEEK);
-    },
-  },
-);
 
 function getCalendarScrollContainer(calendarShell: HTMLElement | null) {
   return calendarShell?.querySelector(".rbc-time-content") as HTMLElement | null;
@@ -774,10 +702,41 @@ function getTimeGridDaySlots(scrollContainer: HTMLElement) {
   );
 }
 
-function clearCalendarActiveDayAttributes(calendarShell: HTMLElement) {
-  calendarShell.querySelectorAll("[data-calendar-active-day]").forEach((element) => {
-    element.removeAttribute("data-calendar-active-day");
-  });
+function getTodayTimeColumn(
+  calendarShell: HTMLElement,
+  scrollContainer: HTMLElement,
+  view: View,
+  currentDate: Date,
+) {
+  const daySlots = getTimeGridDaySlots(scrollContainer);
+
+  if (daySlots.length === 0) {
+    return null;
+  }
+
+  if (view === Views.DAY) {
+    return isToday(currentDate) ? daySlots[0] : null;
+  }
+
+  if (view !== Views.WEEK) {
+    return null;
+  }
+
+  const headerCells = Array.from(
+    calendarShell.querySelectorAll(".rbc-time-header-content .rbc-header"),
+  ).filter((cell): cell is HTMLElement => cell instanceof HTMLElement);
+  const backgroundCells = Array.from(calendarShell.querySelectorAll(".rbc-day-bg")).filter(
+    (cell): cell is HTMLElement => cell instanceof HTMLElement,
+  );
+  const todayIndex = [headerCells, backgroundCells]
+    .map((cells) => cells.findIndex((cell) => cell.classList.contains("rbc-today")))
+    .find((index) => index !== -1);
+
+  if (todayIndex === undefined || todayIndex < 0) {
+    return null;
+  }
+
+  return daySlots[todayIndex] ?? null;
 }
 
 function splitFullName(fullName: string) {
@@ -803,12 +762,6 @@ function getPatientName(patient: PatientLookupRecord) {
     .trim();
 }
 
-function formatCalendarHeaderDay(date: Date) {
-  return format(date, "EEE", { locale: tr })
-    .replace(".", "")
-    .toLocaleUpperCase("tr-TR");
-}
-
 function normalizeAppointmentStatus(status?: string): AppointmentVisualStatus {
   const normalized = (status ?? "").toLowerCase();
 
@@ -824,13 +777,16 @@ function normalizeAppointmentStatus(status?: string): AppointmentVisualStatus {
 }
 
 const CustomToolbar = ({
-  date,
   onNavigate,
   onView,
   view,
   onManageAvailability,
   calendarTitle,
   specializationName,
+  todayLabel,
+  manageLabel,
+  rangeLabel,
+  viewLabels,
 }: CustomToolbarProps) => (
   <div className="scheduler-toolbar-shell">
     <div className="scheduler-toolbar-row">
@@ -848,106 +804,167 @@ const CustomToolbar = ({
         </div>
       </div>
 
-      <div className="scheduler-toolbar-controls">
-        <div className="scheduler-toolbar-center">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="scheduler-toolbar-nav-button"
-            onClick={() => onNavigate("PREV")}
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <span className="scheduler-toolbar-title">
-            {formatToolbarRangeLabel(date, view)}
-          </span>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="scheduler-toolbar-nav-button"
-            onClick={() => onNavigate("NEXT")}
-          >
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            className="scheduler-toolbar-today-button"
-            onClick={() => onNavigate("TODAY")}
-          >
-            Bugün
-          </Button>
-        </div>
+      <div className="scheduler-toolbar-center">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="scheduler-toolbar-nav-button"
+          onClick={() => onNavigate("PREV")}
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </Button>
+        <span className="scheduler-toolbar-title">{rangeLabel}</span>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="scheduler-toolbar-nav-button"
+          onClick={() => onNavigate("NEXT")}
+        >
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          className="scheduler-toolbar-today-button"
+          onClick={() => onNavigate("TODAY")}
+        >
+          {todayLabel}
+        </Button>
+      </div>
 
-        <div className="scheduler-toolbar-actions">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                type="button"
-                variant="outline"
-                className="scheduler-toolbar-view-button"
+      <div className="scheduler-toolbar-actions">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              type="button"
+              variant="outline"
+              className="scheduler-toolbar-view-button"
+            >
+              {viewLabels[view] ?? view}
+              <ChevronDown className="ml-2 h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-40 rounded-2xl">
+            {toolbarViews.map((toolbarView) => (
+              <DropdownMenuItem
+                key={toolbarView}
+                onClick={() => onView(toolbarView)}
+                className={cn(
+                  "rounded-xl",
+                  view === toolbarView && "bg-accent text-foreground",
+                )}
               >
-                {toolbarViewLabels[view]}
-                <ChevronDown className="ml-2 h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-40 rounded-2xl">
-              {toolbarViews.map((toolbarView) => (
-                <DropdownMenuItem
-                  key={toolbarView}
-                  onClick={() => onView(toolbarView)}
-                  className={cn(
-                    "rounded-xl",
-                    view === toolbarView && "bg-accent text-foreground",
-                  )}
-                >
-                  {toolbarViewLabels[toolbarView]}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+                {viewLabels[toolbarView] ?? toolbarView}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
 
-          <Button
-            type="button"
-            variant="outline"
-            className="scheduler-toolbar-manage-button"
-            onClick={onManageAvailability}
-          >
-            <Settings2 className="mr-2 h-4 w-4" />
-            Müsaitlik Paneli
-          </Button>
-        </div>
+        <Button
+          type="button"
+          variant="outline"
+          className="scheduler-toolbar-manage-button"
+          onClick={onManageAvailability}
+        >
+          <Settings2 className="mr-2 h-4 w-4" />
+          {manageLabel}
+        </Button>
       </div>
     </div>
   </div>
 );
 
 function AppointmentStatusIcon({ status }: { status: string }) {
-  return (
-    <span className="scheduler-event-status-icon" aria-hidden="true">
-      {status === "pending" ? (
-        <span className="scheduler-event-status-glyph">!</span>
-      ) : status === "cancelled" || status === "blocked" ? (
-        <Ban className="scheduler-event-status-svg" />
-      ) : (
-        <svg
-          className="scheduler-event-status-svg"
-          viewBox="0 0 10 10"
-          fill="none"
-          aria-hidden="true"
-        >
+  if (status === "confirmed") {
+    return (
+      <span
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          width: 13,
+          height: 13,
+          borderRadius: "9999px",
+          backgroundColor: "#2563eb",
+          flexShrink: 0,
+        }}
+      >
+        <svg width="7" height="7" viewBox="0 0 10 10" fill="none" aria-hidden="true">
           <path
             d="M2 5l2.5 2.5L8 3"
-            stroke="currentColor"
+            stroke="#fff"
             strokeWidth="1.8"
             strokeLinecap="round"
             strokeLinejoin="round"
           />
         </svg>
-      )}
-    </span>
+      </span>
+    );
+  }
+
+  if (status === "pending") {
+    return (
+      <span
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          width: 13,
+          height: 13,
+          borderRadius: "9999px",
+          backgroundColor: "#CA8A04",
+          flexShrink: 0,
+          fontSize: 8,
+          color: "#fff",
+          fontWeight: 700,
+          lineHeight: 1,
+        }}
+      >
+        !
+      </span>
+    );
+  }
+
+  if (status === "completed") {
+    return (
+      <span
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          width: 13,
+          height: 13,
+          borderRadius: "9999px",
+          backgroundColor: "#16A34A",
+          flexShrink: 0,
+        }}
+      >
+        <svg width="7" height="7" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+          <path
+            d="M2 5l2.5 2.5L8 3"
+            stroke="#fff"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </span>
+    );
+  }
+
+  return (
+    <span
+      style={{
+        width: 13,
+        height: 13,
+        borderRadius: "9999px",
+        backgroundColor: "#9CA3AF",
+        flexShrink: 0,
+        display: "inline-flex",
+      }}
+    />
   );
 }
 
@@ -956,16 +973,35 @@ function CalendarEventContent({
   title,
   view,
   defaultDuration,
+  t,
 }: {
   event: SchedulerEvent;
   title: string;
   view?: string;
   defaultDuration: number;
+  t: ReturnType<typeof useLanguage>["t"];
 }) {
   const timeRange = `${format(event.start, "HH:mm")} - ${format(event.end, "HH:mm")}`;
 
   if (event.type === "availability-surface") {
-    return null;
+    const durationMinutes =
+      (event.end.getTime() - event.start.getTime()) / 60000;
+
+    if (durationMinutes < 45) {
+      return null;
+    }
+
+    const timeLabel = `${format(event.start, "HH:mm")} – ${format(event.end, "HH:mm")}`;
+    const slotCount = Math.floor(durationMinutes / defaultDuration);
+
+    return (
+      <div className="avail-surface-label">
+        <span className="avail-surface-time">{timeLabel}</span>
+        {slotCount > 0 ? (
+          <span className="avail-surface-slots">{slotCount} {t.activeSlots}</span>
+        ) : null}
+      </div>
+    );
   }
 
   if (event.type === "blackout-surface") {
@@ -984,7 +1020,7 @@ function CalendarEventContent({
   if (event.type === "draft") {
     return (
       <div className="flex h-full flex-col justify-start gap-0.5 overflow-hidden">
-        <span style={{ fontSize: "10px", opacity: 0.7, fontWeight: 400 }}>Taslak</span>
+        <span style={{ fontSize: "10px", opacity: 0.7, fontWeight: 400 }}>{t.pending}</span>
         <span style={{ fontSize: "12px", fontWeight: 600, color: "rgba(99, 102, 241, 0.9)" }}>
           {timeRange}
         </span>
@@ -1008,10 +1044,10 @@ function CalendarEventContent({
           : "scheduler-agenda-event-custom-hours";
     const agendaLabel =
       event.type === "appointment"
-        ? "Randevu"
+        ? t.appointments
         : event.type === "blackout"
-          ? "Kapalı Gün"
-          : "Blok";
+          ? t.closeDay
+          : t.addException;
 
     return (
       <div className={cn("scheduler-agenda-event", agendaToneClass)}>
@@ -1034,30 +1070,6 @@ function CalendarEventContent({
       const s = (event.resource as Appointment | undefined)?.status;
       return s === "cancelled" || s === "canceled";
     })();
-  const durationMs = (event.end as Date).getTime() - (event.start as Date).getTime();
-  const durationMin = durationMs / 60000;
-  const isXs = durationMin <= 15;
-  const isSm = durationMin <= 20;
-  const isMd = durationMin <= 30;
-
-  if (isXs) {
-    return (
-      <div className="scheduler-event-content-stack">
-        <span className="scheduler-event-title-only">{title}</span>
-      </div>
-    );
-  }
-
-  if (isSm || isMd) {
-    return (
-      <div className="scheduler-event-content-stack">
-        <span className="scheduler-event-compact-row">
-          <span className="scheduler-event-title-compact">{title}</span>
-          <span className="scheduler-event-time-compact">{timeRange}</span>
-        </span>
-      </div>
-    );
-  }
 
   return (
     <div className="scheduler-event-content-stack">
@@ -1068,31 +1080,21 @@ function CalendarEventContent({
         <span
           className={cn(
             "scheduler-event-title",
-            isAppointmentCancelled && "line-through",
+            isAppointmentCancelled && "line-through opacity-60",
           )}
         >
           {title}
         </span>
       </span>
-      <span className="scheduler-event-meta">{timeRange}</span>
+      <span
+        className="scheduler-event-meta"
+        style={{ opacity: isAppointmentCancelled ? 0.45 : 1 }}
+      >
+        {timeRange}
+      </span>
     </div>
   );
 }
-
-const TimeSlotWrapper = ({
-  value,
-  children,
-}: {
-  value?: Date;
-  children?: React.ReactNode;
-}) => {
-  if (!(value instanceof Date)) return <>{children}</>;
-  const minutes = value.getMinutes();
-  let cls = "rbc-slot-sub-invisible";
-  if (minutes === 0) cls = "rbc-slot-hour";
-  else if (minutes === 30) cls = "rbc-slot-half";
-  return <div className={cls}>{children}</div>;
-};
 
 function toApiDate(date: Date) {
   return format(date, "yyyy-MM-dd");
@@ -1212,8 +1214,14 @@ export function DoctorCalendar({
   calendarView,
   onCalendarViewChange,
 }: DoctorCalendarProps) {
+  const { lang, t } = useLanguage();
   const isMobile = useIsMobile();
   const queryClient = useQueryClient();
+  const locale = useMemo(() => getDateFnsLocale(lang), [lang]);
+  const intlLocale = useMemo(() => getIntlLocale(lang), [lang]);
+  const resolvedCalendarMessages = useMemo(() => getCalendarMessages(t), [t]);
+  const resolvedToolbarViewLabels = useMemo(() => getCalendarViewLabels(t), [t]);
+  const resolvedCalendarLocalizer = useMemo(() => createCalendarLocalizer(lang), [lang]);
   const calendarShellRef = useRef<HTMLDivElement | null>(null);
   const quickActionPanelRef = useRef<HTMLDivElement | null>(null);
   const hasAutoScrolledToCurrentTimeRef = useRef(false);
@@ -1226,6 +1234,36 @@ export function DoctorCalendar({
   )
     ? defaultDuration
     : 30;
+  const resolvedDayLabels = useMemo(
+    () => getCalendarDayLabels?.(t) ?? fallbackDayLabels,
+    [t],
+  );
+  const rollingWeekView = useMemo(
+    () =>
+      Object.assign(
+        function RollingWeekView(props: RollingWeekViewProps) {
+          const range = getRollingWeekRange(props.date, locale);
+          return <TimeGridComponent {...props} range={range} eventOffset={15} />;
+        },
+        {
+          range: (date: Date) => getRollingWeekRange(date, locale),
+          navigate(date: Date, action: string) {
+            switch (action) {
+              case "PREV":
+                return addDays(date, -7);
+              case "NEXT":
+                return addDays(date, 7);
+              case "TODAY":
+                return new Date();
+              default:
+                return date;
+            }
+          },
+          title: (date: Date) => formatCalendarRangeLabel(date, Views.WEEK, lang, t),
+        },
+      ),
+    [lang, locale, t],
+  );
   const durationAlignedTimes = useMemo(() => {
     const times: string[] = [];
     const totalMinutes = 24 * 60;
@@ -1265,11 +1303,9 @@ export function DoctorCalendar({
     initialDate?: string;
     initialType?: "blackout" | "custom_hours";
     override?: AvailabilityOverride;
-    conflictingAppointments: Appointment[];
-  }>({ open: false, mode: "create", conflictingAppointments: [] });
+  }>({ open: false, mode: "create" });
   const [isAvailabilitySheetOpen, setIsAvailabilitySheetOpen] = useState(false);
   const [slotToDelete, setSlotToDelete] = useState<AvailabilitySlot | null>(null);
-  const [deleteSpecificSlotId, setDeleteSpecificSlotId] = useState<string | null>(null);
   const [overrideToDelete, setOverrideToDelete] =
     useState<AvailabilityOverride | null>(null);
   const [contextMenuState, setContextMenuState] = useState<{
@@ -1298,7 +1334,6 @@ export function DoctorCalendar({
   const [blockActionState, setBlockActionState] = useState<BlockActionState | null>(
     null,
   );
-  const [blockReason, setBlockReason] = useState("");
   const [appointmentComposer, setAppointmentComposer] =
     useState<AppointmentComposerState | null>(null);
   const [appointmentMode, setAppointmentMode] =
@@ -1309,6 +1344,11 @@ export function DoctorCalendar({
   const [manualPatientPhone, setManualPatientPhone] = useState("");
   const [manualPatientNote, setManualPatientNote] = useState("");
   const [appointmentNotes, setAppointmentNotes] = useState("");
+  const [currentTime, setCurrentTime] = useState(() => new Date());
+  const [currentTimeIndicatorStyle, setCurrentTimeIndicatorStyle] =
+    useState<CSSProperties | null>(null);
+  const [currentTimeIndicatorPortalTarget, setCurrentTimeIndicatorPortalTarget] =
+    useState<HTMLElement | null>(null);
 
   const resolvedCurrentDate = calendarDate ?? internalCurrentDate;
   const resolvedView = calendarView ?? internalView;
@@ -1333,8 +1373,8 @@ export function DoctorCalendar({
   };
 
   const { rangeStart, rangeEnd } = useMemo(
-    () => getDateRange(resolvedCurrentDate, resolvedView),
-    [resolvedCurrentDate, resolvedView],
+    () => getDateRange(resolvedCurrentDate, resolvedView, locale),
+    [locale, resolvedCurrentDate, resolvedView],
   );
 
   const overrideRangeStart = useMemo(
@@ -1443,7 +1483,6 @@ export function DoctorCalendar({
     onSuccess: async () => {
       toast.success("Musaitlik silindi");
       setSlotToDelete(null);
-      setDeleteSpecificSlotId(null);
       await queryClient.invalidateQueries({ queryKey: ["availability", doctorId] });
       await queryClient.refetchQueries({ queryKey: ["availability", doctorId] });
       await queryClient.invalidateQueries({ queryKey: ["doctor-calendar", doctorId] });
@@ -1496,7 +1535,7 @@ export function DoctorCalendar({
   });
 
   const createQuickBlock = useMutation({
-    mutationFn: async (payload: { start: Date; end: Date; reason?: string }) => {
+    mutationFn: async (payload: { start: Date; end: Date }) => {
       const date = toApiDate(payload.start);
       const sameDayOverrides = (data?.overrides ?? []).filter(
         (override) => override.date === date,
@@ -1552,13 +1591,11 @@ export function DoctorCalendar({
         type: "custom_hours",
         start_time: nextStart,
         end_time: nextEnd,
-        reason: payload.reason,
       });
     },
     onSuccess: async () => {
       toast.success("Zaman bloklamasi eklendi");
       setBlockActionState(null);
-      setBlockReason("");
       closeQuickActionPanel();
       clearCalendarSelection();
       await queryClient.invalidateQueries({
@@ -1821,14 +1858,6 @@ export function DoctorCalendar({
     [availabilitySlots],
   );
 
-  const sortedSpecificDateSlots = useMemo(
-    () =>
-      availabilitySlots
-        .filter((slot) => !!slot.specific_date)
-        .sort((a, b) => (a.specific_date! > b.specific_date! ? 1 : -1)),
-    [availabilitySlots],
-  );
-
   const sortedOverrides = useMemo(
     () => [...overrideList].sort(compareOverrides),
     [overrideList],
@@ -1955,7 +1984,7 @@ export function DoctorCalendar({
       open: true,
       start,
       end,
-      dateLabel: format(start, "d MMMM yyyy, EEEE", { locale: tr }),
+      dateLabel: format(start, "d MMMM yyyy, EEEE", { locale }),
       timeLabel: `${format(start, "HH:mm")} - ${format(end, "HH:mm")}`,
     };
 
@@ -2054,17 +2083,6 @@ export function DoctorCalendar({
       return appointmentStart < end && appointmentEnd > start;
     });
 
-  const getConflictingAppointmentsForDate = (dateStr: string) =>
-    (data?.appointments ?? []).filter((apt) => {
-      if (!apt.resource) return false;
-      const appt = apt.resource as Appointment;
-      return (
-        appt.appointment_date === dateStr &&
-        appt.status !== "cancelled" &&
-        appt.status !== "canceled"
-      );
-    });
-
   const getSlotStateForRange = (
     start: Date,
     end: Date,
@@ -2116,29 +2134,20 @@ export function DoctorCalendar({
       event.type === "custom_hours" && "scheduler-event-custom-hours",
     );
 
-  const getSchedulerEventSizeClass = (event: SchedulerEvent) => {
-    const durationMs = (event.end as Date).getTime() - (event.start as Date).getTime();
-    const durationMin = durationMs / 60000;
-
-    let sizeClass = "evt-lg";
-    if (durationMin <= 15) sizeClass = "evt-xs";
-    else if (durationMin <= 20) sizeClass = "evt-sm";
-    else if (durationMin <= 30) sizeClass = "evt-md";
-
-    return sizeClass;
-  };
-
-  const backgroundEventPropGetter: EventPropGetter<SchedulerEvent> = (event) => {
+  const eventPropGetter: EventPropGetter<SchedulerEvent> = (event) => {
     if (event.type === "availability-surface") {
       return {
         className: "scheduler-event scheduler-event-availability-surface",
         style: {
-          backgroundColor: "hsl(var(--calendar-availability-bg))",
-          border: "1px dashed hsl(var(--calendar-availability-border))",
-          borderRadius: "6px",
+          backgroundColor: "rgba(148,163,184,0.12)",
+          border: "1px solid rgba(148,163,184,0.20)",
+          borderRadius: "4px",
           left: 0,
           right: 0,
-          width: "auto",
+          width: "100%",
+          margin: 0,
+          marginLeft: 0,
+          marginRight: 0,
           height: "100%",
           paddingLeft: 0,
           paddingRight: 0,
@@ -2152,10 +2161,7 @@ export function DoctorCalendar({
       return {
         className: "scheduler-event scheduler-event-blackout-surface",
         style: {
-          background:
-            "repeating-linear-gradient(45deg, hsl(0 72% 70% / 0.25) 0 8px, transparent 8px 16px) !important",
-          border: "1px dashed hsl(0 60% 75%) !important",
-          borderRadius: "6px !important",
+          borderRadius: 0,
           width: "100%",
           margin: 0,
           height: "100%",
@@ -2167,37 +2173,11 @@ export function DoctorCalendar({
 
     if (event.type === "draft") {
       return {
-        className: cn(
-          "scheduler-event scheduler-event-draft",
-          getSchedulerEventSizeClass(event),
-        ),
+        className: "scheduler-event scheduler-event-draft",
         style: {
           pointerEvents: "none",
         },
       };
-    }
-
-    return {};
-  };
-
-  const eventPropGetter: EventPropGetter<SchedulerEvent> = (event) => {
-    if (event.type === "draft") {
-      return {
-        className: cn(
-          "scheduler-event scheduler-event-draft",
-          getSchedulerEventSizeClass(event),
-        ),
-        style: {
-          pointerEvents: "none",
-        },
-      };
-    }
-
-    if (
-      event.type === "availability-surface" ||
-      event.type === "blackout-surface"
-    ) {
-      return backgroundEventPropGetter(event);
     }
 
     if (resolvedView === Views.AGENDA) {
@@ -2211,41 +2191,30 @@ export function DoctorCalendar({
       const tone = APPOINTMENT_STATUS_STYLES[status];
 
       return {
-        className: cn(
-          getSchedulerEventClassName(event),
-          getSchedulerEventSizeClass(event),
-        ),
+        className: getSchedulerEventClassName(event),
         style: {
           "--scheduler-event-background": tone.background,
           "--scheduler-event-foreground": tone.text,
-          "--scheduler-event-muted-foreground": tone.mutedText,
           "--scheduler-event-accent": tone.accent,
           backgroundColor: tone.background,
           color: tone.text,
-          border: "1px solid hsl(var(--calendar-event-outline))",
-          borderRadius: "8px",
+          border: "1px solid rgba(0, 0, 0, 0.08)",
+          borderRadius: "6px",
         } as CSSProperties,
       };
     }
 
     if (event.type === "blackout" || event.type === "custom_hours") {
-      const tone = OVERRIDE_EVENT_STYLES[event.type];
+      const color = OVERRIDE_COLORS[event.type];
 
       return {
-        className: cn(
-          getSchedulerEventClassName(event),
-          getSchedulerEventSizeClass(event),
-        ),
+        className: getSchedulerEventClassName(event),
         style: {
-          "--scheduler-event-background": tone.background,
-          "--scheduler-event-foreground": tone.text,
-          "--scheduler-event-muted-foreground": tone.mutedText,
-          "--scheduler-event-accent": tone.accent,
-          backgroundColor: tone.background,
-          color: tone.text,
-          border: "1px solid hsl(var(--calendar-event-outline))",
-          borderLeft: `3px solid ${tone.accent}`,
-          borderRadius: "8px",
+          "--scheduler-event-color": color,
+          background:
+            "linear-gradient(rgba(234, 88, 12, 0.15), rgba(234, 88, 12, 0.15)), white",
+          color: "#ea580c",
+          borderRadius: "6px",
         } as CSSProperties,
       };
     }
@@ -2283,7 +2252,6 @@ export function DoctorCalendar({
         open: true,
         mode: "edit",
         override,
-        conflictingAppointments: getConflictingAppointmentsForDate(override.date),
       });
       return;
     }
@@ -2294,7 +2262,6 @@ export function DoctorCalendar({
         open: true,
         mode: "edit",
         override,
-        conflictingAppointments: [],
       });
     }
   };
@@ -2318,17 +2285,11 @@ export function DoctorCalendar({
     type: "blackout" | "custom_hours",
   ) => {
     resetCalendarActiveState();
-    const initialDate = format(date, "yyyy-MM-dd");
-    const conflicts =
-      type === "blackout"
-        ? getConflictingAppointmentsForDate(initialDate)
-        : [];
     setOverrideModal({
       open: true,
       mode: "create",
-      initialDate,
+      initialDate: format(date, "yyyy-MM-dd"),
       initialType: type,
-      conflictingAppointments: conflicts,
     });
   };
 
@@ -2362,7 +2323,7 @@ export function DoctorCalendar({
       start: slotInfo.start,
       end: slotInfo.end,
       dayOfWeek: slotInfo.start.getDay(),
-      dateLabel: format(slotInfo.start, "d MMMM yyyy, EEEE", { locale: tr }),
+      dateLabel: format(slotInfo.start, "d MMMM yyyy, EEEE", { locale }),
       timeLabel: `${format(slotInfo.start, "HH:mm")} - ${format(
         slotInfo.end,
         "HH:mm",
@@ -2531,6 +2492,24 @@ export function DoctorCalendar({
   }, [resolvedCurrentDate, resolvedView, doctorId]);
 
   useEffect(() => {
+    if (resolvedView !== Views.WEEK && resolvedView !== Views.DAY) {
+      setCurrentTimeIndicatorPortalTarget(null);
+      setCurrentTimeIndicatorStyle(null);
+      return;
+    }
+
+    setCurrentTime(new Date());
+
+    const intervalId = window.setInterval(() => {
+      setCurrentTime(new Date());
+    }, 60_000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [resolvedView]);
+
+  useEffect(() => {
     if (!activeDraftPreview || (resolvedView !== Views.WEEK && resolvedView !== Views.DAY)) {
       return;
     }
@@ -2571,73 +2550,6 @@ export function DoctorCalendar({
     activeDraftPreview?.end.getTime(),
     activeDraftPreview?.id,
     activeDraftPreview?.start.getTime(),
-    resolvedView,
-  ]);
-
-  useLayoutEffect(() => {
-    const calendarShell = calendarShellRef.current;
-
-    if (!calendarShell) {
-      return;
-    }
-
-    let rafId = 0;
-
-    const syncActiveDayColumn = () => {
-      clearCalendarActiveDayAttributes(calendarShell);
-
-      if (resolvedView !== Views.WEEK) {
-        return;
-      }
-
-      const scrollContainer = getCalendarScrollContainer(calendarShell);
-
-      if (!scrollContainer) {
-        return;
-      }
-
-      const activeDayIndex = getRollingWeekRange(resolvedCurrentDate).findIndex((day) =>
-        isSameDay(day, resolvedCurrentDate),
-      );
-
-      if (activeDayIndex < 0) {
-        return;
-      }
-
-      const headerCells = Array.from(
-        calendarShell.querySelectorAll(".rbc-time-header-content .rbc-header"),
-      ).filter((cell): cell is HTMLElement => cell instanceof HTMLElement);
-      const backgroundCells = Array.from(calendarShell.querySelectorAll(".rbc-day-bg")).filter(
-        (cell): cell is HTMLElement => cell instanceof HTMLElement,
-      );
-      const daySlots = getTimeGridDaySlots(scrollContainer);
-
-      [headerCells[activeDayIndex], backgroundCells[activeDayIndex], daySlots[activeDayIndex]]
-        .filter((cell): cell is HTMLElement => Boolean(cell))
-        .forEach((cell) => {
-          cell.setAttribute("data-calendar-active-day", "true");
-        });
-    };
-
-    const scheduleSync = () => {
-      window.cancelAnimationFrame(rafId);
-      rafId = window.requestAnimationFrame(syncActiveDayColumn);
-    };
-
-    scheduleSync();
-    window.addEventListener("resize", scheduleSync);
-
-    return () => {
-      window.cancelAnimationFrame(rafId);
-      window.removeEventListener("resize", scheduleSync);
-      clearCalendarActiveDayAttributes(calendarShell);
-    };
-  }, [
-    activeDraftPreview?.id,
-    availabilitySurfaceEvents.length,
-    blackoutSurfaceEvents.length,
-    events.length,
-    resolvedCurrentDate,
     resolvedView,
   ]);
 
@@ -2690,6 +2602,90 @@ export function DoctorCalendar({
       window.cancelAnimationFrame(rafId);
     };
   }, [isAvailabilityLoading, isCalendarLoading, resolvedView]);
+
+  useEffect(() => {
+    if (isAvailabilityLoading || isCalendarLoading) {
+      setCurrentTimeIndicatorPortalTarget(null);
+      setCurrentTimeIndicatorStyle(null);
+      return;
+    }
+
+    if (resolvedView !== Views.WEEK && resolvedView !== Views.DAY) {
+      setCurrentTimeIndicatorPortalTarget(null);
+      setCurrentTimeIndicatorStyle(null);
+      return;
+    }
+
+    const calendarShell = calendarShellRef.current;
+
+    if (!calendarShell) {
+      setCurrentTimeIndicatorPortalTarget(null);
+      setCurrentTimeIndicatorStyle(null);
+      return;
+    }
+
+    let rafId = 0;
+
+    const syncCurrentTimeIndicator = () => {
+      const scrollContainer = getCalendarScrollContainer(calendarShell);
+
+      if (!scrollContainer) {
+        setCurrentTimeIndicatorPortalTarget(null);
+        setCurrentTimeIndicatorStyle(null);
+        return;
+      }
+
+      setCurrentTimeIndicatorPortalTarget(scrollContainer);
+
+      const targetColumn = getTodayTimeColumn(
+        calendarShell,
+        scrollContainer,
+        resolvedView,
+        resolvedCurrentDate,
+      );
+      const currentMinutes = getMinutesSinceMidnight(currentTime);
+      const totalMinutes = CALENDAR_END_MINUTES - CALENDAR_START_MINUTES;
+
+      if (
+        !targetColumn ||
+        currentMinutes < CALENDAR_START_MINUTES ||
+        currentMinutes > CALENDAR_END_MINUTES
+      ) {
+        setCurrentTimeIndicatorStyle(null);
+        return;
+      }
+
+      const top =
+        ((currentMinutes - CALENDAR_START_MINUTES) / totalMinutes) *
+        targetColumn.scrollHeight;
+
+      setCurrentTimeIndicatorStyle({
+        left: targetColumn.offsetLeft,
+        width: targetColumn.offsetWidth,
+        top,
+      });
+    };
+
+    const scheduleSync = () => {
+      window.cancelAnimationFrame(rafId);
+      rafId = window.requestAnimationFrame(syncCurrentTimeIndicator);
+    };
+
+    scheduleSync();
+    window.addEventListener("resize", scheduleSync);
+
+    return () => {
+      window.cancelAnimationFrame(rafId);
+      window.removeEventListener("resize", scheduleSync);
+    };
+  }, [
+    currentTime,
+    data?.appointments?.length,
+    isAvailabilityLoading,
+    isCalendarLoading,
+    resolvedCurrentDate,
+    resolvedView,
+  ]);
 
   useEffect(() => {
     if (resolvedView !== Views.WEEK && resolvedView !== Views.DAY) {
@@ -2757,7 +2753,7 @@ export function DoctorCalendar({
         const minutes = timeToMinutes(timeValue);
         return (
           minutes >= QUICK_ACTION_TIME_MINUTES_START &&
-          minutes < QUICK_ACTION_TIME_MINUTES_END
+          minutes <= QUICK_ACTION_TIME_MINUTES_END
         );
       }),
     [durationAlignedTimes],
@@ -2803,7 +2799,7 @@ export function DoctorCalendar({
   }
 
   const surfaceContextTitle =
-    doctorName ?? (mode === "staff" ? "Doktor takvimi" : "Kendi takviminiz");
+    doctorName ?? (mode === "staff" ? t.doctorList : t.mySchedule);
 
   const quickActionBadge =
     quickActionSlotStatus === "available" || quickActionSlotStatus === "gap"
@@ -2840,7 +2836,7 @@ export function DoctorCalendar({
 
   const isQuickActionEditable = Boolean(quickActionSlot);
   const quickActionDatePillLabel = quickActionSlot
-    ? format(quickActionSlot.start, "EEE, d MMMM", { locale: tr })
+    ? format(quickActionSlot.start, "EEE, d MMMM", { locale })
     : "";
 
   const canBlockSelectedRange =
@@ -2875,7 +2871,7 @@ export function DoctorCalendar({
         start: nextStart,
         end: nextEnd,
         dayOfWeek: nextStart.getDay(),
-        dateLabel: format(nextStart, "d MMMM yyyy, EEEE", { locale: tr }),
+        dateLabel: format(nextStart, "d MMMM yyyy, EEEE", { locale }),
         timeLabel: `${format(nextStart, "HH:mm")} - ${format(nextEnd, "HH:mm")}`,
         override: nextBlockingOverride ?? null,
         availabilityTarget: nextAvailabilityTarget,
@@ -2889,13 +2885,10 @@ export function DoctorCalendar({
     }
 
     const nextMinutes = timeToMinutes(value);
-    const isOutsideRange =
+    if (
       nextMinutes < QUICK_ACTION_TIME_MINUTES_START ||
-      (field === "start"
-        ? nextMinutes >= QUICK_ACTION_TIME_MINUTES_END
-        : nextMinutes > QUICK_ACTION_TIME_MINUTES_END);
-
-    if (isOutsideRange) {
+      nextMinutes > QUICK_ACTION_TIME_MINUTES_END
+    ) {
       return false;
     }
 
@@ -3017,17 +3010,11 @@ export function DoctorCalendar({
       return;
     }
 
-    const conflicts =
-      quickActionSlot.override.type === "blackout"
-        ? getConflictingAppointmentsForDate(quickActionSlot.override.date)
-        : [];
-
     resetCalendarActiveState();
     setOverrideModal({
       open: true,
       mode: "edit",
       override: quickActionSlot.override,
-      conflictingAppointments: conflicts,
     });
   };
 
@@ -3272,85 +3259,45 @@ export function DoctorCalendar({
   };
 
   const renderWeekHeader = (date: Date) => {
-    const dateKey = toApiDate(date);
-    const totalSlots = availabilityWindows
-      .filter((window) => toApiDate(window.start) === dateKey)
-      .reduce((count, window) => {
-        const windowDurationMinutes = differenceInMinutes(window.end, window.start);
-        return count + Math.max(0, Math.floor(windowDurationMinutes / resolvedDefaultDuration));
-      }, 0);
-    const doluSlots = (data?.appointments ?? []).filter((appointment) => {
-      if (appointment.appointment_date !== dateKey) {
-        return false;
-      }
-
-      const status = normalizeAppointmentStatus(appointment.status);
-      return status === "confirmed" || status === "pending";
-    }).length;
-    const bosSlots = Math.max(0, totalSlots - doluSlots);
+    const dayOfWeek = getDay(date);
+    const daySlotCount = availabilitySlots.filter(
+      (slot) => slot.day_of_week === dayOfWeek,
+    ).length;
+    const dayApptCount = events.filter(
+      (event) => event.type === "appointment" && isSameDay(event.start, date),
+    ).length;
     const currentDay = isToday(date);
-    const selectedDay = isSameDay(date, resolvedCurrentDate);
 
     return (
       <div
         onContextMenu={(event) => handleHeaderContextMenu(event, date)}
         className={cn(
           "scheduler-week-header",
-          selectedDay && "scheduler-week-header-active",
           currentDay && "scheduler-week-header-today",
         )}
-        title="Sağ tık: günlük istisna ekle."
+        title={t.addException}
       >
         <span className="scheduler-week-header-day">
-          {formatCalendarHeaderDay(date)}
+          {formatCalendarHeaderDayLabel(date, lang)}
         </span>
         <span className="scheduler-week-header-date">
-          {format(date, "d", { locale: tr })}
+          {format(date, "d", { locale })}
         </span>
-        {totalSlots > 0 ? (
-          <span className="scheduler-week-header-meta">
-            <span className="scheduler-week-header-count">
-              <span className="scheduler-week-header-count-value">{totalSlots}</span> slot
-            </span>
-            <span className="scheduler-week-header-sep">{"\u00B7"}</span>
-            {doluSlots === 0 ? (
-              <span className="scheduler-week-header-booked">
-                <span className="scheduler-week-header-count-value">{totalSlots}</span>{" "}
-                {"bo\u015F"}
-              </span>
-            ) : (
-              <>
-                <span className="scheduler-week-header-booked">
-                  <span className="scheduler-week-header-count-value">{doluSlots}</span> dolu
-                </span>
-                <span className="scheduler-week-header-sep">{"\u00B7"}</span>
-                <span className="scheduler-week-header-booked">
-                  <span className="scheduler-week-header-count-value">{bosSlots}</span>{" "}
-                  {"bo\u015F"}
-                </span>
-              </>
-            )}
-          </span>
-        ) : null}
-        <span
-          className="hidden"
-        >
-          {totalSlots > 0 ? (
+        <span className="scheduler-week-header-meta">
+          {daySlotCount > 0 ? (
             <>
-              <span className="scheduler-week-header-count">
-                <span className="scheduler-week-header-count-value">{totalSlots}</span> slot
-              </span>
-              {doluSlots === 0 ? (
+              <span>{daySlotCount} {t.activeSlots}</span>
+              {dayApptCount > 0 ? (
                 <>
                   <span className="scheduler-week-header-sep">·</span>
                   <span className="scheduler-week-header-booked">
-                    <span className="scheduler-week-header-count-value">{totalSlots}</span> boÅŸ
+                    {dayApptCount} {t.appointments.toLowerCase()}
                   </span>
                 </>
               ) : null}
             </>
           ) : (
-            <span className="scheduler-week-header-empty">-</span>
+            <span style={{ color: "#d1d5db" }}>-</span>
           )}
         </span>
       </div>
@@ -3361,7 +3308,6 @@ export function DoctorCalendar({
     <div
       ref={calendarShellRef}
       className="scheduler-calendar-shell flex h-full min-h-0 flex-col overflow-hidden rounded-[34px] border border-border/60 bg-card/95 shadow-soft"
-      style={{ "--slot-height": `${resolvedDefaultDuration}px` } as React.CSSProperties}
     >
       <BigCalendar<SchedulerEvent>
         className="scheduler-calendar min-h-0 flex-1 overflow-hidden"
@@ -3369,36 +3315,20 @@ export function DoctorCalendar({
           month: true,
           agenda: true,
           day: true,
-          week: RollingWeekView,
+          week: rollingWeekView,
         }}
         components={{
           header: ({ date }) => renderWeekHeader(date),
-          dateHeader: ({ date, label, onDrillDown, drilldownView }) =>
+          dateHeader: ({ date, label }) =>
             resolvedView === Views.MONTH ? (
-              typeof onDrillDown === "function" && drilldownView ? (
-                <button
-                  type="button"
-                  className={cn(
-                    "scheduler-month-date scheduler-month-date-button",
-                    isToday(date) && "scheduler-month-date-today",
-                  )}
-                  onClick={(event) => {
-                    resetCalendarActiveState();
-                    onDrillDown(event);
-                  }}
-                >
-                  {label}
-                </button>
-              ) : (
-                <div
-                  className={cn(
-                    "scheduler-month-date",
-                    isToday(date) && "scheduler-month-date-today",
-                  )}
-                >
-                  {label}
-                </div>
-              )
+              <div
+                className={cn(
+                  "scheduler-month-date",
+                  isToday(date) && "scheduler-month-date-today",
+                )}
+              >
+                {label}
+              </div>
             ) : (
               renderWeekHeader(date)
             ),
@@ -3407,6 +3337,10 @@ export function DoctorCalendar({
               {...toolbarProps}
               calendarTitle={surfaceContextTitle}
               specializationName={specializationName}
+              todayLabel={t.today}
+              manageLabel={t.manageAvailability}
+              rangeLabel={formatCalendarRangeLabel(resolvedCurrentDate, resolvedView, lang, t)}
+              viewLabels={resolvedToolbarViewLabels}
               onManageAvailability={() => {
                 resetCalendarActiveState();
                 setIsAvailabilitySheetOpen(true);
@@ -3419,24 +3353,11 @@ export function DoctorCalendar({
               title={title}
               view={resolvedView}
               defaultDuration={resolvedDefaultDuration}
+              t={t}
             />
           ),
-          timeSlotWrapper: TimeSlotWrapper as any,
         }}
-        localizer={localizer}
-        formats={{
-          timeGutterFormat: (
-            date: Date,
-            culture: string | undefined,
-            localizer: any,
-          ) => {
-            if (date.getMinutes() === 0) {
-              return localizer.format(date, "HH:mm", culture);
-            }
-
-            return "";
-          },
-        }}
+        localizer={resolvedCalendarLocalizer}
         events={events}
         backgroundEvents={[
           ...availabilitySurfaceEvents,
@@ -3457,9 +3378,9 @@ export function DoctorCalendar({
           minHeight: 0,
           overflow: "hidden",
         }}
-        messages={calendarMessages}
+        messages={resolvedCalendarMessages}
         eventPropGetter={eventPropGetter}
-        backgroundEventPropGetter={backgroundEventPropGetter}
+        backgroundEventPropGetter={eventPropGetter}
         enableAutoScroll={false}
         slotPropGetter={(date) => {
           const isPast = date < new Date();
@@ -3505,17 +3426,25 @@ export function DoctorCalendar({
         onSelectEvent={handleSelectEvent}
         selectable={!isMobile || resolvedView === Views.MONTH}
         popup
-        culture="tr"
+        culture={intlLocale}
         step={resolvedDefaultDuration}
         timeslots={1}
         min={setMinutes(setHours(new Date(), CALENDAR_START_HOUR), 0)}
-        max={addMinutes(
-          setMinutes(setHours(new Date(), CALENDAR_END_HOUR), 0),
-          resolvedDefaultDuration,
-        )}
+        max={setMinutes(setHours(new Date(), CALENDAR_END_HOUR), 0)}
         drilldownView={Views.DAY}
         dayLayoutAlgorithm="no-overlap"
       />
+
+      {currentTimeIndicatorPortalTarget && currentTimeIndicatorStyle
+        ? createPortal(
+            <div
+              aria-hidden="true"
+              className="scheduler-current-time-indicator"
+              style={currentTimeIndicatorStyle}
+            />,
+            currentTimeIndicatorPortalTarget,
+          )
+        : null}
 
       {quickActionSlot?.open && !isMobile && typeof document !== "undefined"
         ? createPortal(
@@ -3622,7 +3551,7 @@ export function DoctorCalendar({
                             onMonthChange={setQuickActionCalendarMonth}
                             onSelect={handleQuickActionDateSelect}
                             fixedWeeks
-                            locale={tr}
+                            locale={locale}
                             weekStartsOn={1}
                             className="p-0"
                             classNames={{
@@ -4048,46 +3977,40 @@ export function DoctorCalendar({
         onOpenChange={(open) => {
           if (!open) {
             setBlockActionState(null);
-            setBlockReason("");
           }
         }}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Zaman Aralığını Blokla</AlertDialogTitle>
+            <AlertDialogTitle>Bu zaman araligi bloklansin mi?</AlertDialogTitle>
             <AlertDialogDescription>
-              Bu işlem seçili aralık için blok istisnası oluşturur. Haftalık müsaitlik kuralı korunur.
+              Takvimdeki secili aralik duzenlenmez; bu islem o tarih ve saat icin blok istisnasi ekler. Haftalik musaitlik kurali korunur.
             </AlertDialogDescription>
           </AlertDialogHeader>
 
           {blockActionState ? (
             <div className="space-y-4">
-              <div className="rounded-2xl border border-border/60 bg-muted/40 p-4 space-y-2 text-sm">
-                {doctorName ? (
-                  <div className="flex items-center justify-between">
+              <div className="rounded-2xl border border-border/70 bg-background/80 p-4">
+                <div className="space-y-2 text-sm">
+                  <div className="flex items-center justify-between gap-3">
                     <span className="text-muted-foreground">Doktor</span>
-                    <span className="font-medium">{doctorName}</span>
+                    <span className="text-right font-medium text-foreground">
+                      {doctorName}
+                    </span>
                   </div>
-                ) : null}
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Tarih</span>
-                  <span className="font-medium">{blockActionState.dateLabel}</span>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-muted-foreground">Tarih</span>
+                    <span className="text-right font-medium text-foreground">
+                      {blockActionState.dateLabel}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-muted-foreground">Saat</span>
+                    <span className="text-right font-medium text-foreground">
+                      {blockActionState.timeLabel}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Saat</span>
-                  <span className="font-medium">{blockActionState.timeLabel}</span>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-sm">Not (isteğe bağlı)</Label>
-                <Textarea
-                  value={blockReason}
-                  onChange={(e) => setBlockReason(e.target.value)}
-                  placeholder="Bu bloğun sebebini yazın..."
-                  className="rounded-xl resize-none text-sm"
-                  rows={3}
-                />
               </div>
             </div>
           ) : null}
@@ -4103,12 +4026,11 @@ export function DoctorCalendar({
                   createQuickBlock.mutate({
                     start: blockActionState.start,
                     end: blockActionState.end,
-                    reason: blockReason || undefined,
                   });
                 }
               }}
             >
-              {createQuickBlock.isPending ? "Bloklanıyor..." : "Bu Zamanı Blokla"}
+              {createQuickBlock.isPending ? "Bloklaniyor..." : "Bu zamani blokla"}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -4169,11 +4091,9 @@ export function DoctorCalendar({
       >
         <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-lg">
           <SheetHeader className="pb-2">
-            <SheetTitle className="text-lg font-semibold">Müsaitlik Paneli</SheetTitle>
+            <SheetTitle className="text-lg font-semibold">{t.manageAvailability}</SheetTitle>
             <SheetDescription className="text-sm text-muted-foreground">
-              Haftalık slotlar panelden düzenlenir, aktiflik durumunu
-              degistirebilir veya yeni slot ekleyebilirsiniz. Takvimdeki yesil alanlar
-              yalnizca gosterimdir.
+              {t.calendarOverviewDesc}
             </SheetDescription>
           </SheetHeader>
 
@@ -4182,10 +4102,10 @@ export function DoctorCalendar({
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                    Haftalik Slotlar
+                    {t.weeklySlots}
                   </h3>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    Duzenli calisma saatlerinizi yonetin.
+                    {t.weeklySlotsDesc}
                   </p>
                 </div>
                 <Button
@@ -4194,7 +4114,7 @@ export function DoctorCalendar({
                   className="rounded-xl text-sm"
                   onClick={() => setAvailabilityModal({ open: true, mode: "create" })}
                 >
-                  + Yeni Slot Ekle
+                  + {t.availabilityCreateTitle}
                 </Button>
               </div>
 
@@ -4207,10 +4127,10 @@ export function DoctorCalendar({
                     >
                       <div className="flex items-center gap-3 min-w-0">
                         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-xs font-bold text-primary">
-                          {dayLabels[slot.day_of_week]?.slice(0, 3)}
+                          {resolvedDayLabels[slot.day_of_week]?.slice(0, 3)}
                         </div>
                         <div className="min-w-0">
-                          <div className="text-sm font-semibold leading-tight">{dayLabels[slot.day_of_week]}</div>
+                          <div className="text-sm font-semibold leading-tight">{resolvedDayLabels[slot.day_of_week]}</div>
                           <div className="text-xs text-muted-foreground">
                             {formatTimeRange(slot.start_time, slot.end_time)} · {slot.slot_duration} dk
                           </div>
@@ -4224,15 +4144,15 @@ export function DoctorCalendar({
                             api.availability
                               .update(slot.id, { isActive: checked })
                               .then(() => {
-                                toast.success("Musaitlik durumu guncellendi");
+                                toast.success(t.availabilityStatusUpdated);
                                 return queryClient.invalidateQueries({ queryKey: ["availability", doctorId] });
                               })
                               .then(() => queryClient.invalidateQueries({ queryKey: ["doctor-calendar", doctorId] }))
                               .catch((error: unknown) => {
-                                toast.error(error instanceof Error ? error.message : "Musaitlik durumu guncellenemedi");
+                                toast.error(error instanceof Error ? error.message : t.availabilityStatusUpdateFailed);
                               });
                           }}
-                          aria-label={`${dayLabels[slot.day_of_week]} musaitlik durumu`}
+                          aria-label={`${resolvedDayLabels[slot.day_of_week]} ${t.manageAvailability}`}
                         />
                         <Button
                           type="button"
@@ -4258,74 +4178,19 @@ export function DoctorCalendar({
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed py-8 text-center">
-                  <p className="text-sm text-muted-foreground">Henuz tanimli musaitlik slotu bulunmuyor.</p>
+                  <p className="text-sm text-muted-foreground">{t.noAvailabilitySlotsDefined}</p>
                 </div>
               )}
             </section>
-
-            {sortedSpecificDateSlots.length > 0 && (
-              <section className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                      TARİHE ÖZEL MÜSAİTLİKLER
-                    </h3>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      Belirli bir tarihe özel eklenen çalışma saatleri.
-                    </p>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  {sortedSpecificDateSlots.map((slot) => (
-                    <div
-                      key={slot.id}
-                      className="flex items-center justify-between gap-3 rounded-2xl border border-border/60 bg-muted/30 px-4 py-3"
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 text-xs font-bold">
-                          {format(parseISO(slot.specific_date! + "T00:00:00"), "dd")}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium truncate">
-                            {format(parseISO(slot.specific_date! + "T00:00:00"), "d MMMM yyyy", { locale: tr })}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {slot.start_time.slice(0, 5)} – {slot.end_time.slice(0, 5)}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1 shrink-0">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 rounded-xl text-muted-foreground hover:text-foreground"
-                          onClick={() => setAvailabilityModal({ open: true, mode: "edit", slot })}
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-destructive hover:text-destructive"
-                          onClick={() => setDeleteSpecificSlotId(slot.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            )}
 
             <section className="space-y-3">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                    Istisnalar
+                    {t.exceptions}
                   </h3>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    Son 30 gun ve gelecek icin kapanis ve bloklu zaman istisnalari.
+                    {t.exceptionsDesc}
                   </p>
                 </div>
                 <Button
@@ -4339,13 +4204,10 @@ export function DoctorCalendar({
                       mode: "create",
                       initialDate: format(new Date(), "yyyy-MM-dd"),
                       initialType: "blackout",
-                      conflictingAppointments: getConflictingAppointmentsForDate(
-                        format(new Date(), "yyyy-MM-dd"),
-                      ),
                     })
                   }
                 >
-                  + Istisna Ekle
+                  + {t.addException}
                 </Button>
               </div>
 
@@ -4359,6 +4221,8 @@ export function DoctorCalendar({
                 <div className="space-y-2">
                   {sortedOverrides.map((override) => {
                     const badge = getOverrideBadge(override.type);
+                    const badgeLabel =
+                      override.type === "blackout" ? t.closeDay : t.defineCustomHours;
                     return (
                       <div
                         key={override.id}
@@ -4369,11 +4233,11 @@ export function DoctorCalendar({
                             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-xs font-bold"
                             style={{ backgroundColor: `${badge.color}18`, color: badge.color }}
                           >
-                            {format(parseDateOnly(override.date), "dd", { locale: tr })}
+                            {format(parseDateOnly(override.date), "dd", { locale })}
                           </div>
                           <div className="min-w-0">
                             <div className="text-sm font-semibold leading-tight">
-                              {format(parseDateOnly(override.date), "d MMMM yyyy", { locale: tr })}
+                              {format(parseDateOnly(override.date), "d MMMM yyyy", { locale })}
                             </div>
                             <div className="flex items-center gap-1.5 mt-0.5">
                               <span
@@ -4383,7 +4247,7 @@ export function DoctorCalendar({
                                   color: badge.color,
                                 }}
                               >
-                                {badge.label}
+                                {badgeLabel}
                               </span>
                               {override.type === "custom_hours" && override.start_time && override.end_time ? (
                                 <span className="text-xs text-muted-foreground">
@@ -4400,17 +4264,7 @@ export function DoctorCalendar({
                             variant="ghost"
                             size="icon"
                             className="h-8 w-8 rounded-xl text-muted-foreground hover:text-foreground"
-                            onClick={() =>
-                              setOverrideModal({
-                                open: true,
-                                mode: "edit",
-                                override,
-                                conflictingAppointments:
-                                  override.type === "blackout"
-                                    ? getConflictingAppointmentsForDate(override.date)
-                                    : [],
-                              })
-                            }
+                            onClick={() => setOverrideModal({ open: true, mode: "edit", override })}
                           >
                             <Pencil className="h-3.5 w-3.5" />
                           </Button>
@@ -4430,7 +4284,7 @@ export function DoctorCalendar({
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed py-8 text-center">
-                  <p className="text-sm text-muted-foreground">Tanimli istisna bulunmuyor.</p>
+                  <p className="text-sm text-muted-foreground">{t.noExceptionsDefined}</p>
                 </div>
               )}
             </section>
@@ -4441,19 +4295,19 @@ export function DoctorCalendar({
       <AlertDialog open={Boolean(slotToDelete)} onOpenChange={() => {}}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Musaitlik silinsin mi?</AlertDialogTitle>
+            <AlertDialogTitle>{t.deleteAvailabilityTitle}</AlertDialogTitle>
             <AlertDialogDescription>
               {slotToDelete
-                ? `${dayLabels[slotToDelete.day_of_week]} gunundeki ${formatTimeRange(
-                    slotToDelete.start_time,
-                    slotToDelete.end_time,
-                  )} araligi kaldirilacak.`
-                : "Bu musaitlik slotu kaldirilacak."}
+                ? applyTemplate(t.deleteAvailabilityRangeDesc, {
+                    day: resolvedDayLabels[slotToDelete.day_of_week],
+                    range: formatTimeRange(slotToDelete.start_time, slotToDelete.end_time),
+                  })
+                : t.deleteAvailabilityDesc}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setSlotToDelete(null)}>
-              İptal
+              {t.cancel}
             </AlertDialogCancel>
             <Button
               variant="destructive"
@@ -4464,34 +4318,8 @@ export function DoctorCalendar({
                 }
               }}
             >
-              {removeAvailability.isPending ? "Siliniyor..." : "Sil"}
+              {removeAvailability.isPending ? t.deleting : t.delete}
             </Button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <AlertDialog
-        open={!!deleteSpecificSlotId}
-        onOpenChange={(open) => !open && setDeleteSpecificSlotId(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Müsaitliği Sil</AlertDialogTitle>
-            <AlertDialogDescription>Bu tarihe özel müsaitlik silinecek. Emin misiniz?</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Vazgeç</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => {
-                if (deleteSpecificSlotId) {
-                  removeAvailability.mutate(deleteSpecificSlotId);
-                }
-                setDeleteSpecificSlotId(null);
-              }}
-            >
-              Sil
-            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -4499,18 +4327,18 @@ export function DoctorCalendar({
       <AlertDialog open={Boolean(overrideToDelete)} onOpenChange={() => {}}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Istisna silinsin mi?</AlertDialogTitle>
+            <AlertDialogTitle>{t.deleteOverrideTitle}</AlertDialogTitle>
             <AlertDialogDescription>
               {overrideToDelete
-                ? `${format(parseDateOnly(overrideToDelete.date), "d MMMM yyyy", {
-                    locale: tr,
-                  })} tarihli istisna kaldirilacak.`
-                : "Bu istisna kaldirilacak."}
+                ? applyTemplate(t.deleteOverrideDateDesc, {
+                    date: format(parseDateOnly(overrideToDelete.date), "d MMMM yyyy", { locale }),
+                  })
+                : t.deleteOverrideDesc}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setOverrideToDelete(null)}>
-              İptal
+              {t.cancel}
             </AlertDialogCancel>
             <Button
               variant="destructive"
@@ -4521,7 +4349,7 @@ export function DoctorCalendar({
                 }
               }}
             >
-              {removeOverride.isPending ? "Siliniyor..." : "Sil"}
+              {removeOverride.isPending ? t.deleting : t.delete}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -4552,11 +4380,7 @@ export function DoctorCalendar({
       <OverrideModal
         open={overrideModal.open}
         onClose={() => {
-          setOverrideModal({
-            open: false,
-            mode: "create",
-            conflictingAppointments: [],
-          });
+          setOverrideModal({ open: false, mode: "create" });
           resetCalendarActiveState();
         }}
         mode={overrideModal.mode}
@@ -4565,13 +4389,8 @@ export function DoctorCalendar({
         initialDate={overrideModal.initialDate}
         initialType={overrideModal.initialType}
         override={overrideModal.override}
-        conflictingAppointments={overrideModal.conflictingAppointments}
         onSaved={() => {
-          setOverrideModal({
-            open: false,
-            mode: "create",
-            conflictingAppointments: [],
-          });
+          setOverrideModal({ open: false, mode: "create" });
           resetCalendarActiveState();
           void queryClient.invalidateQueries({
             queryKey: ["availability-overrides", doctorId],
@@ -4591,4 +4410,3 @@ export function DoctorCalendar({
     </div>
   );
 }
-

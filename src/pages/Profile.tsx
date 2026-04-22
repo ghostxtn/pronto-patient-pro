@@ -1,19 +1,20 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
-import api from "@/services/api";
-import { useAuth } from "@/contexts/AuthContext";
-import { useLanguage } from "@/contexts/LanguageContext";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Camera, Loader2, Mail, Phone, Save, Shield, User } from "lucide-react";
+import { toast } from "sonner";
 import AppLayout from "@/components/AppLayout";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { Camera, Loader2, Save, User, Phone, Mail, Shield } from "lucide-react";
-import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
+import api from "@/services/api";
+import { getRoleLabel } from "@/lib/role-localization";
 
 const fadeUp = {
   initial: { opacity: 0, y: 20 },
@@ -68,7 +69,10 @@ export default function Profile() {
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 2 * 1024 * 1024) { toast.error(t.imageMaxSize); return; }
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error(t.imageMaxSize);
+      return;
+    }
     setAvatarFile(file);
     setAvatarPreview(URL.createObjectURL(file));
   };
@@ -91,7 +95,11 @@ export default function Profile() {
     updateMutation.mutate({ firstName, lastName, avatarUrl });
   };
 
-  const initials = [firstName, lastName].filter(Boolean).map((w) => w[0]).join("").toUpperCase() || "U";
+  const initials = [firstName, lastName]
+    .filter(Boolean)
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase() || "U";
   const displayAvatar = avatarPreview || profile?.avatar_url || "";
 
   if (!authLoading && user?.role === "patient" && location.pathname === "/profile") {
@@ -99,42 +107,53 @@ export default function Profile() {
   }
 
   if (authLoading || isLoading) {
-    return <AppLayout><div className="flex items-center justify-center min-h-[60vh]"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div></AppLayout>;
+    return (
+      <AppLayout>
+        <div className="flex min-h-[60vh] items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </AppLayout>
+    );
   }
 
   return (
     <AppLayout>
-      <div className="max-w-2xl mx-auto space-y-6">
+      <div className="mx-auto max-w-2xl space-y-6">
         <motion.div {...fadeUp}>
-          <h1 className="text-3xl font-display font-bold" style={{ color: "#1a2e3b", fontFamily: "Manrope, sans-serif", fontWeight: 700 }}>{t.myProfile}</h1>
-          <p className="text-muted-foreground mt-1" style={{ color: "#5a7a8a" }}>{t.profileDesc}</p>
+          <h1 className="text-3xl font-display font-bold text-foreground">{t.myProfile}</h1>
+          <p className="mt-1 text-muted-foreground">{t.profileDesc}</p>
         </motion.div>
 
         <motion.div {...fadeUp} transition={{ delay: 0.1, duration: 0.4 } as any}>
-          <Card style={{ background: "white", border: "1px solid #b5d1cc", borderRadius: "16px", boxShadow: "0 2px 12px rgba(79,143,230,0.08)" }}>
+          <Card className="rounded-2xl border-border bg-card shadow-sm">
             <CardHeader>
-              <CardTitle className="text-lg" style={{ color: "#1a2e3b", fontFamily: "Manrope, sans-serif", fontWeight: 600 }}>{t.personalInfo}</CardTitle>
-              <CardDescription style={{ color: "#5a7a8a" }}>{t.personalInfoDesc}</CardDescription>
+              <CardTitle className="text-lg text-foreground">{t.personalInfo}</CardTitle>
+              <CardDescription>{t.personalInfoDesc}</CardDescription>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="flex items-center gap-6">
-                  <div className="relative group">
-                    <Avatar className="h-20 w-20" style={{ border: "2px solid #b5d1cc", borderRadius: "50%" }}>
+                  <div className="group relative">
+                    <Avatar className="h-20 w-20 border-2 border-border">
                       <AvatarImage src={displayAvatar} />
-                      <AvatarFallback style={{ background: "#eaf5ff", color: "#4f8fe6", fontSize: "1.1rem", fontWeight: 700 }}>{initials}</AvatarFallback>
+                      <AvatarFallback className="bg-primary/10 text-[1.1rem] font-bold text-primary">{initials}</AvatarFallback>
                     </Avatar>
-                    <label htmlFor="avatar-upload" className="absolute inset-0 flex items-center justify-center rounded-full bg-foreground/40 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                    <label
+                      htmlFor="avatar-upload"
+                      className="absolute inset-0 flex cursor-pointer items-center justify-center rounded-full bg-foreground/40 opacity-0 transition-opacity group-hover:opacity-100"
+                    >
                       <Camera className="h-5 w-5 text-primary-foreground" />
                     </label>
                     <input id="avatar-upload" type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
                   </div>
                   <div>
-                    <p className="font-medium" style={{ color: "#1a2e3b", fontWeight: 600 }}>{[firstName, lastName].filter(Boolean).join(" ") || t.yourName}</p>
-                    <p className="text-sm text-muted-foreground" style={{ color: "#5a7a8a", fontSize: "0.875rem" }}>{user?.email}</p>
-                    <div className="flex gap-1 mt-1">
+                    <p className="font-medium text-foreground">{[firstName, lastName].filter(Boolean).join(" ") || t.yourName}</p>
+                    <p className="text-sm text-muted-foreground">{user?.email}</p>
+                    <div className="mt-1 flex gap-1">
                       {roles.map((role) => (
-                        <span key={role} style={{ background: "#eaf5ff", color: "#4f8fe6", fontSize: "0.75rem", fontWeight: 600, padding: "2px 10px", borderRadius: "999px" }}>{role}</span>
+                        <span key={role} className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">
+                          {getRoleLabel(role, t)}
+                        </span>
                       ))}
                     </div>
                   </div>
@@ -144,34 +163,48 @@ export default function Profile() {
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="firstName" className="flex items-center gap-2"><User className="h-3.5 w-3.5 text-muted-foreground" style={{ color: "#b5d1cc", width: 14, height: 14 }} /> {t.firstName || "Ad"}</Label>
+                    <Label htmlFor="firstName" className="flex items-center gap-2">
+                      <User className="h-3.5 w-3.5 text-muted-foreground" />
+                      {t.firstName || "Ad"}
+                    </Label>
                     <Input id="firstName" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="Ad" className="rounded-xl" />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="lastName" className="flex items-center gap-2"><Phone className="h-3.5 w-3.5 text-muted-foreground" style={{ color: "#b5d1cc", width: 14, height: 14 }} /> {t.lastName || "Soyad"}</Label>
+                    <Label htmlFor="lastName" className="flex items-center gap-2">
+                      <Phone className="h-3.5 w-3.5 text-muted-foreground" />
+                      {t.lastName || "Soyad"}
+                    </Label>
                     <Input id="lastName" value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Soyad" className="rounded-xl" />
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="flex items-center gap-2"><Mail className="h-3.5 w-3.5 text-muted-foreground" style={{ color: "#b5d1cc", width: 14, height: 14 }} /> {t.email}</Label>
+                  <Label className="flex items-center gap-2">
+                    <Mail className="h-3.5 w-3.5 text-muted-foreground" />
+                    {t.email}
+                  </Label>
                   <Input value={user?.email || ""} disabled className="rounded-xl bg-muted" />
                   <p className="text-xs text-muted-foreground">{t.emailCantChange}</p>
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="flex items-center gap-2"><Shield className="h-3.5 w-3.5 text-muted-foreground" style={{ color: "#b5d1cc", width: 14, height: 14 }} /> {t.roles}</Label>
+                  <Label className="flex items-center gap-2">
+                    <Shield className="h-3.5 w-3.5 text-muted-foreground" />
+                    {t.roles}
+                  </Label>
                   <div className="flex gap-2">
                     {roles.map((role) => (
-                      <span key={role} style={{ background: "#eaf5ff", color: "#4f8fe6", fontSize: "0.75rem", fontWeight: 600, padding: "2px 10px", borderRadius: "999px" }}>{role}</span>
+                      <span key={role} className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">
+                        {getRoleLabel(role, t)}
+                      </span>
                     ))}
                   </div>
                 </div>
 
-                <button type="submit" disabled={updateMutation.isPending || uploading} style={{ background: "#4f8fe6", color: "white", borderRadius: "12px", padding: "10px 24px", fontWeight: 600, border: "none", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "8px", opacity: (updateMutation.isPending || uploading) ? 0.7 : 1 }}>
-                  {(updateMutation.isPending || uploading) ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                <Button type="submit" disabled={updateMutation.isPending || uploading} className="inline-flex rounded-xl px-6">
+                  {updateMutation.isPending || uploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                   {t.saveChanges}
-                </button>
+                </Button>
               </form>
             </CardContent>
           </Card>

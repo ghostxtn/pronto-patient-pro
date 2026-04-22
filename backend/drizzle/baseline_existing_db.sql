@@ -23,6 +23,9 @@ WHERE "domain" IS NULL OR "domain" = '';
 ALTER TABLE "appointments"
 ALTER COLUMN "status" SET DEFAULT 'pending';
 
+ALTER TABLE "appointments"
+ADD COLUMN IF NOT EXISTS "reminder_sent_at" timestamp;
+
 CREATE TABLE IF NOT EXISTS "doctor_availability_overrides" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
   "clinic_id" uuid NOT NULL,

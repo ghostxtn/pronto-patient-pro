@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
+import ThemeToggle from "@/components/ThemeToggle";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useHomepagePreviewData } from "@/hooks/useHomepagePreviewData";
@@ -44,8 +45,8 @@ export default function LandingNav() {
       className={[
         "fixed inset-x-0 top-0 z-50 border-b transition-all duration-300",
         isScrolled
-          ? "border-homepage-border-strong/90 bg-white/[0.96] backdrop-blur-md"
-          : "border-transparent bg-white/[0.78] backdrop-blur-sm",
+          ? "border-homepage-border-strong/90 bg-homepage-shell/95 backdrop-blur-md"
+          : "border-transparent bg-homepage-shell/80 backdrop-blur-sm",
       ].join(" ")}
     >
       <div className="container flex h-20 items-center justify-between gap-4">
@@ -86,6 +87,7 @@ export default function LandingNav() {
         </nav>
 
         <div className="flex items-center gap-2 sm:gap-3">
+          <ThemeToggle className="h-11 w-11 rounded-full border border-homepage-border text-homepage-muted hover:border-homepage-border-strong hover:bg-homepage-shell" />
           <LanguageSwitcher className="h-11 w-11 rounded-full border border-homepage-border text-homepage-muted hover:border-homepage-border-strong hover:bg-homepage-shell" />
 
           <button
@@ -115,8 +117,8 @@ export default function LandingNav() {
                     width: 28,
                     height: 28,
                     borderRadius: "50%",
-                    background: "#eaf5ff",
-                    border: "1.5px solid #b5d1cc",
+                    background: "rgb(var(--homepage-shell-cool))",
+                    border: "1.5px solid rgb(var(--homepage-border))",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
@@ -165,7 +167,7 @@ export default function LandingNav() {
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
             transition={{ duration: 0.2, ease: "easeOut" }}
-            className="overflow-hidden border-t border-homepage-border bg-white/[0.98] backdrop-blur-md lg:hidden"
+            className="overflow-hidden border-t border-homepage-border bg-homepage-shell/95 backdrop-blur-md lg:hidden"
           >
             <div className="container flex flex-col gap-1 py-4">
               {navigationItems.map((item) => (

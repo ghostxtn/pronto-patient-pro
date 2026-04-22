@@ -17,7 +17,7 @@ export default function Landing() {
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: -30 }}
       transition={{ duration: 0.3, ease: "easeOut" }}
-      className="min-h-screen [overflow-x:clip] bg-[#f4f8fd] text-[#1a2e3b]"
+      className="min-h-screen [overflow-x:clip] bg-homepage-shell text-homepage-ink"
     >
       <LandingNav />
       <HeroSection />
@@ -25,7 +25,7 @@ export default function Landing() {
         style={{
           position: "relative",
           zIndex: 10,
-          background: "#f4f8fd",
+          background: "rgb(var(--homepage-shell))",
           borderRadius: "48px 48px 0 0",
           marginTop: "-75vh",
           overflow: "visible",

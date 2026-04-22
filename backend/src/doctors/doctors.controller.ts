@@ -73,9 +73,11 @@ export class DoctorsController {
   @Roles('owner', 'admin', 'doctor', 'staff', 'patient')
   findById(
     @Param('id', ParseUUIDPipe) id: string,
-    @CurrentUser() user: { clinicId: string },
+    @CurrentUser() user: { clinicId: string; role: string },
   ) {
-    return this.doctorsService.findById(id, user.clinicId);
+    return this.doctorsService.findById(id, user.clinicId, {
+      includeInactive: user.role !== 'patient',
+    });
   }
 
   @Audit('UPDATE_DOCTOR', 'doctor')
