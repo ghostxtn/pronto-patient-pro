@@ -642,21 +642,6 @@
     @apply bg-primary/10 text-primary;
   }
 
-  .scheduler-calendar-shell .rbc-time-gutter .rbc-timeslot-group {
-    background: hsl(var(--calendar-gutter));
-  }
-
-  .scheduler-calendar-shell .rbc-label {
-    padding: 0 8px 0 0;
-    font-size: 11px;
-    font-weight: 400;
-    line-height: 1;
-    color: hsl(var(--calendar-gutter-fg));
-    text-align: right;
-    transform: translateY(-6px);
-    font-variant-numeric: tabular-nums;
-  }
-
   .scheduler-calendar-shell .rbc-allday-cell {
     @apply hidden;
   }
@@ -664,6 +649,7 @@
   .scheduler-calendar-shell .rbc-time-content {
     @apply rounded-b-[32px];
     background: hsl(var(--calendar-surface));
+    padding-top: 8px;
     flex: 1 1 auto !important;
     min-height: 0 !important;
     overflow-x: hidden !important;
@@ -673,20 +659,59 @@
     scrollbar-gutter: stable;
   }
 
+  /* ── Slot group height: 1 step = var(--slot-height) ── */
+  .scheduler-calendar-shell .rbc-timeslot-group,
+  .scheduler-calendar-shell .rbc-time-gutter .rbc-timeslot-group {
+    min-height: var(--slot-height, 30px);
+    border: none;
+  }
+
+  /* ── Remove all default slot borders ── */
+  .scheduler-calendar-shell .rbc-time-slot,
+  .scheduler-calendar-shell .rbc-time-gutter .rbc-time-slot,
+  .scheduler-calendar-shell .rbc-day-slot .rbc-time-slot {
+    border-top: none;
+  }
+
+  /* ── Hour boundary: strong line across full grid ── */
+  .scheduler-calendar-shell .rbc-slot-hour {
+    border-top: 1px solid hsl(var(--calendar-grid-strong));
+  }
+
+  /* ── :30 boundary: very faint line ── */
+  .scheduler-calendar-shell .rbc-slot-half {
+    border-top: 1px solid hsl(var(--calendar-grid-soft) / 0.5);
+  }
+
+  /* ── :15 / :45 slots: completely invisible ── */
+  .scheduler-calendar-shell .rbc-slot-sub-invisible {
+    border-top: none;
+  }
+
+  /* ── Gutter background ── */
   .scheduler-calendar-shell .rbc-time-gutter {
     background: hsl(var(--calendar-gutter));
     width: 72px;
     min-width: 72px;
   }
 
-  .scheduler-calendar-shell .rbc-time-gutter .rbc-timeslot-group,
-  .scheduler-calendar-shell .rbc-timeslot-group {
-    @apply min-h-[60px];
-    border-top: 1px solid hsl(var(--calendar-grid-strong));
+  /* ── Hour label: right-aligned, centered on boundary line ── */
+  .scheduler-calendar-shell .rbc-slot-hour .rbc-label {
+    display: block;
+    padding: 0 10px 0 0;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1;
+    color: hsl(var(--calendar-gutter-fg));
+    text-align: right;
+    transform: translateY(-50%);
+    font-variant-numeric: tabular-nums;
   }
 
-  .scheduler-calendar-shell .rbc-timeslot-group {
-    background: hsl(var(--calendar-surface));
+  /* ── Sub-hour labels: hidden ── */
+  .scheduler-calendar-shell .rbc-slot-half .rbc-label,
+  .scheduler-calendar-shell .rbc-slot-sub-invisible .rbc-label {
+    display: none;
   }
 
   .scheduler-calendar-shell .rbc-time-view {
@@ -734,7 +759,6 @@
   .scheduler-calendar-shell .rbc-day-slot .rbc-time-slot,
   .scheduler-calendar-shell .rbc-time-slot {
     @apply transition-colors;
-    border-top: 1px solid hsl(var(--calendar-grid-soft));
   }
 
   .scheduler-slot {
@@ -784,7 +808,7 @@
     @apply text-xs font-medium;
     border: 1px solid hsl(var(--calendar-event-outline));
     border-radius: 8px;
-    padding: 6px 10px;
+    padding: 2px 6px;
     box-shadow:
       0 1px 2px hsl(var(--calendar-shadow) / 0.05),
       0 1px 1px hsl(var(--calendar-shadow) / 0.03);
@@ -797,6 +821,60 @@
     transition:
       box-shadow 150ms ease,
       transform 150ms ease;
+  }
+
+  /* xs: ≤15 min — absolute minimum height, no padding waste */
+  .scheduler-calendar-shell .rbc-event.evt-xs {
+    padding: 0 4px !important;
+    min-height: 0 !important;
+    overflow: hidden;
+  }
+
+  .scheduler-calendar-shell .rbc-event.evt-xs .scheduler-event-title-only {
+    font-size: 10px;
+    font-weight: 500;
+    line-height: 14px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block;
+  }
+
+  /* sm/md: 20-30 min — compact single row */
+  .scheduler-calendar-shell .rbc-event.evt-sm,
+  .scheduler-calendar-shell .rbc-event.evt-md {
+    padding: 1px 6px !important;
+  }
+
+  .scheduler-calendar-shell .scheduler-event-compact-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    overflow: hidden;
+    width: 100%;
+  }
+
+  .scheduler-calendar-shell .scheduler-event-title-compact {
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex-shrink: 1;
+    min-width: 0;
+  }
+
+  .scheduler-calendar-shell .scheduler-event-time-compact {
+    font-size: 10px;
+    font-weight: 400;
+    white-space: nowrap;
+    flex-shrink: 0;
+    opacity: 0.85;
+  }
+
+  /* lg: normal events keep existing styling */
+  .scheduler-calendar-shell .rbc-event.evt-lg {
+    padding: 4px 8px !important;
   }
 
   .scheduler-calendar-shell .rbc-time-header-content .rbc-header.rbc-today::before {
