@@ -1,45 +1,40 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import api from "@/services/api";
+import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { motion } from "framer-motion";
+import { AlertCircle, CalendarDays, CheckCircle2, Clock, FileText, Loader2, X, XCircle } from "lucide-react";
+import { parseISO } from "date-fns";
+import { toast } from "sonner";
+import AppLayout from "@/components/AppLayout";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
-import AppLayout from "@/components/AppLayout";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { motion } from "framer-motion";
-import { toast } from "sonner";
-import { format, parseISO } from "date-fns";
-import {
-  CalendarDays, Clock, X, Stethoscope, HeartPulse, Brain, Eye, Baby, Bone, ScanFace, Smile,
-  FileText, CheckCircle2, XCircle, AlertCircle, Loader2,
-} from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { useState } from "react";
+import api from "@/services/api";
+import { formatLocalizedDateFns } from "@/lib/date-localization";
 import { cn } from "@/lib/utils";
-
-const iconMap: Record<string, React.ElementType> = {
-  stethoscope: Stethoscope, "heart-pulse": HeartPulse, brain: Brain,
-  eye: Eye, baby: Baby, bone: Bone, "scan-face": ScanFace, smile: Smile,
-};
+import { getAppointmentStatusLabel, normalizeAppointmentStatus } from "@/lib/status-localization";
 
 const fadeUp = {
   hidden: { opacity: 0, y: 20 },
   visible: (i: number) => ({
-    opacity: 1, y: 0,
+    opacity: 1,
+    y: 0,
     transition: { delay: i * 0.06, duration: 0.5, ease: [0.22, 1, 0.36, 1] as const },
   }),
 };
 
 export default function MyAppointments() {
   const { user } = useAuth();
-  const { t } = useLanguage();
+  const { lang, t } = useLanguage();
   const queryClient = useQueryClient();
   const [detailId, setDetailId] = useState<string | null>(null);
 
   const statusConfig: Record<string, { color: string; icon: React.ElementType; label: string }> = {
-    pending: { color: "bg-[#fff8e6] text-[#f5a623] border-[#f5a623]/30", icon: AlertCircle, label: t.pending },
-    confirmed: { color: "bg-[#eaf5ff] text-[#4f8fe6] border-[#b5d1cc]", icon: CheckCircle2, label: t.confirmed },
-    completed: { color: "bg-[#e6f4ef] text-[#65a98f] border-[#b5d1cc]", icon: CheckCircle2, label: t.completed },
-    cancelled: { color: "bg-[#fef2f2] text-[#e05252] border-[#fca5a5]/30", icon: XCircle, label: t.cancelled },
+    pending: { color: "border-amber-500/25 bg-amber-500/12 text-amber-700 dark:text-amber-300", icon: AlertCircle, label: t.pending },
+    confirmed: { color: "border-primary/20 bg-primary/10 text-primary", icon: CheckCircle2, label: t.confirmed },
+    completed: { color: "border-emerald-500/25 bg-emerald-500/12 text-emerald-700 dark:text-emerald-300", icon: CheckCircle2, label: t.completed },
+    cancelled: { color: "border-destructive/25 bg-destructive/10 text-destructive", icon: XCircle, label: t.cancelled },
   };
 
   const { data: appointments, isLoading } = useQuery({
@@ -49,10 +44,12 @@ export default function MyAppointments() {
   });
 
   const cancelMutation = useMutation({
-    mutationFn: async (appointmentId: string) => {
-      return api.appointments.updateStatus(appointmentId, "cancelled");
+    mutationFn: async (appointmentId: string) => api.appointments.updateStatus(appointmentId, "cancelled"),
+    onSuccess: () => {
+      toast.success(t.appointmentCancelled);
+      queryClient.invalidateQueries({ queryKey: ["my-appointments"] });
+      setDetailId(null);
     },
-    onSuccess: () => { toast.success(t.appointmentCancelled); queryClient.invalidateQueries({ queryKey: ["my-appointments"] }); setDetailId(null); },
     onError: (err: any) => toast.error(err.message),
   });
 
@@ -64,35 +61,62 @@ export default function MyAppointments() {
     <AppLayout>
       <motion.div initial="hidden" animate="visible">
         <motion.div className="mb-8" custom={0} variants={fadeUp}>
-          <h1 className="text-3xl font-display font-bold mb-2" style={{ color: "#1a2e3b", fontFamily: "Manrope, sans-serif", fontWeight: 700 }}>{t.myAppointments}</h1>
-          <p className="text-muted-foreground" style={{ color: "#5a7a8a" }}>{t.myAppointmentsDesc}</p>
+          <h1 className="mb-2 text-3xl font-display font-bold text-foreground">{t.myAppointments}</h1>
+          <p className="text-muted-foreground">{t.myAppointmentsDesc}</p>
         </motion.div>
 
         {isLoading ? (
-          <div className="space-y-3">{[1, 2, 3].map((i) => <div key={i} className="glass rounded-2xl p-5 shadow-card animate-pulse h-24" />)}</div>
+          <div className="space-y-3">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-24 animate-pulse rounded-2xl border border-border bg-card p-5 shadow-sm" />
+            ))}
+          </div>
         ) : appointments && appointments.length > 0 ? (
           <div className="space-y-8">
             {upcoming.length > 0 && (
               <div>
-                <motion.h2 className="font-display font-semibold text-lg mb-4" custom={1} variants={fadeUp} style={{ color: "#1a2e3b", fontFamily: "Manrope, sans-serif", fontWeight: 600 }}>{t.upcoming} ({upcoming.length})</motion.h2>
+                <motion.h2 className="mb-4 text-lg font-display font-semibold text-foreground" custom={1} variants={fadeUp}>
+                  {t.upcoming} ({upcoming.length})
+                </motion.h2>
                 <div className="space-y-3">
                   {upcoming.map((apt, i) => {
                     const doc = apt.doctor as any;
-                    const status = statusConfig[apt.status]; const StatusIcon = status.icon;
+                    const status = statusConfig[normalizeAppointmentStatus(apt.status)] ?? statusConfig.pending;
+                    const StatusIcon = status.icon;
+
                     return (
-                      <motion.div key={apt.id} className="cursor-pointer transition-all" custom={i + 2} variants={fadeUp} onClick={() => setDetailId(apt.id)} style={{ background: "white", border: "1px solid #b5d1cc", borderRadius: "16px", padding: "20px", boxShadow: "0 2px 12px rgba(79,143,230,0.08)" }} onMouseEnter={(e) => e.currentTarget.style.boxShadow = "0 4px 20px rgba(79,143,230,0.16)"} onMouseLeave={(e) => e.currentTarget.style.boxShadow = "0 2px 12px rgba(79,143,230,0.08)"}>
+                      <motion.div
+                        key={apt.id}
+                        className="cursor-pointer rounded-2xl border border-border bg-card p-5 shadow-sm transition-all hover:border-primary/20 hover:shadow-md"
+                        custom={i + 2}
+                        variants={fadeUp}
+                        onClick={() => setDetailId(apt.id)}
+                      >
                         <div className="flex items-center justify-between gap-4">
-                          <div className="flex items-center gap-4 min-w-0">
-                            <div style={{ width: 48, height: 48, borderRadius: "12px", background: "#eaf5ff", border: "2px solid #b5d1cc", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><span style={{ color: "#4f8fe6", fontWeight: 700, fontSize: "1.1rem" }}>{doc?.firstName?.[0] || "D"}</span></div>
+                          <div className="flex min-w-0 items-center gap-4">
+                            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-primary/15 bg-primary/10">
+                              <span className="text-[1.1rem] font-bold text-primary">{doc?.firstName?.[0] || "D"}</span>
+                            </div>
                             <div className="min-w-0">
-                              <div className="font-display font-semibold truncate" style={{ color: "#1a2e3b", fontWeight: 600 }}>Dr. {[doc?.firstName, doc?.lastName].filter(Boolean).join(" ")}</div>
-                              <div className="flex items-center gap-3 text-sm text-muted-foreground mt-0.5">
-                                <span className="flex items-center gap-1" style={{ color: "#5a7a8a" }}><CalendarDays className="h-3 w-3" style={{ color: "#b5d1cc" }} />{format(parseISO(apt.appointment_date), "MMM d")}</span>
-                                <span className="flex items-center gap-1" style={{ color: "#5a7a8a" }}><Clock className="h-3 w-3" style={{ color: "#b5d1cc" }} />{apt.start_time.slice(0, 5)}</span>
+                              <div className="truncate font-display font-semibold text-foreground">
+                                Dr. {[doc?.firstName, doc?.lastName].filter(Boolean).join(" ")}
+                              </div>
+                              <div className="mt-0.5 flex items-center gap-3 text-sm text-muted-foreground">
+                                <span className="flex items-center gap-1">
+                                  <CalendarDays className="h-3 w-3 text-muted-foreground" />
+                                  {formatLocalizedDateFns(parseISO(apt.appointment_date), "MMM d", lang)}
+                                </span>
+                                <span className="flex items-center gap-1">
+                                  <Clock className="h-3 w-3 text-muted-foreground" />
+                                  {apt.start_time.slice(0, 5)}
+                                </span>
                               </div>
                             </div>
                           </div>
-                          <Badge className={cn("rounded-full border flex-shrink-0", status.color)} variant="outline"><StatusIcon className="h-3 w-3 mr-1" /><span className="hidden sm:inline">{status.label}</span></Badge>
+                          <Badge className={cn("rounded-full border flex-shrink-0", status.color)} variant="outline">
+                            <StatusIcon className="mr-1 h-3 w-3" />
+                            <span className="hidden sm:inline">{status.label}</span>
+                          </Badge>
                         </div>
                       </motion.div>
                     );
@@ -100,26 +124,47 @@ export default function MyAppointments() {
                 </div>
               </div>
             )}
+
             {past.length > 0 && (
               <div>
-                <motion.h2 className="font-display font-semibold text-lg mb-4" custom={upcoming.length + 2} variants={fadeUp} style={{ color: "#1a2e3b", fontFamily: "Manrope, sans-serif", fontWeight: 600 }}>{t.past} ({past.length})</motion.h2>
+                <motion.h2 className="mb-4 text-lg font-display font-semibold text-foreground" custom={upcoming.length + 2} variants={fadeUp}>
+                  {t.past} ({past.length})
+                </motion.h2>
                 <div className="space-y-3">
                   {past.map((apt, i) => {
                     const doc = apt.doctor as any;
-                    const status = statusConfig[apt.status]; const StatusIcon = status.icon;
+                    const status = statusConfig[normalizeAppointmentStatus(apt.status)] ?? statusConfig.pending;
+                    const StatusIcon = status.icon;
+
                     return (
-                      <motion.div key={apt.id} className="cursor-pointer transition-all" custom={i + upcoming.length + 3} variants={fadeUp} onClick={() => setDetailId(apt.id)} style={{ background: "white", border: "1px solid #b5d1cc", borderRadius: "16px", padding: "20px", boxShadow: "0 2px 12px rgba(79,143,230,0.08)" }} onMouseEnter={(e) => e.currentTarget.style.boxShadow = "0 4px 20px rgba(79,143,230,0.16)"} onMouseLeave={(e) => e.currentTarget.style.boxShadow = "0 2px 12px rgba(79,143,230,0.08)"}>
+                      <motion.div
+                        key={apt.id}
+                        className="cursor-pointer rounded-2xl border border-border bg-card p-5 shadow-sm transition-all hover:border-primary/20 hover:shadow-md"
+                        custom={i + upcoming.length + 3}
+                        variants={fadeUp}
+                        onClick={() => setDetailId(apt.id)}
+                      >
                         <div className="flex items-center justify-between gap-4">
-                          <div className="flex items-center gap-4 min-w-0">
-                            <div style={{ width: 48, height: 48, borderRadius: "12px", background: "#eaf5ff", border: "2px solid #b5d1cc", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><span style={{ color: "#4f8fe6", fontWeight: 700, fontSize: "1.1rem" }}>{doc?.firstName?.[0] || "D"}</span></div>
+                          <div className="flex min-w-0 items-center gap-4">
+                            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-primary/15 bg-primary/10">
+                              <span className="text-[1.1rem] font-bold text-primary">{doc?.firstName?.[0] || "D"}</span>
+                            </div>
                             <div className="min-w-0">
-                              <div className="font-display font-semibold truncate" style={{ color: "#1a2e3b", fontWeight: 600 }}>Dr. {[doc?.firstName, doc?.lastName].filter(Boolean).join(" ")}</div>
-                              <div className="flex items-center gap-3 text-sm text-muted-foreground mt-0.5">
-                                <span className="flex items-center gap-1" style={{ color: "#5a7a8a" }}><CalendarDays className="h-3 w-3" style={{ color: "#b5d1cc" }} />{format(parseISO(apt.appointment_date), "MMM d")}</span>
+                              <div className="truncate font-display font-semibold text-foreground">
+                                Dr. {[doc?.firstName, doc?.lastName].filter(Boolean).join(" ")}
+                              </div>
+                              <div className="mt-0.5 flex items-center gap-3 text-sm text-muted-foreground">
+                                <span className="flex items-center gap-1">
+                                  <CalendarDays className="h-3 w-3 text-muted-foreground" />
+                                  {formatLocalizedDateFns(parseISO(apt.appointment_date), "MMM d", lang)}
+                                </span>
                               </div>
                             </div>
                           </div>
-                          <Badge className={cn("rounded-full border flex-shrink-0", status.color)} variant="outline"><StatusIcon className="h-3 w-3 mr-1" /><span className="hidden sm:inline">{status.label}</span></Badge>
+                          <Badge className={cn("rounded-full border flex-shrink-0", status.color)} variant="outline">
+                            <StatusIcon className="mr-1 h-3 w-3" />
+                            <span className="hidden sm:inline">{status.label}</span>
+                          </Badge>
                         </div>
                       </motion.div>
                     );
@@ -129,47 +174,97 @@ export default function MyAppointments() {
             )}
           </div>
         ) : (
-          <motion.div className="glass rounded-2xl p-12 shadow-card text-center" custom={1} variants={fadeUp}>
-            <CalendarDays className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" />
-            <h3 className="font-display font-semibold text-lg mb-2">{t.noAppointmentsYet}</h3>
-            <p className="text-muted-foreground text-sm mb-4">{t.noAppointmentsDesc}</p>
-            <Button className="rounded-full px-6 shadow-soft" style={{ background: "#4f8fe6", color: "white", borderRadius: "999px", padding: "8px 24px", fontWeight: 600, border: "none", cursor: "pointer" }} onClick={() => window.location.href = "/patient/doctors"}>{t.findDoctor}</Button>
+          <motion.div className="rounded-2xl border border-border bg-card p-12 text-center shadow-sm" custom={1} variants={fadeUp}>
+            <CalendarDays className="mx-auto mb-4 h-12 w-12 text-muted-foreground/30" />
+            <h3 className="mb-2 text-lg font-display font-semibold text-foreground">{t.noAppointmentsYet}</h3>
+            <p className="mb-4 text-sm text-muted-foreground">{t.noAppointmentsDesc}</p>
+            <Button className="rounded-full px-6 shadow-soft" onClick={() => (window.location.href = "/patient/doctors")}>
+              {t.findDoctor}
+            </Button>
           </motion.div>
         )}
       </motion.div>
 
       <Dialog open={!!detailId} onOpenChange={() => setDetailId(null)}>
         <DialogContent className="sm:max-w-lg rounded-2xl">
-          {selectedAppointment && (() => {
-            const doc = selectedAppointment.doctor as any;
-            const status = statusConfig[selectedAppointment.status]; const StatusIcon = status.icon;
-            return (
-              <>
-                <DialogHeader>
-                  <DialogTitle className="font-display">{t.appointmentDetails}</DialogTitle>
-                  <DialogDescription><Badge className={cn("mt-2 rounded-full border", status.color)} variant="outline"><StatusIcon className="h-3 w-3 mr-1" /> {status.label}</Badge></DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3">
-                    <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-primary to-info flex items-center justify-center"><span className="text-primary-foreground font-display font-bold">{doc?.firstName?.[0] || "D"}</span></div>
-                    <div><div className="font-semibold">Dr. {[doc?.firstName, doc?.lastName].filter(Boolean).join(" ")}</div><div className="text-sm text-muted-foreground">{doc?.email}</div></div>
+          {selectedAppointment &&
+            (() => {
+              const doc = selectedAppointment.doctor as any;
+              const status = statusConfig[normalizeAppointmentStatus(selectedAppointment.status)] ?? statusConfig.pending;
+              const StatusIcon = status.icon;
+
+              return (
+                <>
+                  <DialogHeader>
+                    <DialogTitle className="font-display">{t.appointmentDetails}</DialogTitle>
+                    <DialogDescription>
+                      <Badge className={cn("mt-2 rounded-full border", status.color)} variant="outline">
+                        <StatusIcon className="mr-1 h-3 w-3" /> {status.label}
+                      </Badge>
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-info">
+                        <span className="font-display font-bold text-primary-foreground">{doc?.firstName?.[0] || "D"}</span>
+                      </div>
+                      <div>
+                        <div className="font-semibold text-foreground">Dr. {[doc?.firstName, doc?.lastName].filter(Boolean).join(" ")}</div>
+                        <div className="text-sm text-muted-foreground">{doc?.email}</div>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div className="rounded-xl bg-muted p-3">
+                        <div className="mb-1 text-muted-foreground">{t.date}</div>
+                        <div className="font-medium text-foreground">
+                          {formatLocalizedDateFns(parseISO(selectedAppointment.appointment_date), "EEE, MMM d, yyyy", lang)}
+                        </div>
+                      </div>
+                      <div className="rounded-xl bg-muted p-3">
+                        <div className="mb-1 text-muted-foreground">{t.time}</div>
+                        <div className="font-medium text-foreground">
+                          {selectedAppointment.start_time.slice(0, 5)} - {selectedAppointment.end_time.slice(0, 5)}
+                        </div>
+                      </div>
+                      <div className="rounded-xl bg-muted p-3">
+                        <div className="mb-1 text-muted-foreground">{t.fee}</div>
+                        <div className="font-medium text-foreground">{doc?.phone || "-"}</div>
+                      </div>
+                      <div className="rounded-xl bg-muted p-3">
+                        <div className="mb-1 text-muted-foreground">{t.status}</div>
+                        <div className="font-medium text-foreground">{getAppointmentStatusLabel(selectedAppointment.status, t)}</div>
+                      </div>
+                    </div>
+                    {selectedAppointment.notes && (
+                      <div className="rounded-xl bg-muted p-3">
+                        <div className="mb-1 flex items-center gap-1 text-sm text-muted-foreground">
+                          <FileText className="h-3 w-3" /> {t.notes}
+                        </div>
+                        <p className="text-sm text-foreground">{selectedAppointment.notes}</p>
+                      </div>
+                    )}
+                    {(selectedAppointment.status === "pending" || selectedAppointment.status === "confirmed") && (
+                      <Button
+                        variant="destructive"
+                        className="w-full rounded-xl"
+                        onClick={() => cancelMutation.mutate(selectedAppointment.id)}
+                        disabled={cancelMutation.isPending}
+                      >
+                        {cancelMutation.isPending ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" /> {t.cancelling}
+                          </>
+                        ) : (
+                          <>
+                            <X className="mr-2 h-4 w-4" /> {t.cancelAppointment}
+                          </>
+                        )}
+                      </Button>
+                    )}
                   </div>
-                  <div className="grid grid-cols-2 gap-3 text-sm">
-                    <div className="p-3 rounded-xl bg-muted"><div className="text-muted-foreground mb-1">{t.date}</div><div className="font-medium">{format(parseISO(selectedAppointment.appointment_date), "EEE, MMM d, yyyy")}</div></div>
-                    <div className="p-3 rounded-xl bg-muted"><div className="text-muted-foreground mb-1">{t.time}</div><div className="font-medium">{selectedAppointment.start_time.slice(0, 5)} — {selectedAppointment.end_time.slice(0, 5)}</div></div>
-                    <div className="p-3 rounded-xl bg-muted"><div className="text-muted-foreground mb-1">{t.fee}</div><div className="font-medium">{doc?.phone || "-"}</div></div>
-                    <div className="p-3 rounded-xl bg-muted"><div className="text-muted-foreground mb-1">{t.status}</div><div className="font-medium capitalize">{selectedAppointment.status}</div></div>
-                  </div>
-                  {selectedAppointment.notes && (<div className="p-3 rounded-xl bg-muted"><div className="text-muted-foreground text-sm mb-1 flex items-center gap-1"><FileText className="h-3 w-3" /> {t.notes}</div><p className="text-sm">{selectedAppointment.notes}</p></div>)}
-                  {(selectedAppointment.status === "pending" || selectedAppointment.status === "confirmed") && (
-                    <Button variant="destructive" className="w-full rounded-xl" style={{ background: "#e05252", color: "white", borderRadius: "12px", width: "100%", padding: "10px", fontWeight: 600, border: "none", cursor: "pointer" }} onClick={() => cancelMutation.mutate(selectedAppointment.id)} disabled={cancelMutation.isPending}>
-                      {cancelMutation.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> {t.cancelling}</> : <><X className="mr-2 h-4 w-4" /> {t.cancelAppointment}</>}
-                    </Button>
-                  )}
-                </div>
-              </>
-            );
-          })()}
+                </>
+              );
+            })()}
         </DialogContent>
       </Dialog>
     </AppLayout>

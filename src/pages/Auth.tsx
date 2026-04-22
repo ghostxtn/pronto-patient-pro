@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { Label } from "@/components/ui/label";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
+import ThemeToggle from "@/components/ThemeToggle";
 import { toast } from "sonner";
 
 type PendingOtpState = {
@@ -168,7 +169,7 @@ export default function Auth() {
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: 30 }}
       transition={{ duration: 0.3, ease: "easeOut" }}
-      className="min-h-screen flex"
+      className="min-h-screen flex bg-background text-foreground"
     >
       <div
         className="relative hidden lg:flex lg:w-1/2 items-center justify-center overflow-hidden"
@@ -235,17 +236,20 @@ export default function Auth() {
         </div>
       </div>
 
-      <div className="flex-1 flex items-center justify-center bg-[#f4f8fd] p-4 md:p-8 lg:p-12">
+      <div className="flex-1 flex items-center justify-center bg-background p-4 md:p-8 lg:p-12">
         <div className="w-full max-w-[420px]">
           <div className="mb-4 flex items-center justify-between">
-            <Link to="/" className="inline-flex items-center gap-2 text-sm text-[#5a7a8a] hover:text-[#1a2e3b]">
+            <Link to="/" className="inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground">
               <ArrowLeft className="h-4 w-4" />
               {t.backToHome}
             </Link>
-            <LanguageSwitcher />
+            <div className="flex items-center gap-2">
+              <ThemeToggle className="h-10 w-10 rounded-xl border border-border text-muted-foreground hover:bg-muted hover:text-foreground" />
+              <LanguageSwitcher />
+            </div>
           </div>
 
-          <div className="w-full rounded-2xl bg-white p-6 shadow-[0_20px_40px_rgba(8,30,42,0.07)] md:p-10">
+          <div className="w-full rounded-2xl border border-border/60 bg-card p-6 text-card-foreground shadow-[0_20px_40px_rgba(8,30,42,0.07)] dark:shadow-[0_20px_40px_rgba(0,0,0,0.35)] md:p-10">
             <Link to="/" className="mb-8 flex items-center gap-3" style={{ textDecoration: "none" }}>
               {logoUrl ? (
                 <img
@@ -285,7 +289,7 @@ export default function Auth() {
                 <div className="space-y-3 mb-6">
                   <Button
                     variant="outline"
-                    className="flex h-auto w-full items-center justify-center gap-2.5 rounded-xl border border-[#dce5ec] bg-white py-3 text-sm font-medium text-[#1a2e3b] hover:bg-[#eaf5ff]"
+                    className="flex h-auto w-full items-center justify-center gap-2.5 rounded-xl border border-border bg-background py-3 text-sm font-medium text-foreground hover:bg-accent hover:text-accent-foreground"
                     onClick={handleGoogleLogin}
                   >
                     <svg className="h-5 w-5" viewBox="0 0 24 24">
@@ -303,7 +307,7 @@ export default function Auth() {
                     <div className="w-full border-t border-[#f0f4f8]" />
                   </div>
                   <div className="relative flex justify-center">
-                    <span className="bg-white px-3 text-xs text-[#5a7a8a]">{t.orContinueWithEmail}</span>
+                    <span className="bg-card px-3 text-xs text-muted-foreground">{t.orContinueWithEmail}</span>
                   </div>
                 </div>
 

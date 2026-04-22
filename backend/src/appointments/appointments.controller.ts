@@ -85,13 +85,16 @@ export class AppointmentsController {
 
   @Patch(':id/status')
   @Audit('UPDATE_APPOINTMENT_STATUS', 'appointment')
-  @Roles('owner', 'admin', 'doctor', 'staff')
+  @Roles('owner', 'admin', 'doctor', 'staff', 'patient')
   updateStatus(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateStatusDto,
-    @CurrentUser() user: { clinicId: string },
+    @CurrentUser() user: { clinicId: string; role: string; userId: string },
   ) {
-    return this.appointmentsService.updateStatus(id, dto.status, user.clinicId);
+    return this.appointmentsService.updateStatus(id, dto.status, user.clinicId, {
+      role: user.role,
+      userId: user.userId,
+    });
   }
 
   @Delete(':id')
@@ -99,9 +102,12 @@ export class AppointmentsController {
   @Roles('owner', 'admin')
   softDelete(
     @Param('id', ParseUUIDPipe) id: string,
-    @CurrentUser() user: { clinicId: string },
+    @CurrentUser() user: { clinicId: string; role: string; userId: string },
   ) {
-    return this.appointmentsService.softDelete(id, user.clinicId);
+    return this.appointmentsService.softDelete(id, user.clinicId, {
+      role: user.role,
+      userId: user.userId,
+    });
   }
 
   @Post(':appointmentId/notes')

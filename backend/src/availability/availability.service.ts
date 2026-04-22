@@ -24,6 +24,7 @@ import {
   type MinuteRange,
   type SlotEntry,
 } from './calendar-time.utils';
+import { isBlockingAppointmentStatus } from '../appointments/appointment-status.utils';
 import { CreateAvailabilityDto } from './dto/create-availability.dto';
 import { UpdateAvailabilityDto } from './dto/update-availability.dto';
 
@@ -392,6 +393,7 @@ export class AvailabilityService {
       .select({
         start_time: appointments.start_time,
         end_time: appointments.end_time,
+        status: appointments.status,
       })
       .from(appointments)
       .where(
@@ -399,7 +401,6 @@ export class AvailabilityService {
           eq(appointments.doctor_id, doctorId),
           eq(appointments.clinic_id, clinicId),
           eq(appointments.appointment_date, date),
-          ne(appointments.status, 'cancelled'),
         ),
       );
 
@@ -411,7 +412,8 @@ export class AvailabilityService {
         };
 
         return !existingAppointments.some(
-          (appointment: { start_time: string; end_time: string }) =>
+          (appointment: { start_time: string; end_time: string; status: string }) =>
+            isBlockingAppointmentStatus(appointment.status) &&
             rangesOverlap(slotRange, this.toRange(appointment.start_time, appointment.end_time)),
         );
       }),

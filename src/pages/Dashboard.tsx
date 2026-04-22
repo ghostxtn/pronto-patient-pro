@@ -1,26 +1,30 @@
-import { useAuth } from "@/contexts/AuthContext";
-import { useLanguage } from "@/contexts/LanguageContext";
-import { useNavigate, Link } from "react-router-dom";
 import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import api from "@/services/api";
+import { Link, useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
+import { Activity, ArrowRight, CalendarCheck, Clock, Users } from "lucide-react";
+import { parseISO } from "date-fns";
 import AppLayout from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
-import { CalendarCheck, Clock, Users, Activity, ArrowRight } from "lucide-react";
-import { motion } from "framer-motion";
-import { format, parseISO } from "date-fns";
+import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
+import api from "@/services/api";
+import { cn } from "@/lib/utils";
+import { formatLocalizedDateFns } from "@/lib/date-localization";
+import { getAppointmentStatusLabel, normalizeAppointmentStatus } from "@/lib/status-localization";
 
 const fadeUp = {
   hidden: { opacity: 0, y: 20 },
   visible: (i: number) => ({
-    opacity: 1, y: 0,
+    opacity: 1,
+    y: 0,
     transition: { delay: i * 0.08, duration: 0.5, ease: [0.22, 1, 0.36, 1] as const },
   }),
 };
 
 export default function Dashboard() {
   const { user, loading } = useAuth();
-  const { t } = useLanguage();
+  const { lang, t } = useLanguage();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -35,8 +39,8 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="h-8 w-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
       </div>
     );
   }
@@ -47,60 +51,62 @@ export default function Dashboard() {
   const total = appointments?.length || 0;
 
   const quickStats = [
-    { icon: CalendarCheck, label: t.upcoming, value: String(upcoming.length), bg: "#eaf5ff", iconColor: "#4f8fe6" },
-    { icon: Clock, label: t.pending, value: String(pending.length), bg: "#fff8e6", iconColor: "#f5a623" },
-    { icon: Users, label: t.completed, value: String(completed.length), bg: "#e6f4ef", iconColor: "#65a98f" },
-    { icon: Activity, label: t.total, value: String(total), bg: "#eaf5ff", iconColor: "#2f75ca" },
+    { icon: CalendarCheck, label: t.upcoming, value: String(upcoming.length), iconWrap: "bg-primary/10 text-primary" },
+    { icon: Clock, label: t.pending, value: String(pending.length), iconWrap: "bg-amber-500/12 text-amber-700 dark:text-amber-300" },
+    { icon: Users, label: t.completed, value: String(completed.length), iconWrap: "bg-emerald-500/12 text-emerald-700 dark:text-emerald-300" },
+    { icon: Activity, label: t.total, value: String(total), iconWrap: "bg-sky-500/12 text-sky-700 dark:text-sky-300" },
   ];
+
+  const getStatusClasses = (status: string) => {
+    switch (normalizeAppointmentStatus(status)) {
+      case "confirmed":
+        return "bg-primary/10 text-primary";
+      case "pending":
+        return "bg-amber-500/12 text-amber-700 dark:text-amber-300";
+      case "completed":
+        return "bg-emerald-500/12 text-emerald-700 dark:text-emerald-300";
+      default:
+        return "bg-destructive/10 text-destructive";
+    }
+  };
 
   return (
     <AppLayout>
       <motion.div initial="hidden" animate="visible">
-        <motion.h1 className="text-3xl font-display font-bold mb-2" custom={0} variants={fadeUp} style={{ color: "#1a2e3b", fontFamily: "Manrope, sans-serif", fontWeight: 700 }}>
-          {t.welcomeBackUser}{user?.name ? `, ${user.name}` : ""}! 👋
+        <motion.h1 className="mb-2 text-3xl font-display font-bold text-foreground" custom={0} variants={fadeUp}>
+          {t.welcomeBackUser}
+          {user?.name ? `, ${user.name}` : ""}!
         </motion.h1>
-        <motion.p className="text-muted-foreground mb-8" custom={1} variants={fadeUp} style={{ color: "#5a7a8a" }}>
+        <motion.p className="mb-8 text-muted-foreground" custom={1} variants={fadeUp}>
           {t.dashboardDesc}
         </motion.p>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div className="mb-8 grid grid-cols-2 gap-4 md:grid-cols-4">
           {quickStats.map((stat, i) => (
             <motion.div
               key={stat.label}
               custom={i + 2}
               variants={fadeUp}
-              style={{
-                background: "white",
-                border: "1px solid #b5d1cc",
-                borderRadius: "16px",
-                padding: "20px",
-                boxShadow: "0 2px 12px rgba(79,143,230,0.08)",
-              }}
+              className="rounded-2xl border border-border bg-card p-5 shadow-sm"
             >
-              <div style={{
-                width: 40,
-                height: 40,
-                borderRadius: "12px",
-                background: stat.bg,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                marginBottom: "12px",
-              }}>
-                <stat.icon style={{ width: 20, height: 20, color: stat.iconColor }} />
+              <div className={cn("mb-3 flex h-10 w-10 items-center justify-center rounded-xl", stat.iconWrap)}>
+                <stat.icon className="h-5 w-5" />
               </div>
-              <div style={{ fontSize: "1.5rem", fontWeight: 700, fontFamily: "Manrope, sans-serif", color: "#1a2e3b" }}>{stat.value}</div>
-              <div style={{ fontSize: "0.85rem", color: "#5a7a8a" }}>{stat.label}</div>
+              <div className="text-2xl font-display font-bold text-foreground">{stat.value}</div>
+              <div className="text-sm text-muted-foreground">{stat.label}</div>
             </motion.div>
           ))}
         </div>
 
         {upcoming.length > 0 ? (
-          <motion.div custom={6} variants={fadeUp} style={{ background: "white", border: "1px solid #b5d1cc", borderRadius: "16px", padding: "24px", boxShadow: "0 2px 12px rgba(79,143,230,0.08)" }}>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-display font-semibold text-lg" style={{ color: "#1a2e3b", fontFamily: "Manrope, sans-serif", fontWeight: 600 }}>{t.upcomingAppointments}</h3>
-              <Button variant="ghost" size="sm" asChild style={{ color: "#4f8fe6", fontSize: "0.85rem" }}>
-                <Link to="/patient/appointments">{t.viewAll} <ArrowRight className="ml-1 h-3 w-3" /></Link>
+          <motion.div custom={6} variants={fadeUp} className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-lg font-display font-semibold text-foreground">{t.upcomingAppointments}</h3>
+              <Button variant="ghost" size="sm" asChild className="text-primary">
+                <Link to="/patient/appointments">
+                  {t.viewAll}
+                  <ArrowRight className="ml-1 h-3 w-3" />
+                </Link>
               </Button>
             </div>
             <div className="space-y-3">
@@ -109,31 +115,18 @@ export default function Dashboard() {
                 return (
                   <div
                     key={apt.id}
-                    style={{ background: "#f4f8fd", borderRadius: "12px", padding: "12px", display: "flex", alignItems: "center", justifyContent: "space-between" }}
-                    onMouseEnter={(e) => e.currentTarget.style.background = "#eaf5ff"}
-                    onMouseLeave={(e) => e.currentTarget.style.background = "#f4f8fd"}
+                    className="flex items-center justify-between rounded-xl border border-border/60 bg-muted/40 p-3 transition-colors hover:bg-muted/70"
                   >
                     <div>
-                      <div className="font-medium text-sm" style={{ color: "#1a2e3b", fontWeight: 600, fontSize: "0.875rem" }}>Dr. {[doc?.firstName, doc?.lastName].filter(Boolean).join(" ")}</div>
-                      <div className="text-xs text-muted-foreground" style={{ color: "#5a7a8a", fontSize: "0.75rem" }}>
-                        {format(parseISO(apt.appointment_date), "MMM d")} at {apt.start_time.slice(0, 5)}
+                      <div className="text-sm font-semibold text-foreground">
+                        Dr. {[doc?.firstName, doc?.lastName].filter(Boolean).join(" ")}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {formatLocalizedDateFns(parseISO(apt.appointment_date), "MMM d", lang)} · {apt.start_time.slice(0, 5)}
                       </div>
                     </div>
-                    <span style={{
-                      fontSize: "0.72rem",
-                      fontWeight: 600,
-                      padding: "3px 10px",
-                      borderRadius: "999px",
-                      background: apt.status === "confirmed" ? "#eaf5ff"
-                        : apt.status === "pending" ? "#fff8e6"
-                        : apt.status === "completed" ? "#e6f4ef"
-                        : "#fef2f2",
-                      color: apt.status === "confirmed" ? "#4f8fe6"
-                        : apt.status === "pending" ? "#f5a623"
-                        : apt.status === "completed" ? "#65a98f"
-                        : "#e05252",
-                    }}>
-                      {apt.status}
+                    <span className={cn("rounded-full px-2.5 py-1 text-[0.72rem] font-semibold", getStatusClasses(apt.status))}>
+                      {getAppointmentStatusLabel(apt.status, t)}
                     </span>
                   </div>
                 );
@@ -141,11 +134,11 @@ export default function Dashboard() {
             </div>
           </motion.div>
         ) : (
-          <motion.div custom={6} variants={fadeUp} style={{ background: "white", border: "1px solid #b5d1cc", borderRadius: "16px", padding: "32px", textAlign: "center", boxShadow: "0 2px 12px rgba(79,143,230,0.08)" }}>
-            <CalendarCheck className="h-12 w-12 mx-auto mb-4" style={{ color: "#b5d1cc" }} />
-            <h3 className="font-display font-semibold text-lg mb-2" style={{ color: "#1a2e3b", fontFamily: "Manrope, sans-serif", fontWeight: 600 }}>{t.noAppointmentsYet}</h3>
-            <p className="text-muted-foreground text-sm mb-4" style={{ color: "#5a7a8a", fontSize: "0.875rem" }}>{t.noAppointmentsDesc}</p>
-            <Button className="rounded-full px-6 shadow-soft" asChild style={{ background: "#4f8fe6", color: "white", borderRadius: "999px", padding: "8px 24px", fontWeight: 600 }}>
+          <motion.div custom={6} variants={fadeUp} className="rounded-2xl border border-border bg-card px-8 py-10 text-center shadow-sm">
+            <CalendarCheck className="mx-auto mb-4 h-12 w-12 text-muted-foreground/50" />
+            <h3 className="mb-2 text-lg font-display font-semibold text-foreground">{t.noAppointmentsYet}</h3>
+            <p className="mb-4 text-sm text-muted-foreground">{t.noAppointmentsDesc}</p>
+            <Button className="rounded-full px-6" asChild>
               <Link to="/patient/doctors">{t.findDoctor}</Link>
             </Button>
           </motion.div>

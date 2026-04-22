@@ -63,7 +63,7 @@ export default function DoctorsSection({
       {...sectionMotionProps}
       ref={sectionRef}
       id="doktorlarimiz"
-      className="relative z-[10] w-full bg-[#f4f8fd] px-6 py-20 md:px-12 lg:px-20"
+      className="relative z-[10] w-full bg-homepage-shell px-6 py-20 md:px-12 lg:px-20"
     >
       <style>{".doctor-scroll-container::-webkit-scrollbar { display: none; }"}</style>
 
@@ -74,7 +74,7 @@ export default function DoctorsSection({
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, amount: 0.3 }}
             transition={{ duration: 0.6, ease: appleEase }}
-            className="text-[2rem] font-bold text-[#1a2e3b]"
+            className="text-[2rem] font-bold text-homepage-ink"
             style={{ fontFamily: "Manrope, sans-serif" }}
           >
             {t.doctorsPageTitle}
@@ -88,7 +88,7 @@ export default function DoctorsSection({
           >
             <SmartLink
               href="/doctors"
-              className="shrink-0 text-sm font-medium text-[#4f8fe6] transition-colors duration-200 hover:text-[#2f75ca]"
+              className="shrink-0 text-sm font-medium text-homepage-brand transition-colors duration-200 hover:text-homepage-brand-deep"
               style={{ fontFamily: "Inter, sans-serif" }}
             >
               {t.viewAll} →
@@ -117,14 +117,14 @@ export default function DoctorsSection({
             ))}
           </div>
         ) : hasLoadedEmpty ? (
-          <div style={{ textAlign: "center", color: "#5a7a8a", padding: 40 }}>{t.noActiveDoctors}</div>
+          <div style={{ textAlign: "center", color: "rgb(var(--homepage-muted))", padding: 40 }}>{t.noActiveDoctors}</div>
         ) : (
           <div className={useGridMode ? "" : "relative px-0 md:px-6"}>
             {!useGridMode ? (
               <button
                 type="button"
                 onClick={() => scrollRef.current?.scrollBy({ left: -340, behavior: "smooth" })}
-                className="hidden md:flex absolute left-[-20px] top-1/2 z-10 h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border-[1.5px] border-[#b5d1cc] bg-white shadow-[0_2px_12px_rgba(79,143,230,0.15)]"
+                className="hidden md:flex absolute left-[-20px] top-1/2 z-10 h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border-[1.5px] border-homepage-border bg-homepage-card shadow-[0_2px_12px_rgba(79,143,230,0.15)]"
                 style={{ opacity: canScrollLeft ? 1 : 0.3, pointerEvents: canScrollLeft ? "auto" : "none" }}
               >
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
@@ -137,7 +137,7 @@ export default function DoctorsSection({
               <button
                 type="button"
                 onClick={() => scrollRef.current?.scrollBy({ left: 340, behavior: "smooth" })}
-                className="hidden md:flex absolute right-[-20px] top-1/2 z-10 h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border-[1.5px] border-[#b5d1cc] bg-white shadow-[0_2px_12px_rgba(79,143,230,0.15)]"
+                className="hidden md:flex absolute right-[-20px] top-1/2 z-10 h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border-[1.5px] border-homepage-border bg-homepage-card shadow-[0_2px_12px_rgba(79,143,230,0.15)]"
                 style={{ opacity: canScrollRight ? 1 : 0.3, pointerEvents: canScrollRight ? "auto" : "none" }}
               >
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
@@ -221,11 +221,11 @@ export default function DoctorsSection({
                   <div style={{ height: "16px" }} />
 
                   <div style={{ padding: "0 8px 8px", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" }}>
-                    <h3 style={{ fontSize: "22px", fontWeight: "700", fontFamily: "Manrope, sans-serif", color: "#1a2e3b", marginBottom: "6px", lineHeight: "1.2" }}>
+                    <h3 style={{ fontSize: "22px", fontWeight: "700", fontFamily: "Manrope, sans-serif", color: "rgb(var(--homepage-ink))", marginBottom: "6px", lineHeight: "1.2" }}>
                       {doctor.name}
                     </h3>
 
-                    <p style={{ fontSize: "14px", fontWeight: "400", fontFamily: "Inter, sans-serif", color: "#5a7a8a", marginBottom: "0", lineHeight: "1.5" }}>
+                    <p style={{ fontSize: "14px", fontWeight: "400", fontFamily: "Inter, sans-serif", color: "rgb(var(--homepage-muted))", marginBottom: "0", lineHeight: "1.5" }}>
                       {doctor.specialtyName || doctor.title}
                     </p>
 

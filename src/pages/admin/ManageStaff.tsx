@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { cn } from "@/lib/utils";
 import api from "@/services/api";
 
 const fadeUp = {
@@ -18,38 +19,15 @@ const fadeUp = {
   visible: (i: number) => ({
     opacity: 1,
     y: 0,
-    transition: {
-      delay: i * 0.06,
-      duration: 0.5,
-      ease: [0.22, 1, 0.36, 1] as const,
-    },
+    transition: { delay: i * 0.06, duration: 0.5, ease: [0.22, 1, 0.36, 1] as const },
   }),
 };
 
 function humanizeError(err: any): string {
   const raw = err?.response?.data?.message ?? err?.message;
   const messages = Array.isArray(raw) ? raw : raw ? [raw] : [];
-
-  const map: Record<string, string> = {
-    "firstName should not be empty": "Ad boş bırakılamaz",
-    "lastName should not be empty": "Soyad boş bırakılamaz",
-    "email must be an email": "Geçerli bir e-posta adresi girin",
-    "email should not be empty": "E-posta boş bırakılamaz",
-    "password must be longer than or equal to 6 characters":
-      "Şifre en az 6 karakter olmalıdır",
-    "password should not be empty": "Şifre boş bırakılamaz",
-    "specializationId should not be empty": "Uzmanlık alanı seçiniz",
-    "specializationId must be a UUID": "Uzmanlık alanı seçiniz",
-    "title should not be empty": "Unvan boş bırakılamaz",
-    "bio should not be empty": "Biyografi boş bırakılamaz",
-    "phone should not be empty": "Telefon boş bırakılamaz",
-    "role should not be empty": "Rol seçiniz",
-    "Email already exists": "Bu e-posta adresi zaten kullanılıyor",
-  };
-
   const first = messages[0];
-  if (!first) return "Bir hata oluştu. Lütfen tekrar deneyin.";
-  return map[first] ?? first;
+  return first || "Bir hata oluştu. Lütfen tekrar deneyin.";
 }
 
 type StaffCreateFormState = {
@@ -87,10 +65,7 @@ export default function ManageStaff() {
   const createStaff = useMutation({
     mutationFn: async (payload: StaffCreateFormState) => {
       try {
-        const { isActive: _removed, ...createPayload } = payload as StaffCreateFormState & {
-          isActive?: boolean;
-        };
-        return await api.staff.create(createPayload);
+        return await api.staff.create(payload);
       } catch (err: any) {
         toast.error(humanizeError(err));
         throw err;
@@ -160,20 +135,18 @@ export default function ManageStaff() {
         <motion.div custom={0} variants={fadeUp}>
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h1
-                className="text-3xl font-display font-bold"
-                style={{ color: "#1a2e3b", fontFamily: "Manrope, sans-serif", fontWeight: 700 }}
-              >
+              <h1 className="text-3xl font-display font-bold text-foreground" style={{ fontFamily: "Manrope, sans-serif", fontWeight: 700 }}>
                 {t.manageStaff}
               </h1>
-              <p className="text-muted-foreground mt-1" style={{ color: "#5a7a8a" }}>{staff.length} {t.registeredStaff}</p>
+              <p className="mt-1 text-muted-foreground">{staff.length} {t.registeredStaff}</p>
             </div>
+
             <button
-              onClick={() => { setNewStaff(emptyStaffForm); setAddOpen(true); }}
-              className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-white transition-colors"
-              style={{ background: "#4f8fe6" }}
-              onMouseEnter={(e) => e.currentTarget.style.background = "#2f75ca"}
-              onMouseLeave={(e) => e.currentTarget.style.background = "#4f8fe6"}
+              onClick={() => {
+                setNewStaff(emptyStaffForm);
+                setAddOpen(true);
+              }}
+              className="flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
             >
               <UserPlus className="h-4 w-4" />
               {t.addStaff}
@@ -181,104 +154,73 @@ export default function ManageStaff() {
           </div>
         </motion.div>
 
-        <motion.div custom={1} variants={fadeUp} className="flex gap-2 mb-4">
-          {(["active", "inactive", "all"] as const).map((f) => (
+        <motion.div custom={1} variants={fadeUp} className="mb-4 flex gap-2">
+          {(["active", "inactive", "all"] as const).map((filterValue) => (
             <button
-              key={f}
-              onClick={() => setStatusFilter(f)}
-              style={{
-                background: statusFilter === f ? "#4f8fe6" : "white",
-                color: statusFilter === f ? "white" : "#5a7a8a",
-                border: `1.5px solid ${statusFilter === f ? "#4f8fe6" : "#b5d1cc"}`,
-                borderRadius: "10px",
-                padding: "6px 18px",
-                fontSize: "0.875rem",
-                fontWeight: 500,
-                cursor: "pointer",
-                transition: "all 0.15s",
-              }}
+              key={filterValue}
+              onClick={() => setStatusFilter(filterValue)}
+              className={cn(
+                "rounded-[10px] border px-[18px] py-[6px] text-sm font-medium transition-all",
+                statusFilter === filterValue
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border bg-card text-muted-foreground hover:bg-muted/70",
+              )}
             >
-              {f === "active" ? t.active : f === "inactive" ? t.inactive : t.all}
+              {filterValue === "active" ? t.active : filterValue === "inactive" ? t.inactive : t.all}
             </button>
           ))}
         </motion.div>
 
         <motion.div custom={2} variants={fadeUp} className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder={t.searchByNameOrEmail}
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(event) => setSearch(event.target.value)}
             className="pl-10"
           />
         </motion.div>
 
         <motion.div custom={3} variants={fadeUp}>
-          <Card
-            style={{
-              background: "white",
-              border: "1px solid #b5d1cc",
-              borderRadius: "16px",
-              boxShadow: "0 2px 12px rgba(79,143,230,0.08)",
-              overflow: "visible",
-            }}
-          >
+          <Card className="overflow-visible rounded-2xl border border-border bg-card shadow-sm">
             <CardContent className="p-0">
-              <div className="overflow-x-auto overflow-y-auto max-h-[560px]">
+              <div className="max-h-[560px] overflow-x-auto overflow-y-auto">
                 <table className="w-full">
                   <thead>
-                    <tr className="text-left" style={{ background: "#f4f8fd", borderBottom: "1px solid #b5d1cc" }}>
-                      <th className="p-4 text-sm font-medium text-muted-foreground" style={{ color: "#5a7a8a", fontSize: "0.8rem", fontWeight: 600, padding: "12px 16px" }}>{t.name}</th>
-                      <th className="p-4 text-sm font-medium text-muted-foreground hidden md:table-cell" style={{ color: "#5a7a8a", fontSize: "0.8rem", fontWeight: 600, padding: "12px 16px" }}>{t.email}</th>
-                      <th className="p-4 text-sm font-medium text-muted-foreground hidden lg:table-cell" style={{ color: "#5a7a8a", fontSize: "0.8rem", fontWeight: 600, padding: "12px 16px" }}>{t.phone}</th>
-                      <th className="p-4 text-sm font-medium text-muted-foreground" style={{ color: "#5a7a8a", fontSize: "0.8rem", fontWeight: 600, padding: "12px 16px" }}>{t.status}</th>
-                      <th className="p-4 text-sm font-medium text-muted-foreground text-right" style={{ color: "#5a7a8a", fontSize: "0.8rem", fontWeight: 600, padding: "12px 16px" }}>{t.actions}</th>
+                    <tr className="border-b border-border bg-muted/50 text-left">
+                      <th className="p-4 text-sm font-medium text-muted-foreground">{t.name}</th>
+                      <th className="hidden p-4 text-sm font-medium text-muted-foreground md:table-cell">{t.email}</th>
+                      <th className="hidden p-4 text-sm font-medium text-muted-foreground lg:table-cell">{t.phone}</th>
+                      <th className="p-4 text-sm font-medium text-muted-foreground">{t.status}</th>
+                      <th className="p-4 text-right text-sm font-medium text-muted-foreground">{t.actions}</th>
                     </tr>
                   </thead>
                   <tbody>
                     {staff.map((member: any) => {
                       const fullName = `${member.firstName ?? ""} ${member.lastName ?? ""}`.trim() || "Unknown";
+
                       return (
-                        <tr
-                          key={member.id}
-                          className="last:border-0 transition-colors"
-                          style={{ borderBottom: "1px solid #f0f4f8" }}
-                          onMouseEnter={(e) => e.currentTarget.style.background = "#f4f8fd"}
-                          onMouseLeave={(e) => e.currentTarget.style.background = "white"}
-                        >
+                        <tr key={member.id} className="border-b border-border bg-card transition-colors last:border-0 hover:bg-muted/40">
                           <td className="p-4">
                             <div className="flex items-center gap-3">
-                              <div style={{
-                                width: 36,
-                                height: 36,
-                                borderRadius: "10px",
-                                background: "#eaf5ff",
-                                color: "#4f8fe6",
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                fontSize: "0.875rem",
-                                fontWeight: 700,
-                                border: "2px solid #b5d1cc",
-                                flexShrink: 0,
-                              }}>
+                              <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-[10px] border-2 border-border bg-primary/10 text-[0.875rem] font-bold text-primary">
                                 {fullName[0] ?? "S"}
                               </div>
                               <div>
-                                <p className="font-medium text-sm" style={{ color: "#1a2e3b", fontWeight: 600, fontSize: "0.9rem" }}>{fullName}</p>
-                                <p className="text-xs text-muted-foreground md:hidden" style={{ color: "#5a7a8a", fontSize: "0.78rem" }}>{member.email ?? "—"}</p>
+                                <p className="text-sm font-medium text-foreground">{fullName}</p>
+                                <p className="text-xs text-muted-foreground md:hidden">{member.email ?? "—"}</p>
                               </div>
                             </div>
                           </td>
-                          <td className="p-4 hidden md:table-cell text-sm text-muted-foreground">{member.email ?? "—"}</td>
-                          <td className="p-4 hidden lg:table-cell text-sm text-muted-foreground">{member.phone ?? "—"}</td>
+                          <td className="hidden p-4 text-sm text-muted-foreground md:table-cell">{member.email ?? "—"}</td>
+                          <td className="hidden p-4 text-sm text-muted-foreground lg:table-cell">{member.phone ?? "—"}</td>
                           <td className="p-4">
                             <Badge
                               variant="outline"
                               className={
                                 member.isActive
-                                  ? "border-[#b5d1cc] bg-[#e6f4ef] text-[#65a98f]"
-                                  : "border-[#fca5a5]/30 bg-[#fef2f2] text-[#e05252]"
+                                  ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-200"
+                                  : "border-slate-200 bg-slate-100 text-slate-600 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-300"
                               }
                             >
                               {member.isActive ? t.active : t.inactive}
@@ -303,27 +245,15 @@ export default function ManageStaff() {
                                 <Edit className="h-4 w-4" />
                               </Button>
                               {member.isActive ? (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => setStaffStatus.mutate({ id: member.id, isActive: false })}
-                                >
+                                <Button variant="ghost" size="icon" onClick={() => setStaffStatus.mutate({ id: member.id, isActive: false })}>
                                   <UserX className="h-4 w-4 text-destructive" />
                                 </Button>
                               ) : (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => setStaffStatus.mutate({ id: member.id, isActive: true })}
-                                >
-                                  <UserCheck className="h-4 w-4 text-success" />
+                                <Button variant="ghost" size="icon" onClick={() => setStaffStatus.mutate({ id: member.id, isActive: true })}>
+                                  <UserCheck className="h-4 w-4 text-emerald-600 dark:text-emerald-300" />
                                 </Button>
                               )}
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => deleteStaff.mutate(member.id)}
-                              >
+                              <Button variant="ghost" size="icon" onClick={() => deleteStaff.mutate(member.id)}>
                                 <Trash2 className="h-4 w-4 text-destructive" />
                               </Button>
                             </div>
@@ -331,9 +261,12 @@ export default function ManageStaff() {
                         </tr>
                       );
                     })}
+
                     {!staff.length && (
                       <tr>
-                        <td colSpan={5} className="p-8 text-center text-muted-foreground">{t.noStaffFound}</td>
+                        <td colSpan={5} className="p-8 text-center text-muted-foreground">
+                          {t.noStaffFound}
+                        </td>
                       </tr>
                     )}
                   </tbody>
@@ -406,28 +339,25 @@ function StaffForm<T extends StaffCreateFormState>({
       </div>
       <div>
         <Label>{t.email}</Label>
-        <Input
-          type="email"
-          autoComplete="off"
-          value={form.email}
-          onChange={(e) => onChange({ ...form, email: e.target.value })}
-        />
+        <Input type="email" autoComplete="off" value={form.email} onChange={(e) => onChange({ ...form, email: e.target.value })} />
       </div>
       <div>
         <Label>{t.phone}</Label>
         <Input value={form.phone} onChange={(e) => onChange({ ...form, phone: e.target.value })} />
       </div>
-      <div>
-        <Label>{t.status}</Label>
-        <div className="mt-2 flex gap-2">
-          <Button type="button" variant={form.isActive ? "default" : "outline"} onClick={() => onChange({ ...form, isActive: true })}>
-            {t.active}
-          </Button>
-          <Button type="button" variant={!form.isActive ? "default" : "outline"} onClick={() => onChange({ ...form, isActive: false })}>
-            {t.inactive}
-          </Button>
+      {"isActive" in form ? (
+        <div>
+          <Label>{t.status}</Label>
+          <div className="mt-2 flex gap-2">
+            <Button type="button" variant={form.isActive ? "default" : "outline"} onClick={() => onChange({ ...form, isActive: true } as T)}>
+              {t.active}
+            </Button>
+            <Button type="button" variant={!form.isActive ? "default" : "outline"} onClick={() => onChange({ ...form, isActive: false } as T)}>
+              {t.inactive}
+            </Button>
+          </div>
         </div>
-      </div>
+      ) : null}
     </div>
   );
 }

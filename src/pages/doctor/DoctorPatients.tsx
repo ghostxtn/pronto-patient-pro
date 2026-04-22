@@ -72,12 +72,12 @@ export default function DoctorPatients() {
 
   return (
     <AppLayout>
-      <motion.div initial="hidden" animate="visible" className="space-y-6 rounded-[28px] bg-[#f4f8fd] p-1">
+      <motion.div initial="hidden" animate="visible" className="space-y-6 rounded-[28px] bg-background/40 p-1">
         <motion.div custom={0} variants={fadeUp}>
-          <h1 className="text-3xl font-bold tracking-tight text-[#1a2e3b]" style={{ fontFamily: "Manrope, sans-serif" }}>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground" style={{ fontFamily: "Manrope, sans-serif" }}>
             Hastalarım
           </h1>
-          <p className="mt-2 text-sm text-[#5a7a8a]" style={{ fontFamily: "Inter, sans-serif" }}>
+          <p className="mt-2 text-sm text-muted-foreground" style={{ fontFamily: "Inter, sans-serif" }}>
             Kayıtlı hastaları görüntüleyin ve hasta detaylarına geçin.
           </p>
         </motion.div>
@@ -89,7 +89,7 @@ export default function DoctorPatients() {
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder="Ad veya e-posta ile ara"
-              className="w-full h-10 pl-10 pr-4 rounded-xl border border-[#b5d1cc] bg-white text-sm text-[#1a2e3b] placeholder:text-[#5a7a8a] focus:outline-none focus:ring-2 focus:ring-[#4f8fe6]/30 shadow-[0_2px_8px_rgba(79,143,230,0.06)]"
+              className="h-10 w-full rounded-xl border border-border bg-card pl-10 pr-4 text-sm text-foreground shadow-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
               style={{ fontFamily: "Inter, sans-serif" }}
             />
           </div>
@@ -99,7 +99,7 @@ export default function DoctorPatients() {
           {isLoading ? (
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3" style={{ maxHeight: "560px", overflowY: "auto" }}>
               {Array.from({ length: 6 }).map((_, index) => (
-                <Card key={index} className="rounded-2xl border border-[#b5d1cc] bg-white shadow-[0_2px_12px_rgba(79,143,230,0.08)]">
+                <Card key={index} className="rounded-2xl border border-border bg-card shadow-sm">
                   <CardContent className="space-y-4 p-5">
                     <div className="flex items-center gap-3">
                       <Skeleton className="h-12 w-12 rounded-full" />
@@ -121,32 +121,30 @@ export default function DoctorPatients() {
 
                 return (
                   <motion.div key={patient.id} custom={index} variants={fadeUp}>
-                    <Card className="h-full rounded-2xl border border-[#b5d1cc] bg-white shadow-[0_2px_12px_rgba(79,143,230,0.08)] transition-all duration-200 hover:border-[#4f8fe6] hover:shadow-[0_8px_22px_rgba(79,143,230,0.14)]">
+                    <Card className="h-full rounded-2xl border border-border bg-card shadow-sm transition-all duration-200 hover:border-primary/50 hover:shadow-md">
                       <CardContent className="flex h-full flex-col gap-4 p-5">
                         <div className="flex items-center gap-3">
-                          <div className="h-12 w-12 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "#eaf5ff" }}>
-                            <span className="font-bold text-sm" style={{ color: "#4f8fe6", fontFamily: "Manrope, sans-serif" }}>
+                          <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-primary/10">
+                            <span className="text-sm font-bold text-primary" style={{ fontFamily: "Manrope, sans-serif" }}>
                               {getInitials(fullName)}
                             </span>
                           </div>
                           <div className="min-w-0">
-                            <p className="truncate font-semibold text-[#1a2e3b]" style={{ fontFamily: "Manrope, sans-serif" }}>{fullName}</p>
-                            <p className="truncate text-sm" style={{ color: "#5a7a8a", fontFamily: "Inter, sans-serif" }}>
+                            <p className="truncate font-semibold text-foreground" style={{ fontFamily: "Manrope, sans-serif" }}>{fullName}</p>
+                            <p className="truncate text-sm text-muted-foreground" style={{ fontFamily: "Inter, sans-serif" }}>
                               {patient.email || "E-posta bilgisi yok"}
                             </p>
                           </div>
                         </div>
 
-                        <div className="space-y-1 text-sm" style={{ color: "#5a7a8a", fontFamily: "Inter, sans-serif" }}>
+                        <div className="space-y-1 text-sm text-muted-foreground" style={{ fontFamily: "Inter, sans-serif" }}>
                           <p>{patient.email || "E-posta bilgisi yok"}</p>
                           <p>{patient.phone || "Telefon bilgisi yok"}</p>
                         </div>
 
                         <button
-                          className="mt-auto w-full rounded-xl py-2 text-sm font-medium text-white transition-colors"
-                          style={{ backgroundColor: "#4f8fe6", fontFamily: "Inter, sans-serif" }}
-                          onMouseOver={(e) => (e.currentTarget.style.backgroundColor = "#2f75ca")}
-                          onMouseOut={(e) => (e.currentTarget.style.backgroundColor = "#4f8fe6")}
+                          className="mt-auto w-full rounded-xl bg-primary py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+                          style={{ fontFamily: "Inter, sans-serif" }}
                           onClick={() => navigate(`/doctor/patients/${patient.id}`)}
                         >
                           Görüntüle
@@ -158,10 +156,10 @@ export default function DoctorPatients() {
               })}
             </div>
           ) : (
-            <Card className="rounded-2xl border border-dashed border-[#b5d1cc] bg-white">
+            <Card className="rounded-2xl border border-dashed border-border bg-card">
               <CardContent className="flex min-h-[260px] flex-col items-center justify-center gap-3 p-8 text-center">
-                <div className="rounded-full p-4" style={{ backgroundColor: "#eaf5ff" }}>
-                  <Users className="h-6 w-6" style={{ color: "#4f8fe6" }} />
+                <div className="rounded-full bg-primary/10 p-4">
+                  <Users className="h-6 w-6 text-primary" />
                 </div>
                 <div className="space-y-1">
                   <p className="font-medium text-[#1a2e3b]" style={{ fontFamily: "Manrope, sans-serif" }}>Hasta bulunamadı</p>

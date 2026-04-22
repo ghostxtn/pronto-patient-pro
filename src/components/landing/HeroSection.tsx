@@ -1,5 +1,6 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import Lenis from "@studio-freight/lenis";
+import { useTheme } from "next-themes";
 import { useNavigate } from "react-router-dom";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useHomepagePreviewData } from "@/hooks/useHomepagePreviewData";
@@ -7,6 +8,7 @@ import { useHomepagePreviewData } from "@/hooks/useHomepagePreviewData";
 export default function HeroSection() {
   const navigate = useNavigate();
   const { lang, t } = useLanguage();
+  const { resolvedTheme } = useTheme();
   const previewData = useHomepagePreviewData(lang);
   const clinic = (previewData.data as { clinic?: { name?: string | null; logo_url?: string | null; updated_at?: string | null } | null } | undefined)?.clinic;
   const logoUrl = clinic?.logo_url
@@ -15,6 +17,11 @@ export default function HeroSection() {
   const clinicName = clinic?.name ?? "MediBook";
   const rafRef = useRef<number>(0);
   const heroTotalRef = useRef<number>(1);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     const heroEl = document.getElementById("hero-section");
@@ -87,10 +94,29 @@ export default function HeroSection() {
     };
   }, []);
 
+  const isDark = mounted && resolvedTheme === "dark";
+
   return (
     <section id="hero-section" className="hero-section">
       <div id="hero-sticky-bg" className="hero-sticky-bg">
-        <video autoPlay muted loop playsInline className="hero-video-bg" src="/hero-animation.mp4" />
+        <video
+          autoPlay
+          muted
+          loop
+          playsInline
+          className="hero-video-bg"
+          src="/hero-animation.mp4"
+          style={{ opacity: isDark ? 0 : 1, transition: "opacity 280ms ease" }}
+        />
+        <video
+          autoPlay
+          muted
+          loop
+          playsInline
+          className="hero-video-bg"
+          src="/Darkmode-animation.mp4"
+          style={{ opacity: isDark ? 1 : 0, transition: "opacity 280ms ease" }}
+        />
 
         <div id="hero-content" className="hero-content">
           <div className="hero-content-shell">
