@@ -81,7 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const { accessToken } = await api.auth.refresh();
         setAccessToken(accessToken);
-        const me = await api.profiles.me();
+        const me = await api.auth.me();
         const normalizedUser = normalizeUser(me.user ?? me);
         setUser(normalizedUser);
       } catch (err) {
@@ -114,7 +114,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
 
           setAccessToken(result.accessToken ?? null);
-          const me = await api.profiles.me();
+          const me = await api.auth.me();
           setUser(normalizeUser(me.user ?? me));
         } catch (err) {
           console.error("Login failed");
@@ -163,7 +163,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         try {
           const result = await api.auth.verifyOtp(flowToken, code);
           setAccessToken(result.accessToken ?? null);
-          const me = await api.profiles.me();
+          const me = await api.auth.me();
           setUser(normalizeUser(me.user ?? me));
         } catch (err) {
           console.error("OTP verification failed");
