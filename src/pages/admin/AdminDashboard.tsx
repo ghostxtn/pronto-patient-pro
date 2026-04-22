@@ -141,7 +141,7 @@ export default function AdminDashboard() {
             <Card className="rounded-2xl border border-border bg-card shadow-soft">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg text-foreground" style={{ fontFamily: "Manrope, sans-serif" }}>
-                  <Stethoscope className="h-5 w-5 text-[#4f8fe6]" />
+                  <Stethoscope className="h-5 w-5 text-primary" />
                   {t.activeDoctorProfileTitle}
                 </CardTitle>
               </CardHeader>
@@ -166,7 +166,7 @@ export default function AdminDashboard() {
           <Card className="rounded-2xl border border-border bg-card shadow-soft">
             <CardHeader className="flex flex-row items-center justify-between gap-4 pb-3">
               <CardTitle className="flex items-center gap-2 text-lg text-foreground" style={{ fontFamily: "Manrope, sans-serif" }}>
-                <Activity className="h-5 w-5 text-[#4f8fe6]" />
+                <Activity className="h-5 w-5 text-primary" />
                 {t.recentAppointments}
               </CardTitle>
               <input

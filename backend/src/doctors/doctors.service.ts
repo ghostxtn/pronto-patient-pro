@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Inject,
   Injectable,
   NotFoundException,
@@ -144,7 +145,11 @@ export class DoctorsService {
       .where(and(eq(doctors.clinic_id, clinicId), eq(doctors.is_active, true)));
   }
 
-  async findById(id: string, clinicId: string) {
+  async findById(
+    id: string,
+    clinicId: string,
+    options?: { includeInactive?: boolean },
+  ) {
     const [doctor] = await this.db
       .select({
         id: doctors.id,
@@ -167,10 +172,18 @@ export class DoctorsService {
       .from(doctors)
       .innerJoin(users, eq(doctors.user_id, users.id))
       .leftJoin(specializations, eq(doctors.specialization_id, specializations.id))
-      .where(and(eq(doctors.id, id), eq(doctors.clinic_id, clinicId)))
+      .where(eq(doctors.id, id))
       .limit(1);
 
     if (!doctor) {
+      throw new NotFoundException('Doctor not found');
+    }
+
+    if (doctor.clinic_id !== clinicId) {
+      throw new ForbiddenException('Access denied to this clinic');
+    }
+
+    if (!options?.includeInactive && !doctor.is_active) {
       throw new NotFoundException('Doctor not found');
     }
 

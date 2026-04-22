@@ -30,6 +30,14 @@ export class AppointmentsService {
   private readonly logger = new Logger(AppointmentsService.name);
   private readonly NOTE_ENCRYPTED_FIELDS = ['diagnosis', 'treatment', 'prescription', 'notes'];
   private readonly PATIENT_ENCRYPTED_FIELDS = ['firstName', 'lastName', 'email'];
+  private readonly PATIENT_PROFILE_ENCRYPTED_FIELDS = [
+    'first_name',
+    'last_name',
+    'email',
+    'phone',
+    'address',
+    'tc_no',
+  ];
 
   constructor(
     @Inject('DRIZZLE') private readonly db: any,
@@ -161,15 +169,10 @@ export class AppointmentsService {
     const conditions = [eq(appointments.clinic_id, clinicId)];
 
     if (currentUser?.role === 'patient') {
-      const [patient] = await this.db
-        .select()
-        .from(patients)
-        .where(and(eq(patients.user_id, currentUser.userId), eq(patients.clinic_id, clinicId)))
-        .limit(1);
-
-      if (!patient) {
-        throw new ForbiddenException('Patient record not found');
-      }
+      const patient = await this.resolveOrProvisionPatientRecord(
+        currentUser.userId,
+        clinicId,
+      );
 
       conditions.push(eq(appointments.patient_id, patient.id));
     }
@@ -274,18 +277,9 @@ export class AppointmentsService {
     }
 
     if (role === 'patient' && userId) {
-      const [patient] = await this.db
-        .select()
-        .from(patients)
-        .where(
-          and(
-            eq(patients.user_id, userId),
-            eq(patients.clinic_id, clinicId),
-          ),
-        )
-        .limit(1);
+      const patient = await this.resolveOrProvisionPatientRecord(userId, clinicId);
 
-      if (!patient || appointment.patient_id !== patient.id) {
+      if (appointment.patient_id !== patient.id) {
         throw new ForbiddenException('Access denied');
       }
     }
@@ -581,11 +575,11 @@ export class AppointmentsService {
       .where(and(eq(patients.user_id, userId), eq(patients.clinic_id, clinicId)))
       .limit(1);
 
-    if (!patient) {
-      throw new ForbiddenException('Patient record not found');
+    if (patient) {
+      return patient.id;
     }
 
-    return patient.id;
+    return (await this.resolveOrProvisionPatientRecord(userId, clinicId)).id;
   }
 
   private async ensureDoctorInClinic(doctorId: string, clinicId: string) {
@@ -770,5 +764,57 @@ export class AppointmentsService {
     );
 
     return appointment;
+  }
+
+  private async resolveOrProvisionPatientRecord(userId: string, clinicId: string) {
+    const [patient] = await this.db
+      .select()
+      .from(patients)
+      .where(and(eq(patients.user_id, userId), eq(patients.clinic_id, clinicId)))
+      .limit(1);
+
+    if (patient) {
+      return patient;
+    }
+
+    const [user] = await this.db
+      .select({
+        id: users.id,
+        first_name: users.first_name,
+        last_name: users.last_name,
+        email: users.email,
+        role: users.role,
+        clinic_id: users.clinic_id,
+      })
+      .from(users)
+      .where(and(eq(users.id, userId), eq(users.clinic_id, clinicId)))
+      .limit(1);
+
+    if (!user || user.role !== 'patient') {
+      throw new ForbiddenException('Patient record not found');
+    }
+
+    const encryptedPatient = await this.encryptionService.encryptFields(
+      {
+        clinic_id: clinicId,
+        user_id: user.id,
+        first_name: user.first_name,
+        last_name: user.last_name,
+        email: user.email,
+      },
+      this.PATIENT_PROFILE_ENCRYPTED_FIELDS,
+      clinicId,
+    );
+
+    const [createdPatient] = await this.db
+      .insert(patients)
+      .values(encryptedPatient)
+      .returning();
+
+    this.logger.warn(
+      `Provisioned missing patient profile for user ${userId} in clinic ${clinicId}`,
+    );
+
+    return createdPatient;
   }
 }

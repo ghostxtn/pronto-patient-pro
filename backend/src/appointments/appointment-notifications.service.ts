@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { and, eq, gte, isNull, lte } from 'drizzle-orm';
+import { and, eq, gte, isNull, lte, sql } from 'drizzle-orm';
 import { appointments, clinics, doctors, patients, users } from '../database/schema';
 import { EmailService } from '../email/email.service';
 import { EncryptionService } from '../encryption/encryption.service';
@@ -73,6 +73,7 @@ export class AppointmentNotificationsService {
     'patientLast',
     'patientEmail',
   ];
+  private reminderSchemaVerified = false;
 
   constructor(
     @Inject('DRIZZLE') private readonly db: any,
@@ -246,6 +247,8 @@ export class AppointmentNotificationsService {
   }
 
   async processDueReminders() {
+    await this.ensureReminderSchemaReady();
+
     const reminderLeadHours = Math.max(
       1,
       Number(this.configService.get<string>('APPOINTMENT_REMINDER_LEAD_HOURS', '24')),
@@ -260,6 +263,10 @@ export class AppointmentNotificationsService {
       windowStart.getTime() + reminderWindowMinutes * 60 * 1000,
     );
 
+    this.logger.debug(
+      `Running reminder pass for window ${windowStart.toISOString()} -> ${windowEnd.toISOString()}`,
+    );
+
     const rows = (await this.db
       .select()
       .from(appointments)
@@ -270,6 +277,8 @@ export class AppointmentNotificationsService {
           lte(appointments.appointment_date, this.toDateOnly(windowEnd)),
         ),
       )) as AppointmentRecord[];
+
+    this.logger.debug(`Reminder candidate query returned ${rows.length} appointment(s)`);
 
     const dueAppointments = rows.filter((appointment) => {
       if (!isReminderEligibleAppointmentStatus(appointment.status)) {
@@ -283,6 +292,10 @@ export class AppointmentNotificationsService {
 
       return appointmentStart >= windowStart && appointmentStart <= windowEnd;
     });
+
+    this.logger.debug(
+      `Reminder pass resolved ${dueAppointments.length} due appointment(s) after status/time filtering`,
+    );
 
     for (const appointment of dueAppointments) {
       const context = await this.buildNotificationContext(
@@ -322,6 +335,35 @@ export class AppointmentNotificationsService {
         `Sent appointment reminder for appointment ${appointment.id} in clinic ${appointment.clinic_id}`,
       );
     }
+  }
+
+  private async ensureReminderSchemaReady() {
+    if (this.reminderSchemaVerified) {
+      return;
+    }
+
+    const result = await this.db.execute(sql`
+      select exists (
+        select 1
+        from information_schema.columns
+        where table_schema = 'public'
+          and table_name = 'appointments'
+          and column_name = 'reminder_sent_at'
+      ) as "hasReminderSentAt"
+    `);
+
+    const hasReminderSentAt = Boolean(
+      (result as { rows?: Array<{ hasReminderSentAt?: boolean }> })?.rows?.[0]
+        ?.hasReminderSentAt,
+    );
+
+    if (!hasReminderSentAt) {
+      throw new Error(
+        'appointments.reminder_sent_at is missing from the active database schema. Apply the latest Drizzle migrations before running appointment reminders.',
+      );
+    }
+
+    this.reminderSchemaVerified = true;
   }
 
   private async buildNotificationContext(

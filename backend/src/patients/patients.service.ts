@@ -37,9 +37,14 @@ export class PatientsService {
     return redacted as T;
   }
 
-  async create(dto: CreatePatientDto, clinicId: string) {
+  async create(
+    dto: CreatePatientDto,
+    clinicId: string,
+    options?: { userId?: string | null },
+  ) {
     const rawData: Record<string, any> = {
       clinic_id: clinicId,
+      user_id: options?.userId ?? null,
       first_name: dto.firstName,
       last_name: dto.lastName,
       tc_no: dto.tcNo,

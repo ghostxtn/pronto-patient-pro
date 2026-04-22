@@ -18,10 +18,10 @@ const fadeUp = {
 };
 
 const statusColors: Record<string, string> = {
-  pending: "border-[rgba(245,166,35,0.3)] bg-[#fff8e6] text-[#f5a623]",
-  confirmed: "border-[#b5d1cc] bg-[#eaf5ff] text-[#4f8fe6]",
-  completed: "border-[#b5d1cc] bg-[#e6f4ef] text-[#65a98f]",
-  cancelled: "border-[rgba(252,165,165,0.3)] bg-[#fef2f2] text-[#e05252]",
+  pending: "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-200",
+  confirmed: "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-900/60 dark:bg-blue-950/40 dark:text-blue-200",
+  completed: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-200",
+  cancelled: "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-200",
 };
 
 export default function DoctorDashboard() {
@@ -119,7 +119,7 @@ export default function DoctorDashboard() {
                     <div className="flex h-12 w-12 items-center justify-center rounded-xl" style={{ backgroundColor: stat.iconBg }}>
                       <stat.icon className="h-5 w-5" style={{ color: stat.iconColor }} />
                     </div>
-                    <TrendingUp className="h-4 w-4 shrink-0 text-[#65a98f]" />
+                    <TrendingUp className="h-4 w-4 shrink-0 text-emerald-500 dark:text-emerald-300" />
                   </div>
                   <div className="text-[2rem] font-bold leading-none text-foreground" style={{ fontFamily: "Manrope, sans-serif" }}>
                     {stat.value}
@@ -137,7 +137,7 @@ export default function DoctorDashboard() {
           <Card className="rounded-2xl border border-border bg-card shadow-soft">
             <CardHeader className="flex flex-row items-center justify-between pb-3">
               <CardTitle className="flex items-center gap-2 text-lg text-foreground" style={{ fontFamily: "Manrope, sans-serif" }}>
-                <CalendarCheck className="h-5 w-5 text-[#4f8fe6]" />
+                <CalendarCheck className="h-5 w-5 text-primary" />
                 {t.todaysSchedule}
               </CardTitle>
               <Button variant="ghost" size="sm" asChild><Link to="/doctor/appointments">{t.viewAll} <ArrowRight className="ml-1 h-3 w-3" /></Link></Button>
@@ -148,8 +148,8 @@ export default function DoctorDashboard() {
                   {todayAppts.map((apt) => { const patient = apt.profiles as any; return (
                     <div key={apt.id} className="flex items-center justify-between rounded-xl bg-background/70 p-4 transition-colors hover:bg-accent/60">
                       <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl" style={{ backgroundColor: "#eaf5ff" }}>
-                          <span className="text-sm font-bold" style={{ color: "#4f8fe6", fontFamily: "Manrope, sans-serif" }}>
+                        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-primary/10">
+                          <span className="text-sm font-bold text-primary" style={{ fontFamily: "Manrope, sans-serif" }}>
                             {patient?.full_name?.[0] || "P"}
                           </span>
                         </div>
@@ -159,7 +159,7 @@ export default function DoctorDashboard() {
                           </div>
                           <div className="flex items-center gap-2 text-xs text-muted-foreground" style={{ fontFamily: "Inter, sans-serif" }}>
                             <Clock className="h-3 w-3" />
-                            {apt.start_time.slice(0, 5)} — {apt.end_time.slice(0, 5)}
+                            {apt.start_time.slice(0, 5)} - {apt.end_time.slice(0, 5)}
                           </div>
                         </div>
                       </div>
@@ -186,7 +186,7 @@ export default function DoctorDashboard() {
           <Link to="/doctor/schedule">
             <Card className="group cursor-pointer rounded-2xl border border-border bg-card shadow-soft transition-all duration-200 hover:border-primary/60 hover:shadow-elevated">
               <CardContent className="p-6">
-                <Clock className="mb-3 h-8 w-8 group-hover:scale-110 transition-transform" style={{ color: "#4f8fe6" }} />
+                <Clock className="mb-3 h-8 w-8 text-primary transition-transform group-hover:scale-110" />
                 <h3 className="mb-1 font-semibold text-foreground" style={{ fontFamily: "Manrope, sans-serif" }}>{t.manageSchedule}</h3>
                 <p className="text-sm text-muted-foreground" style={{ fontFamily: "Inter, sans-serif" }}>{t.manageScheduleDesc}</p>
               </CardContent>
@@ -195,7 +195,7 @@ export default function DoctorDashboard() {
           <Link to="/doctor/appointments">
             <Card className="group cursor-pointer rounded-2xl border border-border bg-card shadow-soft transition-all duration-200 hover:border-primary/60 hover:shadow-elevated">
               <CardContent className="p-6">
-                <CalendarCheck className="mb-3 h-8 w-8 group-hover:scale-110 transition-transform" style={{ color: "#65a98f" }} />
+                <CalendarCheck className="mb-3 h-8 w-8 text-emerald-600 transition-transform group-hover:scale-110 dark:text-emerald-400" />
                 <h3 className="mb-1 font-semibold text-foreground" style={{ fontFamily: "Manrope, sans-serif" }}>{t.viewAppointments}</h3>
                 <p className="text-sm text-muted-foreground" style={{ fontFamily: "Inter, sans-serif" }}>{t.viewAppointmentsDesc}</p>
               </CardContent>

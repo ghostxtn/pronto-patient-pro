@@ -766,6 +766,9 @@ export class AuthService {
         email: user.email,
       },
       flow.clinicId,
+      {
+        userId: user.id,
+      },
     );
 
     if (process.env.APP_ENV === 'development') {
@@ -1215,6 +1218,9 @@ export class AuthService {
           email: user.email,
         },
         clinicId,
+        {
+          userId: user.id,
+        },
       );
 
       this.logger.log(

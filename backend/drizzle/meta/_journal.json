@@ -134,6 +134,13 @@
       "when": 1776865200000,
       "tag": "0018_appointment_reminder_sent_at",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1776870000000,
+      "tag": "0019_ensure_appointment_reminder_sent_at",
+      "breakpoints": true
     }
   ]
 }
