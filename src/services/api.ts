@@ -272,6 +272,7 @@ const api = {
   },
   clinics: {
     list: () => request<any[]>("/clinics"),
+    current: () => request<any>("/clinics/current"),
     get: (id: string) => request<any>(`/clinics/${id}`),
     create: (data: unknown) =>
       request<any>("/clinics", {
