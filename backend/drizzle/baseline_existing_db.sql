@@ -397,3 +397,73 @@ WHERE NOT EXISTS (
   FROM drizzle.__drizzle_migrations
   WHERE hash = '0010_cooing_exiles'
 );
+
+ALTER TABLE "specializations" ADD COLUMN IF NOT EXISTS "image_url" varchar(500);
+
+INSERT INTO drizzle.__drizzle_migrations (hash, created_at)
+SELECT '0011_daffy_lake', 1775000000000
+WHERE NOT EXISTS (SELECT 1 FROM drizzle.__drizzle_migrations WHERE hash = '0011_daffy_lake');
+
+CREATE TABLE IF NOT EXISTS "trusted_devices" (
+  "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+  "user_id" uuid NOT NULL,
+  "clinic_id" uuid NOT NULL,
+  "token_hash" varchar(255) NOT NULL,
+  "user_agent_hash" varchar(255),
+  "expires_at" timestamp NOT NULL,
+  "last_used_at" timestamp DEFAULT now() NOT NULL,
+  "created_at" timestamp DEFAULT now() NOT NULL,
+  "updated_at" timestamp DEFAULT now() NOT NULL
+);
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'trusted_devices_user_id_users_id_fk') THEN
+    ALTER TABLE "trusted_devices" ADD CONSTRAINT "trusted_devices_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;
+  END IF;
+END $$;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'trusted_devices_clinic_id_clinics_id_fk') THEN
+    ALTER TABLE "trusted_devices" ADD CONSTRAINT "trusted_devices_clinic_id_clinics_id_fk" FOREIGN KEY ("clinic_id") REFERENCES "public"."clinics"("id") ON DELETE no action ON UPDATE no action;
+  END IF;
+END $$;
+CREATE UNIQUE INDEX IF NOT EXISTS "trusted_devices_token_hash_unique" ON "trusted_devices" USING btree ("token_hash");
+CREATE INDEX IF NOT EXISTS "trusted_devices_user_id_idx" ON "trusted_devices" USING btree ("user_id");
+CREATE INDEX IF NOT EXISTS "trusted_devices_clinic_id_idx" ON "trusted_devices" USING btree ("clinic_id");
+
+INSERT INTO drizzle.__drizzle_migrations (hash, created_at)
+SELECT '0012_trusted_devices', 1775100000000
+WHERE NOT EXISTS (SELECT 1 FROM drizzle.__drizzle_migrations WHERE hash = '0012_trusted_devices');
+
+ALTER TABLE "doctor_availability_overrides" DROP CONSTRAINT IF EXISTS "doctor_availability_overrides_doctor_date_type_unique";
+
+INSERT INTO drizzle.__drizzle_migrations (hash, created_at)
+SELECT '0013_salak_Hakan', 1775200000000
+WHERE NOT EXISTS (SELECT 1 FROM drizzle.__drizzle_migrations WHERE hash = '0013_salak_Hakan');
+
+ALTER TABLE "clinics" ADD COLUMN IF NOT EXISTS "logo_url" varchar(500);
+
+INSERT INTO drizzle.__drizzle_migrations (hash, created_at)
+SELECT '0014_awesome_cassandra_nova', 1775300000000
+WHERE NOT EXISTS (SELECT 1 FROM drizzle.__drizzle_migrations WHERE hash = '0014_awesome_cassandra_nova');
+
+ALTER TABLE "clinics" ADD COLUMN IF NOT EXISTS "default_appointment_duration" integer DEFAULT 30 NOT NULL;
+ALTER TABLE "clinics" ADD COLUMN IF NOT EXISTS "appointment_approval_mode" varchar(20) DEFAULT 'manual' NOT NULL;
+ALTER TABLE "clinics" ADD COLUMN IF NOT EXISTS "max_booking_days_ahead" integer DEFAULT 60 NOT NULL;
+ALTER TABLE "clinics" ADD COLUMN IF NOT EXISTS "cancellation_hours_before" integer DEFAULT 24 NOT NULL;
+
+INSERT INTO drizzle.__drizzle_migrations (hash, created_at)
+SELECT '0015_amazing_redwing', 1775400000000
+WHERE NOT EXISTS (SELECT 1 FROM drizzle.__drizzle_migrations WHERE hash = '0015_amazing_redwing');
+
+GRANT INSERT ON TABLE audit_logs TO audit_user;
+REVOKE DELETE, UPDATE ON TABLE audit_logs FROM PUBLIC;
+
+INSERT INTO drizzle.__drizzle_migrations (hash, created_at)
+SELECT '0016_audit_user_grants', 1775909200000
+WHERE NOT EXISTS (SELECT 1 FROM drizzle.__drizzle_migrations WHERE hash = '0016_audit_user_grants');
+
+ALTER TABLE "doctor_availability" ADD COLUMN IF NOT EXISTS "specific_date" date;
+ALTER TABLE "doctor_availability" ALTER COLUMN "day_of_week" DROP NOT NULL;
+
+INSERT INTO drizzle.__drizzle_migrations (hash, created_at)
+SELECT '0017_lively_serpent_society', 1776542346724
+WHERE NOT EXISTS (SELECT 1 FROM drizzle.__drizzle_migrations WHERE hash = '0017_lively_serpent_society');
