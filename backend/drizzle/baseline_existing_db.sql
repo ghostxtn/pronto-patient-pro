@@ -470,3 +470,11 @@ ALTER TABLE "doctor_availability" ALTER COLUMN "day_of_week" DROP NOT NULL;
 INSERT INTO drizzle.__drizzle_migrations (hash, created_at)
 SELECT '0017_lively_serpent_society', 1776542346724
 WHERE NOT EXISTS (SELECT 1 FROM drizzle.__drizzle_migrations WHERE hash = '0017_lively_serpent_society');
+
+INSERT INTO drizzle.__drizzle_migrations (hash, created_at)
+SELECT '0018_appointment_reminder_sent_at', 1776865200000
+WHERE NOT EXISTS (SELECT 1 FROM drizzle.__drizzle_migrations WHERE hash = '0018_appointment_reminder_sent_at');
+
+INSERT INTO drizzle.__drizzle_migrations (hash, created_at)
+SELECT '0019_ensure_appointment_reminder_sent_at', 1776870000000
+WHERE NOT EXISTS (SELECT 1 FROM drizzle.__drizzle_migrations WHERE hash = '0019_ensure_appointment_reminder_sent_at');
