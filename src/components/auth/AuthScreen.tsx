@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { ArrowLeft } from "lucide-react";
 import { Link } from "react-router-dom";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
+import ThemeToggle from "@/components/ThemeToggle";
 import { useLanguage } from "@/contexts/LanguageContext";
 
 interface AuthScreenProps {
@@ -18,7 +19,7 @@ export default function AuthScreen({ children }: AuthScreenProps) {
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: 30 }}
       transition={{ duration: 0.3, ease: "easeOut" }}
-      className="min-h-screen flex"
+      className="min-h-screen flex bg-background text-foreground"
     >
       <div
         className="relative hidden lg:flex lg:w-1/2 items-center justify-center overflow-hidden"
@@ -64,24 +65,27 @@ export default function AuthScreen({ children }: AuthScreenProps) {
         </div>
       </div>
 
-      <div className="flex-1 flex items-center justify-center bg-[#f4f8fd] p-4 md:p-8 lg:p-12">
+      <div className="flex-1 flex items-center justify-center bg-background p-4 md:p-8 lg:p-12">
         <div className="w-full max-w-[420px]">
           <div className="mb-4 flex items-center justify-between">
-            <Link to="/auth" className="inline-flex items-center gap-2 text-sm text-[#5a7a8a] hover:text-[#1a2e3b]">
+            <Link to="/auth" className="inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground">
               <ArrowLeft className="h-4 w-4" />
               {t.backToLogin}
             </Link>
-            <LanguageSwitcher />
+            <div className="flex items-center gap-2">
+              <ThemeToggle className="h-10 w-10 rounded-xl border border-border text-muted-foreground hover:bg-muted hover:text-foreground" />
+              <LanguageSwitcher />
+            </div>
           </div>
 
-          <div className="w-full rounded-2xl bg-white p-6 shadow-[0_20px_40px_rgba(8,30,42,0.07)] md:p-10">
+          <div className="w-full rounded-2xl border border-border/60 bg-card p-6 text-card-foreground shadow-[0_20px_40px_rgba(8,30,42,0.07)] dark:shadow-[0_20px_40px_rgba(0,0,0,0.35)] md:p-10">
             <div className="mb-8 flex items-center gap-3">
               <svg width="44" height="44" viewBox="0 0 44 44" xmlns="http://www.w3.org/2000/svg" className="h-11 w-11">
                 <rect x="0" y="13" width="44" height="18" rx="9" fill="#65a98f" />
                 <rect x="13" y="0" width="18" height="22" rx="9" fill="#4f8fe6" />
                 <rect x="13" y="22" width="18" height="22" rx="9" fill="#4f8fe6" />
               </svg>
-              <span className="text-[15px] font-light tracking-tight text-[#081e2a]" style={{ fontFamily: "Manrope, sans-serif" }}>
+              <span className="text-[15px] font-light tracking-tight text-foreground" style={{ fontFamily: "Manrope, sans-serif" }}>
                 Pronto Klinik
               </span>
             </div>

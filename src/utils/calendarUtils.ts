@@ -79,7 +79,7 @@ export function overridesToEvents(
       const blackoutDate = new Date(override.date);
       return {
         id: override.id,
-        title: override.reason ?? "Kapali",
+        title: "Kapalı",
         start: blackoutDate,
         end: blackoutDate,
         allDay: true,
@@ -99,7 +99,7 @@ export function overridesToEvents(
 
     return {
       id: override.id,
-      title: override.reason ?? "Özel Mesai",
+      title: "Kapalı Gün",
       start,
       end,
       type: override.type,

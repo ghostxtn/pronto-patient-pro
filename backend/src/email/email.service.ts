@@ -6,6 +6,13 @@ import {
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
 
+type ClinicEmailContext = {
+  clinicId: string;
+  clinicName: string;
+  clinicDomain: string;
+  clinicEmail: string | null;
+};
+
 @Injectable()
 export class EmailService {
   private readonly logger = new Logger(EmailService.name);
@@ -22,25 +29,13 @@ export class EmailService {
   }
 
   async sendAuthOtp(email: string, code: string): Promise<void> {
-    try {
-      await this.getTransporter().sendMail({
-        from: this.getFromAddress(),
-        to: email,
-        subject: 'Your verification code',
-        text: `Your verification code is ${code}. It expires in 10 minutes.`,
-        html: `<p>Your verification code is <strong>${code}</strong>.</p><p>It expires in 10 minutes.</p>`,
-      });
-    } catch (error) {
-      this.logger.error(
-        `Failed to send OTP email to ${email}: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      );
-
-      throw new ServiceUnavailableException(
-        'Email delivery failed. Check SMTP settings and use a verified SMTP_FROM sender address.',
-      );
-    }
+    await this.sendEmail({
+      to: email,
+      subject: 'Your verification code',
+      text: `Your verification code is ${code}. It expires in 10 minutes.`,
+      html: `<p>Your verification code is <strong>${code}</strong>.</p><p>It expires in 10 minutes.</p>`,
+      logContext: 'OTP',
+    });
   }
 
   async sendPasswordReset(
@@ -48,40 +43,29 @@ export class EmailService {
     resetLink: string,
     expiresInMinutes: number,
   ): Promise<void> {
-    try {
-      await this.getTransporter().sendMail({
-        from: this.getFromAddress(),
-        to: email,
-        subject: 'Reset your password',
-        text: [
-          'We received a request to reset your password.',
-          `Use this link to set a new password: ${resetLink}`,
-          `This link expires in ${expiresInMinutes} minutes.`,
-          'If you did not request this, you can ignore this email.',
-        ].join('\n\n'),
-        html: `
-          <p>We received a request to reset your password.</p>
-          <p><a href="${resetLink}">Set a new password</a></p>
-          <p>This link expires in ${expiresInMinutes} minutes.</p>
-          <p>If you did not request this, you can ignore this email.</p>
-        `,
-      });
-    } catch (error) {
-      this.logger.error(
-        `Failed to send password reset email to ${email}: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      );
-
-      throw new ServiceUnavailableException(
-        'Email delivery failed. Check SMTP settings and use a verified SMTP_FROM sender address.',
-      );
-    }
+    await this.sendEmail({
+      to: email,
+      subject: 'Reset your password',
+      text: [
+        'We received a request to reset your password.',
+        `Use this link to set a new password: ${resetLink}`,
+        `This link expires in ${expiresInMinutes} minutes.`,
+        'If you did not request this, you can ignore this email.',
+      ].join('\n\n'),
+      html: `
+        <p>We received a request to reset your password.</p>
+        <p><a href="${resetLink}">Set a new password</a></p>
+        <p>This link expires in ${expiresInMinutes} minutes.</p>
+        <p>If you did not request this, you can ignore this email.</p>
+      `,
+      logContext: 'password reset',
+    });
   }
 
   async sendAppointmentCreated(
     to: string,
     payload: {
+      clinic?: ClinicEmailContext;
       patientName: string;
       doctorName: string;
       date: string;
@@ -90,37 +74,36 @@ export class EmailService {
       type: string;
     },
   ): Promise<void> {
-    try {
-      await this.getTransporter().sendMail({
-        from: this.getFromAddress(),
-        to,
-        subject: 'Randevunuz Oluşturuldu',
-        html: `
-          <p>Merhaba ${payload.patientName},</p>
-          <p>Randevu talebiniz başarıyla oluşturuldu.</p>
-          <p><strong>Doktor:</strong> ${payload.doctorName}</p>
-          <p><strong>Tarih:</strong> ${payload.date}</p>
-          <p><strong>Saat:</strong> ${payload.startTime} - ${payload.endTime}</p>
-          <p><strong>Randevu Türü:</strong> ${payload.type}</p>
-          <p>Randevunuz onaylandığında sizinle tekrar paylaşılacaktır.</p>
-        `,
-      });
-    } catch (error) {
-      this.logger.error(
-        `Failed to send appointment created email to ${to}: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      );
-
-      throw new ServiceUnavailableException(
-        'Email delivery failed. Check SMTP settings and use a verified SMTP_FROM sender address.',
-      );
-    }
+    await this.sendEmail({
+      to,
+      clinic: payload.clinic,
+      subject: 'Your appointment request has been received',
+      text: [
+        `Hello ${payload.patientName},`,
+        'Your appointment request has been received.',
+        `Doctor: ${payload.doctorName}`,
+        `Date: ${payload.date}`,
+        `Time: ${payload.startTime} - ${payload.endTime}`,
+        `Appointment type: ${payload.type || 'General appointment'}`,
+        'We will notify you once the request is reviewed.',
+      ].join('\n'),
+      html: `
+        <p>Hello ${payload.patientName},</p>
+        <p>Your appointment request has been received.</p>
+        <p><strong>Doctor:</strong> ${payload.doctorName}</p>
+        <p><strong>Date:</strong> ${payload.date}</p>
+        <p><strong>Time:</strong> ${payload.startTime} - ${payload.endTime}</p>
+        <p><strong>Appointment type:</strong> ${payload.type || 'General appointment'}</p>
+        <p>We will notify you once the request is reviewed.</p>
+      `,
+      logContext: 'appointment created',
+    });
   }
 
   async sendAppointmentConfirmed(
     to: string,
     payload: {
+      clinic?: ClinicEmailContext;
       patientName: string;
       doctorName: string;
       date: string;
@@ -128,72 +111,145 @@ export class EmailService {
       endTime: string;
     },
   ): Promise<void> {
-    try {
-      await this.getTransporter().sendMail({
-        from: this.getFromAddress(),
-        to,
-        subject: 'Randevunuz Onaylandı',
-        html: `
-          <p>Merhaba ${payload.patientName},</p>
-          <p>Randevunuz onaylandı.</p>
-          <p><strong>Doktor:</strong> ${payload.doctorName}</p>
-          <p><strong>Tarih:</strong> ${payload.date}</p>
-          <p><strong>Saat:</strong> ${payload.startTime} - ${payload.endTime}</p>
-          <p>Sağlıklı günler dileriz.</p>
-        `,
-      });
-    } catch (error) {
-      this.logger.error(
-        `Failed to send appointment confirmed email to ${to}: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      );
+    await this.sendEmail({
+      to,
+      clinic: payload.clinic,
+      subject: 'Your appointment has been confirmed',
+      text: [
+        `Hello ${payload.patientName},`,
+        'Your appointment has been confirmed.',
+        `Doctor: ${payload.doctorName}`,
+        `Date: ${payload.date}`,
+        `Time: ${payload.startTime} - ${payload.endTime}`,
+      ].join('\n'),
+      html: `
+        <p>Hello ${payload.patientName},</p>
+        <p>Your appointment has been confirmed.</p>
+        <p><strong>Doctor:</strong> ${payload.doctorName}</p>
+        <p><strong>Date:</strong> ${payload.date}</p>
+        <p><strong>Time:</strong> ${payload.startTime} - ${payload.endTime}</p>
+      `,
+      logContext: 'appointment confirmed',
+    });
+  }
 
-      throw new ServiceUnavailableException(
-        'Email delivery failed. Check SMTP settings and use a verified SMTP_FROM sender address.',
-      );
-    }
+  async sendAppointmentDeclined(
+    to: string,
+    payload: {
+      clinic?: ClinicEmailContext;
+      patientName: string;
+      doctorName: string;
+      date: string;
+      startTime: string;
+      endTime: string;
+    },
+  ): Promise<void> {
+    await this.sendEmail({
+      to,
+      clinic: payload.clinic,
+      subject: 'Your appointment request was declined',
+      text: [
+        `Hello ${payload.patientName},`,
+        'Your appointment request was declined.',
+        `Doctor: ${payload.doctorName}`,
+        `Date: ${payload.date}`,
+        `Time: ${payload.startTime} - ${payload.endTime}`,
+        'Please contact the clinic if you want to request another time.',
+      ].join('\n'),
+      html: `
+        <p>Hello ${payload.patientName},</p>
+        <p>Your appointment request was declined.</p>
+        <p><strong>Doctor:</strong> ${payload.doctorName}</p>
+        <p><strong>Date:</strong> ${payload.date}</p>
+        <p><strong>Time:</strong> ${payload.startTime} - ${payload.endTime}</p>
+        <p>Please contact the clinic if you want to request another time.</p>
+      `,
+      logContext: 'appointment declined',
+    });
+  }
+
+  async sendAppointmentReminder(
+    to: string,
+    payload: {
+      clinic?: ClinicEmailContext;
+      patientName: string;
+      doctorName: string;
+      date: string;
+      startTime: string;
+      endTime: string;
+      type: string;
+      reminderLeadHours: number;
+    },
+  ): Promise<void> {
+    await this.sendEmail({
+      to,
+      clinic: payload.clinic,
+      subject: 'Appointment reminder',
+      text: [
+        `Hello ${payload.patientName},`,
+        `This is a reminder that you have an appointment in about ${payload.reminderLeadHours} hours.`,
+        `Doctor: ${payload.doctorName}`,
+        `Date: ${payload.date}`,
+        `Time: ${payload.startTime} - ${payload.endTime}`,
+        `Appointment type: ${payload.type || 'General appointment'}`,
+      ].join('\n'),
+      html: `
+        <p>Hello ${payload.patientName},</p>
+        <p>This is a reminder that you have an appointment in about ${payload.reminderLeadHours} hours.</p>
+        <p><strong>Doctor:</strong> ${payload.doctorName}</p>
+        <p><strong>Date:</strong> ${payload.date}</p>
+        <p><strong>Time:</strong> ${payload.startTime} - ${payload.endTime}</p>
+        <p><strong>Appointment type:</strong> ${payload.type || 'General appointment'}</p>
+      `,
+      logContext: 'appointment reminder',
+    });
   }
 
   async sendAppointmentCancelled(
     to: string,
     payload: {
+      clinic?: ClinicEmailContext;
       patientName: string;
       doctorName: string;
       date: string;
       startTime: string;
+      endTime: string;
+      cancelledBy: string;
     },
   ): Promise<void> {
-    try {
-      await this.getTransporter().sendMail({
-        from: this.getFromAddress(),
-        to,
-        subject: 'Randevunuz İptal Edildi',
-        html: `
-          <p>Merhaba ${payload.patientName},</p>
-          <p>Aşağıdaki randevunuz iptal edilmiştir.</p>
-          <p><strong>Doktor:</strong> ${payload.doctorName}</p>
-          <p><strong>Tarih:</strong> ${payload.date}</p>
-          <p><strong>Saat:</strong> ${payload.startTime}</p>
-          <p>Detaylı bilgi için kliniğinizle iletişime geçebilirsiniz.</p>
-        `,
-      });
-    } catch (error) {
-      this.logger.error(
-        `Failed to send appointment cancelled email to ${to}: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      );
+    const cancellationLine =
+      payload.cancelledBy === 'patient'
+        ? 'You cancelled this appointment.'
+        : payload.cancelledBy === 'clinic'
+          ? 'The clinic cancelled this appointment.'
+          : 'This appointment was cancelled.';
 
-      throw new ServiceUnavailableException(
-        'Email delivery failed. Check SMTP settings and use a verified SMTP_FROM sender address.',
-      );
-    }
+    await this.sendEmail({
+      to,
+      clinic: payload.clinic,
+      subject: 'Your appointment was cancelled',
+      text: [
+        `Hello ${payload.patientName},`,
+        cancellationLine,
+        `Doctor: ${payload.doctorName}`,
+        `Date: ${payload.date}`,
+        `Time: ${payload.startTime} - ${payload.endTime}`,
+      ].join('\n'),
+      html: `
+        <p>Hello ${payload.patientName},</p>
+        <p>${cancellationLine}</p>
+        <p><strong>Doctor:</strong> ${payload.doctorName}</p>
+        <p><strong>Date:</strong> ${payload.date}</p>
+        <p><strong>Time:</strong> ${payload.startTime} - ${payload.endTime}</p>
+      `,
+      logContext: 'appointment cancelled',
+    });
   }
 
   async sendStaffNewAppointment(
     to: string,
     payload: {
+      clinic?: ClinicEmailContext;
       staffName: string;
       patientName: string;
       doctorName: string;
@@ -203,38 +259,109 @@ export class EmailService {
       type: string;
     },
   ): Promise<void> {
-    try {
-      await this.getTransporter().sendMail({
-        from: this.getFromAddress(),
-        to,
-        subject: 'Yeni Randevu Talebi',
-        html: `
-          <p>Merhaba ${payload.staffName},</p>
-          <p>Yeni bir randevu talebi oluşturuldu.</p>
-          <p><strong>Hasta:</strong> ${payload.patientName}</p>
-          <p><strong>Doktor:</strong> ${payload.doctorName}</p>
-          <p><strong>Tarih:</strong> ${payload.date}</p>
-          <p><strong>Saat:</strong> ${payload.startTime} - ${payload.endTime}</p>
-          <p><strong>Randevu Türü:</strong> ${payload.type}</p>
-          <p>Lutfen randevu talebini sistem uzerinden degerlendirin.</p>
-        `,
-      });
-    } catch (error) {
-      this.logger.error(
-        `Failed to send staff new appointment email to ${to}: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      );
+    await this.sendEmail({
+      to,
+      clinic: payload.clinic,
+      subject: 'New appointment request',
+      text: [
+        `Hello ${payload.staffName},`,
+        'A new appointment request was created.',
+        `Patient: ${payload.patientName}`,
+        `Doctor: ${payload.doctorName}`,
+        `Date: ${payload.date}`,
+        `Time: ${payload.startTime} - ${payload.endTime}`,
+        `Appointment type: ${payload.type || 'General appointment'}`,
+      ].join('\n'),
+      html: `
+        <p>Hello ${payload.staffName},</p>
+        <p>A new appointment request was created.</p>
+        <p><strong>Patient:</strong> ${payload.patientName}</p>
+        <p><strong>Doctor:</strong> ${payload.doctorName}</p>
+        <p><strong>Date:</strong> ${payload.date}</p>
+        <p><strong>Time:</strong> ${payload.startTime} - ${payload.endTime}</p>
+        <p><strong>Appointment type:</strong> ${payload.type || 'General appointment'}</p>
+      `,
+      logContext: 'staff new appointment',
+    });
+  }
 
-      throw new ServiceUnavailableException(
-        'Email delivery failed. Check SMTP settings and use a verified SMTP_FROM sender address.',
-      );
-    }
+  async sendStaffAppointmentCancelled(
+    to: string,
+    payload: {
+      clinic?: ClinicEmailContext;
+      staffName: string;
+      patientName: string;
+      doctorName: string;
+      date: string;
+      startTime: string;
+      endTime: string;
+      cancelledBy: string;
+    },
+  ): Promise<void> {
+    await this.sendEmail({
+      to,
+      clinic: payload.clinic,
+      subject: 'Appointment cancelled',
+      text: [
+        `Hello ${payload.staffName},`,
+        `An appointment was cancelled by the ${payload.cancelledBy}.`,
+        `Patient: ${payload.patientName}`,
+        `Doctor: ${payload.doctorName}`,
+        `Date: ${payload.date}`,
+        `Time: ${payload.startTime} - ${payload.endTime}`,
+      ].join('\n'),
+      html: `
+        <p>Hello ${payload.staffName},</p>
+        <p>An appointment was cancelled by the ${payload.cancelledBy}.</p>
+        <p><strong>Patient:</strong> ${payload.patientName}</p>
+        <p><strong>Doctor:</strong> ${payload.doctorName}</p>
+        <p><strong>Date:</strong> ${payload.date}</p>
+        <p><strong>Time:</strong> ${payload.startTime} - ${payload.endTime}</p>
+      `,
+      logContext: 'staff appointment cancelled',
+    });
+  }
+
+  async sendDoctorNewAppointment(
+    to: string,
+    payload: {
+      clinic?: ClinicEmailContext;
+      doctorName: string;
+      patientName: string;
+      date: string;
+      startTime: string;
+      endTime: string;
+      type: string;
+    },
+  ): Promise<void> {
+    await this.sendEmail({
+      to,
+      clinic: payload.clinic,
+      subject: 'New appointment assigned to you',
+      text: [
+        `Hello ${payload.doctorName},`,
+        'A new appointment request has been assigned to you.',
+        `Patient: ${payload.patientName}`,
+        `Date: ${payload.date}`,
+        `Time: ${payload.startTime} - ${payload.endTime}`,
+        `Appointment type: ${payload.type || 'General appointment'}`,
+      ].join('\n'),
+      html: `
+        <p>Hello ${payload.doctorName},</p>
+        <p>A new appointment request has been assigned to you.</p>
+        <p><strong>Patient:</strong> ${payload.patientName}</p>
+        <p><strong>Date:</strong> ${payload.date}</p>
+        <p><strong>Time:</strong> ${payload.startTime} - ${payload.endTime}</p>
+        <p><strong>Appointment type:</strong> ${payload.type || 'General appointment'}</p>
+      `,
+      logContext: 'doctor new appointment',
+    });
   }
 
   async sendDoctorAppointmentConfirmed(
     to: string,
     payload: {
+      clinic?: ClinicEmailContext;
       doctorName: string;
       patientName: string;
       date: string;
@@ -242,23 +369,82 @@ export class EmailService {
       endTime: string;
     },
   ): Promise<void> {
+    await this.sendEmail({
+      to,
+      clinic: payload.clinic,
+      subject: 'Appointment confirmed',
+      text: [
+        `Hello ${payload.doctorName},`,
+        'An appointment assigned to you has been confirmed.',
+        `Patient: ${payload.patientName}`,
+        `Date: ${payload.date}`,
+        `Time: ${payload.startTime} - ${payload.endTime}`,
+      ].join('\n'),
+      html: `
+        <p>Hello ${payload.doctorName},</p>
+        <p>An appointment assigned to you has been confirmed.</p>
+        <p><strong>Patient:</strong> ${payload.patientName}</p>
+        <p><strong>Date:</strong> ${payload.date}</p>
+        <p><strong>Time:</strong> ${payload.startTime} - ${payload.endTime}</p>
+      `,
+      logContext: 'doctor appointment confirmed',
+    });
+  }
+
+  async sendDoctorAppointmentCancelled(
+    to: string,
+    payload: {
+      clinic?: ClinicEmailContext;
+      doctorName: string;
+      patientName: string;
+      date: string;
+      startTime: string;
+      endTime: string;
+      cancelledBy: string;
+    },
+  ): Promise<void> {
+    await this.sendEmail({
+      to,
+      clinic: payload.clinic,
+      subject: 'Appointment cancelled',
+      text: [
+        `Hello ${payload.doctorName},`,
+        `An appointment was cancelled by the ${payload.cancelledBy}.`,
+        `Patient: ${payload.patientName}`,
+        `Date: ${payload.date}`,
+        `Time: ${payload.startTime} - ${payload.endTime}`,
+      ].join('\n'),
+      html: `
+        <p>Hello ${payload.doctorName},</p>
+        <p>An appointment was cancelled by the ${payload.cancelledBy}.</p>
+        <p><strong>Patient:</strong> ${payload.patientName}</p>
+        <p><strong>Date:</strong> ${payload.date}</p>
+        <p><strong>Time:</strong> ${payload.startTime} - ${payload.endTime}</p>
+      `,
+      logContext: 'doctor appointment cancelled',
+    });
+  }
+
+  private async sendEmail(params: {
+    to: string;
+    subject: string;
+    text: string;
+    html: string;
+    clinic?: ClinicEmailContext;
+    logContext: string;
+  }) {
     try {
       await this.getTransporter().sendMail({
         from: this.getFromAddress(),
-        to,
-        subject: 'Randevu Onaylandı',
-        html: `
-          <p>Merhaba ${payload.doctorName},</p>
-          <p>Randevunuz onaylandı.</p>
-          <p><strong>Hasta:</strong> ${payload.patientName}</p>
-          <p><strong>Tarih:</strong> ${payload.date}</p>
-          <p><strong>Saat:</strong> ${payload.startTime} - ${payload.endTime}</p>
-          <p>Takviminizi buna gore planlayabilirsiniz.</p>
-        `,
+        to: params.to,
+        replyTo: params.clinic?.clinicEmail || undefined,
+        subject: params.subject,
+        text: params.text,
+        html: params.html,
       });
     } catch (error) {
       this.logger.error(
-        `Failed to send doctor appointment confirmed email to ${to}: ${
+        `Failed to send ${params.logContext} email to ${params.to}: ${
           error instanceof Error ? error.message : String(error)
         }`,
       );

@@ -11,8 +11,16 @@ import {
   timeToMinutes,
 } from '../availability/calendar-time.utils';
 import { appointmentNotes, appointments, doctors, patients, users } from '../database/schema';
-import { EmailService } from '../email/email.service';
 import { EncryptionService } from '../encryption/encryption.service';
+import {
+  AppointmentNotificationsService,
+  type NotificationActorRole,
+} from './appointment-notifications.service';
+import {
+  isBlockingAppointmentStatus,
+  isReminderEligibleAppointmentStatus,
+  normalizeAppointmentStatus,
+} from './appointment-status.utils';
 import { CreateAppointmentNoteDto } from './dto/create-appointment-note.dto';
 import { CreateAppointmentDto } from './dto/create-appointment.dto';
 import { UpdateAppointmentDto } from './dto/update-appointment.dto';
@@ -22,12 +30,20 @@ export class AppointmentsService {
   private readonly logger = new Logger(AppointmentsService.name);
   private readonly NOTE_ENCRYPTED_FIELDS = ['diagnosis', 'treatment', 'prescription', 'notes'];
   private readonly PATIENT_ENCRYPTED_FIELDS = ['firstName', 'lastName', 'email'];
+  private readonly PATIENT_PROFILE_ENCRYPTED_FIELDS = [
+    'first_name',
+    'last_name',
+    'email',
+    'phone',
+    'address',
+    'tc_no',
+  ];
 
   constructor(
     @Inject('DRIZZLE') private readonly db: any,
     private readonly encryptionService: EncryptionService,
     private readonly availabilityService: AvailabilityService,
-    private readonly emailService: EmailService,
+    private readonly appointmentNotificationsService: AppointmentNotificationsService,
   ) {}
 
   private omitClinicId<T extends { clinic_id?: unknown }>(row: T) {
@@ -127,36 +143,10 @@ export class AppointmentsService {
       })
       .returning();
 
-    const notificationData = await this.getAppointmentNotificationData(
-      dto.doctorId,
-      patientId,
+    void this.appointmentNotificationsService.notifyAppointmentCreated(
+      appointment,
       clinicId,
     );
-
-    if (notificationData.patientEmail) {
-      void this.emailService.sendAppointmentCreated(notificationData.patientEmail, {
-        patientName: notificationData.patientName,
-        doctorName: notificationData.doctorName,
-        date: appointment.appointment_date,
-        startTime: this.formatTime(appointment.start_time),
-        endTime: this.formatTime(appointment.end_time),
-        type: appointment.type ?? '',
-      });
-    }
-
-    const staffRecipients = await this.getClinicStaffNotificationRecipients(clinicId);
-
-    for (const staffRecipient of staffRecipients) {
-      void this.emailService.sendStaffNewAppointment(staffRecipient.email, {
-        staffName: staffRecipient.staffName,
-        doctorName: notificationData.doctorName,
-        patientName: notificationData.patientName,
-        date: appointment.appointment_date,
-        startTime: this.formatTime(appointment.start_time),
-        endTime: this.formatTime(appointment.end_time),
-        type: appointment.type ?? '',
-      });
-    }
 
     return this.omitClinicId(appointment);
   }
@@ -179,15 +169,10 @@ export class AppointmentsService {
     const conditions = [eq(appointments.clinic_id, clinicId)];
 
     if (currentUser?.role === 'patient') {
-      const [patient] = await this.db
-        .select()
-        .from(patients)
-        .where(and(eq(patients.user_id, currentUser.userId), eq(patients.clinic_id, clinicId)))
-        .limit(1);
-
-      if (!patient) {
-        throw new ForbiddenException('Patient record not found');
-      }
+      const patient = await this.resolveOrProvisionPatientRecord(
+        currentUser.userId,
+        clinicId,
+      );
 
       conditions.push(eq(appointments.patient_id, patient.id));
     }
@@ -292,18 +277,9 @@ export class AppointmentsService {
     }
 
     if (role === 'patient' && userId) {
-      const [patient] = await this.db
-        .select()
-        .from(patients)
-        .where(
-          and(
-            eq(patients.user_id, userId),
-            eq(patients.clinic_id, clinicId),
-          ),
-        )
-        .limit(1);
+      const patient = await this.resolveOrProvisionPatientRecord(userId, clinicId);
 
-      if (!patient || appointment.patient_id !== patient.id) {
+      if (appointment.patient_id !== patient.id) {
         throw new ForbiddenException('Access denied');
       }
     }
@@ -365,6 +341,9 @@ export class AppointmentsService {
     if (dto.notes !== undefined) {
       updateData.notes = dto.notes;
     }
+    if (scheduleChanged) {
+      updateData.reminder_sent_at = null;
+    }
 
     const [appointment] = await this.db
       .update(appointments)
@@ -375,97 +354,21 @@ export class AppointmentsService {
     return this.omitClinicId(appointment);
   }
 
-  async updateStatus(id: string, status: string, clinicId: string) {
-    const existingAppointment = await this.findById(id, clinicId);
-
-    const [appointment] = await this.db
-      .update(appointments)
-      .set({
-        status,
-        updated_at: new Date(),
-      })
-      .where(eq(appointments.id, id))
-      .returning();
-
-    if (status === 'approved' || status === 'confirmed') {
-      const notificationData = await this.getAppointmentNotificationData(
-        existingAppointment.doctor_id,
-        existingAppointment.patient_id,
-        clinicId,
-      );
-
-      if (notificationData.patientEmail) {
-        void this.emailService.sendAppointmentConfirmed(notificationData.patientEmail, {
-          patientName: notificationData.patientName,
-          doctorName: notificationData.doctorName,
-          date: appointment.appointment_date,
-          startTime: this.formatTime(appointment.start_time),
-          endTime: this.formatTime(appointment.end_time),
-        });
-      }
-
-      if (notificationData.doctorEmail) {
-        void this.emailService.sendDoctorAppointmentConfirmed(
-          notificationData.doctorEmail,
-          {
-            doctorName: notificationData.doctorName,
-            patientName: notificationData.patientName,
-            date: appointment.appointment_date,
-            startTime: this.formatTime(appointment.start_time),
-            endTime: this.formatTime(appointment.end_time),
-          },
-        );
-      }
-    }
-
-    if (status === 'cancelled') {
-      const notificationData = await this.getAppointmentNotificationData(
-        existingAppointment.doctor_id,
-        existingAppointment.patient_id,
-        clinicId,
-      );
-
-      if (notificationData.patientEmail) {
-        void this.emailService.sendAppointmentCancelled(notificationData.patientEmail, {
-          patientName: notificationData.patientName,
-          doctorName: notificationData.doctorName,
-          date: appointment.appointment_date,
-          startTime: this.formatTime(appointment.start_time),
-        });
-      }
-    }
-
-    return this.omitClinicId(appointment);
+  async updateStatus(
+    id: string,
+    status: string,
+    clinicId: string,
+    actor: { role: string; userId: string },
+  ) {
+    return this.transitionStatus(id, status, clinicId, actor);
   }
 
-  async softDelete(id: string, clinicId: string) {
-    const existingAppointment = await this.findById(id, clinicId);
-
-    const [appointment] = await this.db
-      .update(appointments)
-      .set({
-        status: 'cancelled',
-        updated_at: new Date(),
-      })
-      .where(eq(appointments.id, id))
-      .returning();
-
-    const notificationData = await this.getAppointmentNotificationData(
-      existingAppointment.doctor_id,
-      existingAppointment.patient_id,
-      clinicId,
-    );
-
-    if (notificationData.patientEmail) {
-      void this.emailService.sendAppointmentCancelled(notificationData.patientEmail, {
-        patientName: notificationData.patientName,
-        doctorName: notificationData.doctorName,
-        date: appointment.appointment_date,
-        startTime: this.formatTime(appointment.start_time),
-      });
-    }
-
-    return this.omitClinicId(appointment);
+  async softDelete(
+    id: string,
+    clinicId: string,
+    actor: { role: string; userId: string },
+  ) {
+    return this.transitionStatus(id, 'cancelled', clinicId, actor);
   }
 
   async createNote(
@@ -672,11 +575,11 @@ export class AppointmentsService {
       .where(and(eq(patients.user_id, userId), eq(patients.clinic_id, clinicId)))
       .limit(1);
 
-    if (!patient) {
-      throw new ForbiddenException('Patient record not found');
+    if (patient) {
+      return patient.id;
     }
 
-    return patient.id;
+    return (await this.resolveOrProvisionPatientRecord(userId, clinicId)).id;
   }
 
   private async ensureDoctorInClinic(doctorId: string, clinicId: string) {
@@ -790,6 +693,7 @@ export class AppointmentsService {
       .select({
         start_time: appointments.start_time,
         end_time: appointments.end_time,
+        status: appointments.status,
       })
       .from(appointments)
       .where(and(...conditions));
@@ -801,7 +705,9 @@ export class AppointmentsService {
     const hasOverlap = existingAppointments.some((appointment: {
       start_time: string;
       end_time: string;
+      status: string;
     }) =>
+      isBlockingAppointmentStatus(appointment.status) &&
       rangesOverlap(
         requestedRange,
         {
@@ -816,75 +722,99 @@ export class AppointmentsService {
     }
   }
 
-  private formatTime(value: string) {
-    return value.slice(0, 5);
-  }
-
-  private async getClinicStaffNotificationRecipients(clinicId: string) {
-    const rows = await this.db
-      .select({
-        id: users.id,
-        email: users.email,
-        firstName: users.first_name,
-        lastName: users.last_name,
-      })
-      .from(users)
-      .where(and(eq(users.clinic_id, clinicId), eq(users.role, 'staff')));
-
-    return rows
-      .filter((row: { email: string | null }) => Boolean(row.email))
-      .map((row: {
-        id: string;
-        email: string;
-        firstName: string;
-        lastName: string;
-      }) => ({
-        id: row.id,
-        email: row.email,
-        staffName: `${row.firstName} ${row.lastName}`.trim(),
-      }));
-  }
-
-  private async getAppointmentNotificationData(
-    doctorId: string,
-    patientId: string,
+  private async transitionStatus(
+    id: string,
+    status: string,
     clinicId: string,
+    actor: { role: string; userId: string },
   ) {
-    const [row] = await this.db
-      .select({
-        patientFirst: patients.first_name,
-        patientLast: patients.last_name,
-        patientEmail: patients.email,
-        doctorFirst: users.first_name,
-        doctorLast: users.last_name,
-        doctorEmail: users.email,
-      })
-      .from(patients)
-      .innerJoin(doctors, eq(doctors.id, doctorId))
-      .innerJoin(users, eq(users.id, doctors.user_id))
-      .where(and(eq(patients.id, patientId), eq(patients.clinic_id, clinicId)))
-      .limit(1);
+    const existingAppointment = await this.findById(
+      id,
+      clinicId,
+      actor.userId,
+      actor.role,
+    );
+    const nextStatus = normalizeAppointmentStatus(status);
+    const previousStatus = normalizeAppointmentStatus(existingAppointment.status);
 
-    if (!row) {
-      throw new NotFoundException('Appointment notification recipients not found');
+    if (actor.role === 'patient' && nextStatus !== 'cancelled') {
+      throw new ForbiddenException('Patients may only cancel their own appointments');
     }
 
-    const decryptedPatient = await this.encryptionService.decryptFields(
+    if (previousStatus === nextStatus) {
+      return existingAppointment;
+    }
+
+    const [appointment] = await this.db
+      .update(appointments)
+      .set({
+        status: nextStatus,
+        reminder_sent_at: isReminderEligibleAppointmentStatus(nextStatus)
+          ? existingAppointment.reminder_sent_at ?? null
+          : null,
+        updated_at: new Date(),
+      })
+      .where(eq(appointments.id, id))
+      .returning();
+
+    void this.appointmentNotificationsService.notifyStatusChanged(
+      appointment,
+      previousStatus,
+      actor.role as NotificationActorRole,
+    );
+
+    return appointment;
+  }
+
+  private async resolveOrProvisionPatientRecord(userId: string, clinicId: string) {
+    const [patient] = await this.db
+      .select()
+      .from(patients)
+      .where(and(eq(patients.user_id, userId), eq(patients.clinic_id, clinicId)))
+      .limit(1);
+
+    if (patient) {
+      return patient;
+    }
+
+    const [user] = await this.db
+      .select({
+        id: users.id,
+        first_name: users.first_name,
+        last_name: users.last_name,
+        email: users.email,
+        role: users.role,
+        clinic_id: users.clinic_id,
+      })
+      .from(users)
+      .where(and(eq(users.id, userId), eq(users.clinic_id, clinicId)))
+      .limit(1);
+
+    if (!user || user.role !== 'patient') {
+      throw new ForbiddenException('Patient record not found');
+    }
+
+    const encryptedPatient = await this.encryptionService.encryptFields(
       {
-        patientFirst: row.patientFirst,
-        patientLast: row.patientLast,
-        patientEmail: row.patientEmail,
+        clinic_id: clinicId,
+        user_id: user.id,
+        first_name: user.first_name,
+        last_name: user.last_name,
+        email: user.email,
       },
-      ['patientFirst', 'patientLast', 'patientEmail'],
+      this.PATIENT_PROFILE_ENCRYPTED_FIELDS,
       clinicId,
     );
 
-    return {
-      patientName:
-        `${decryptedPatient.patientFirst ?? ''} ${decryptedPatient.patientLast ?? ''}`.trim(),
-      patientEmail: decryptedPatient.patientEmail as string | null,
-      doctorName: `${row.doctorFirst} ${row.doctorLast}`.trim(),
-      doctorEmail: row.doctorEmail,
-    };
+    const [createdPatient] = await this.db
+      .insert(patients)
+      .values(encryptedPatient)
+      .returning();
+
+    this.logger.warn(
+      `Provisioned missing patient profile for user ${userId} in clinic ${clinicId}`,
+    );
+
+    return createdPatient;
   }
 }

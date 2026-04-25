@@ -45,7 +45,7 @@ export default function AppointmentProcessPage() {
 
         <motion.section
           {...motionProps}
-          className="homepage-shadow-card mt-14 rounded-[32px] border border-homepage-border bg-white/70 p-8 backdrop-blur-sm md:p-10"
+          className="homepage-shadow-card mt-14 rounded-[32px] border border-homepage-border bg-homepage-card/70 p-8 backdrop-blur-sm md:p-10"
         >
           <div className="flex flex-col gap-8 lg:flex-row lg:items-start lg:justify-between">
             {steps.map((step, index) => (

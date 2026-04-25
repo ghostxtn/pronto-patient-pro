@@ -5,7 +5,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { and, eq, inArray, ne } from 'drizzle-orm';
+import { and, eq, inArray, isNull, ne, or } from 'drizzle-orm';
 import {
   appointments,
   clinics,
@@ -24,6 +24,7 @@ import {
   type MinuteRange,
   type SlotEntry,
 } from './calendar-time.utils';
+import { isBlockingAppointmentStatus } from '../appointments/appointment-status.utils';
 import { CreateAvailabilityDto } from './dto/create-availability.dto';
 import { UpdateAvailabilityDto } from './dto/update-availability.dto';
 
@@ -158,7 +159,14 @@ export class AvailabilityService {
     const currentAvailability = await this.findById(id, clinicId);
     await this.ensureDoctorInClinic(currentAvailability.doctor_id, clinicId);
 
-    const nextDayOfWeek = dto.dayOfWeek ?? currentAvailability.day_of_week;
+    const nextDayOfWeek =
+      dto.specificDate !== undefined
+        ? null
+        : dto.dayOfWeek ?? currentAvailability.day_of_week;
+    const nextSpecificDate =
+      dto.dayOfWeek !== undefined
+        ? null
+        : dto.specificDate ?? currentAvailability.specific_date;
     const nextStartTime =
       dto.startTime ?? currentAvailability.start_time.slice(0, 5);
     const nextEndTime = dto.endTime ?? currentAvailability.end_time.slice(0, 5);
@@ -169,6 +177,10 @@ export class AvailabilityService {
     this.validateAvailabilityRange(nextStartTime, nextEndTime);
 
     if (!nextIsActive) {
+      return this.updateAvailabilityRecord(id, dto);
+    }
+
+    if (nextSpecificDate) {
       return this.updateAvailabilityRecord(id, dto);
     }
 
@@ -257,36 +269,23 @@ export class AvailabilityService {
       await this.getClinicDefaultAppointmentDurationForDoctor(doctorId);
 
     const dayOfWeek = new Date(`${date}T00:00:00`).getDay();
-    const [weeklyAvailabilityBlocks, specificDateAvailabilityBlocks] =
-      await Promise.all([
-        this.db
-          .select()
-          .from(doctorAvailability)
-          .where(
+    const availabilityBlocks = (await this.db
+      .select()
+      .from(doctorAvailability)
+      .where(
+        and(
+          eq(doctorAvailability.doctor_id, doctorId),
+          eq(doctorAvailability.clinic_id, clinicId),
+          eq(doctorAvailability.is_active, true),
+          or(
             and(
-              eq(doctorAvailability.doctor_id, doctorId),
-              eq(doctorAvailability.clinic_id, clinicId),
               eq(doctorAvailability.day_of_week, dayOfWeek),
-              eq(doctorAvailability.is_active, true),
+              isNull(doctorAvailability.specific_date),
             ),
+            eq(doctorAvailability.specific_date, date),
           ),
-        this.db
-          .select()
-          .from(doctorAvailability)
-          .where(
-            and(
-              eq(doctorAvailability.doctor_id, doctorId),
-              eq(doctorAvailability.clinic_id, clinicId),
-              eq(doctorAvailability.specific_date, date),
-              eq(doctorAvailability.is_active, true),
-            ),
-          ),
-      ]);
-
-    const availabilityBlocks = [
-      ...(weeklyAvailabilityBlocks as DoctorAvailability[]),
-      ...(specificDateAvailabilityBlocks as DoctorAvailability[]),
-    ];
+        ),
+      )) as DoctorAvailability[];
 
     const overrides = await this.db
       .select()
@@ -394,6 +393,7 @@ export class AvailabilityService {
       .select({
         start_time: appointments.start_time,
         end_time: appointments.end_time,
+        status: appointments.status,
       })
       .from(appointments)
       .where(
@@ -401,7 +401,6 @@ export class AvailabilityService {
           eq(appointments.doctor_id, doctorId),
           eq(appointments.clinic_id, clinicId),
           eq(appointments.appointment_date, date),
-          ne(appointments.status, 'cancelled'),
         ),
       );
 
@@ -413,7 +412,8 @@ export class AvailabilityService {
         };
 
         return !existingAppointments.some(
-          (appointment: { start_time: string; end_time: string }) =>
+          (appointment: { start_time: string; end_time: string; status: string }) =>
+            isBlockingAppointmentStatus(appointment.status) &&
             rangesOverlap(slotRange, this.toRange(appointment.start_time, appointment.end_time)),
         );
       }),
@@ -547,6 +547,12 @@ export class AvailabilityService {
 
     if (dto.dayOfWeek !== undefined) {
       updateData.day_of_week = dto.dayOfWeek;
+      updateData.specific_date = null;
+    }
+
+    if (dto.specificDate !== undefined) {
+      updateData.specific_date = dto.specificDate;
+      updateData.day_of_week = null;
     }
 
     if (dto.startTime !== undefined) {

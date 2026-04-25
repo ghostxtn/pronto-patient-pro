@@ -95,10 +95,10 @@ export default function StaffDashboard() {
   });
 
   const statusConfig: Record<string, { label: string; color: string }> = {
-    pending: { label: t.pending, color: "border-[rgba(245,166,35,0.3)] bg-[#fff8e6] text-[#f5a623]" },
-    confirmed: { label: t.confirmed, color: "border-[#b5d1cc] bg-[#eaf5ff] text-[#4f8fe6]" },
-    completed: { label: t.completed, color: "border-[#b5d1cc] bg-[#e6f4ef] text-[#65a98f]" },
-    cancelled: { label: t.cancelled, color: "border-[rgba(252,165,165,0.3)] bg-[#fef2f2] text-[#e05252]" },
+    pending: { label: t.pending, color: "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-200" },
+    confirmed: { label: t.confirmed, color: "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-900/60 dark:bg-blue-950/40 dark:text-blue-200" },
+    completed: { label: t.completed, color: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-200" },
+    cancelled: { label: t.cancelled, color: "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/40 dark:text-rose-200" },
   };
 
   const statCards = [
@@ -138,12 +138,12 @@ export default function StaffDashboard() {
 
   return (
     <AppLayout>
-      <motion.div initial="hidden" animate="visible" className="space-y-8 rounded-[28px] bg-[#f4f8fd] p-1">
+      <motion.div initial="hidden" animate="visible" className="space-y-8 rounded-[28px] bg-background/40 p-1">
         <motion.div custom={0} variants={fadeUp}>
-          <h1 className="text-3xl font-bold tracking-tight text-[#1a2e3b]" style={{ fontFamily: "Manrope, sans-serif" }}>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground" style={{ fontFamily: "Manrope, sans-serif" }}>
             {t.staffDashboard}
           </h1>
-          <p className="mt-2 text-sm text-[#5a7a8a]" style={{ fontFamily: "Inter, sans-serif" }}>
+          <p className="mt-2 text-sm text-muted-foreground" style={{ fontFamily: "Inter, sans-serif" }}>
             {t.staffDashboardDesc}
           </p>
         </motion.div>
@@ -152,7 +152,7 @@ export default function StaffDashboard() {
           {statCards.map((card, index) => (
             <motion.div key={card.label} custom={index + 1} variants={fadeUp}>
               <Card
-                className="cursor-pointer rounded-2xl border border-[#b5d1cc] bg-white shadow-[0_2px_12px_rgba(79,143,230,0.08)] transition-all duration-200 hover:border-[#4f8fe6] hover:shadow-[0_8px_22px_rgba(79,143,230,0.14)]"
+                className="cursor-pointer rounded-2xl border border-border bg-card shadow-soft transition-all duration-200 hover:border-primary/60 hover:shadow-elevated"
                 onClick={() => navigate(card.to)}
               >
                 <CardContent className="p-5">
@@ -160,12 +160,12 @@ export default function StaffDashboard() {
                     <div className="flex h-12 w-12 items-center justify-center rounded-xl" style={{ backgroundColor: card.iconBg }}>
                       <card.icon className="h-5 w-5" style={{ color: card.iconColor }} />
                     </div>
-                    <TrendingUp className="h-4 w-4 shrink-0 text-[#65a98f]" />
+                    <TrendingUp className="h-4 w-4 shrink-0 text-emerald-500 dark:text-emerald-300" />
                   </div>
-                  <div className="text-[2rem] font-bold leading-none text-[#1a2e3b]" style={{ fontFamily: "Manrope, sans-serif" }}>
+                  <div className="text-[2rem] font-bold leading-none text-foreground" style={{ fontFamily: "Manrope, sans-serif" }}>
                     {isLoading ? "..." : card.value}
                   </div>
-                  <div className="mt-3 text-[0.85rem] text-[#5a7a8a]" style={{ fontFamily: "Inter, sans-serif" }}>
+                  <div className="mt-3 text-[0.85rem] text-muted-foreground" style={{ fontFamily: "Inter, sans-serif" }}>
                     {card.label}
                   </div>
                 </CardContent>
@@ -176,33 +176,33 @@ export default function StaffDashboard() {
 
         <div className="grid gap-6 xl:grid-cols-2">
           <motion.div custom={5} variants={fadeUp}>
-            <Card className="rounded-2xl border border-[#b5d1cc] bg-white shadow-[0_2px_12px_rgba(79,143,230,0.08)]">
+            <Card className="rounded-2xl border border-border bg-card shadow-soft">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg text-[#1a2e3b]" style={{ fontFamily: "Manrope, sans-serif" }}>
-                  <CheckCircle2 className="h-5 w-5" style={{ color: "#4f8fe6" }} />
+                <CardTitle className="flex items-center gap-2 text-lg text-foreground" style={{ fontFamily: "Manrope, sans-serif" }}>
+                  <CheckCircle2 className="h-5 w-5 text-primary" />
                   {t.pendingApprovals}
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 {isLoading ? (
-                  <div className="space-y-3">{[1, 2, 3].map((item) => <div key={item} className="h-20 animate-pulse rounded-xl" style={{ backgroundColor: "#eaf5ff" }} />)}</div>
+                  <div className="space-y-3">{[1, 2, 3].map((item) => <div key={item} className="h-20 animate-pulse rounded-xl bg-muted/70" />)}</div>
                 ) : !data?.pendingAppointments.length ? (
-                  <p className="py-6 text-center text-sm" style={{ color: "#5a7a8a", fontFamily: "Inter, sans-serif" }}>{t.noPendingApprovals}</p>
+                  <p className="py-6 text-center text-sm text-muted-foreground" style={{ fontFamily: "Inter, sans-serif" }}>{t.noPendingApprovals}</p>
                 ) : (
                   <div className="space-y-3">
                     {data.pendingAppointments.map((appointment: any) => (
-                      <div key={appointment.id} className="flex flex-col gap-3 rounded-xl bg-[#f4f8fd] p-4 transition-colors hover:bg-[#eaf5ff] sm:flex-row sm:items-center sm:justify-between">
+                      <div key={appointment.id} className="flex flex-col gap-3 rounded-xl bg-background/70 p-4 transition-colors hover:bg-accent/60 sm:flex-row sm:items-center sm:justify-between">
                         <div className="min-w-0">
-                          <p className="truncate text-sm font-medium text-[#1a2e3b]" style={{ fontFamily: "Inter, sans-serif" }}>{getPatientName(appointment, t.patient)}</p>
-                          <p className="text-sm font-medium text-[#1a2e3b]" style={{ fontFamily: "Inter, sans-serif" }}>{getDoctorName(appointment, t.doctor)}</p>
-                          <p className="text-xs" style={{ color: "#5a7a8a", fontFamily: "Inter, sans-serif" }}>
+                          <p className="truncate text-sm font-medium text-foreground" style={{ fontFamily: "Inter, sans-serif" }}>{getPatientName(appointment, t.patient)}</p>
+                          <p className="text-sm font-medium text-foreground" style={{ fontFamily: "Inter, sans-serif" }}>{getDoctorName(appointment, t.doctor)}</p>
+                          <p className="text-xs text-muted-foreground" style={{ fontFamily: "Inter, sans-serif" }}>
                             {format(new Date(appointment.appointment_date), "dd.MM.yyyy", { locale })} · {appointment.start_time?.slice(0, 5)} - {appointment.end_time?.slice(0, 5)}
                           </p>
                         </div>
                         <Button
                           size="sm"
-                          className="rounded-full text-white"
-                          style={{ backgroundColor: "#4f8fe6", fontFamily: "Inter, sans-serif" }}
+                          className="rounded-full border border-primary bg-primary text-primary-foreground hover:bg-primary/90"
+                          style={{ fontFamily: "Inter, sans-serif" }}
                           disabled={confirmAppointment.isPending}
                           onClick={() => confirmAppointment.mutate(appointment.id)}
                         >
@@ -217,28 +217,28 @@ export default function StaffDashboard() {
           </motion.div>
 
           <motion.div custom={6} variants={fadeUp}>
-            <Card className="rounded-2xl border border-[#b5d1cc] bg-white shadow-[0_2px_12px_rgba(79,143,230,0.08)]">
+            <Card className="rounded-2xl border border-border bg-card shadow-soft">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg text-[#1a2e3b]" style={{ fontFamily: "Manrope, sans-serif" }}>
-                  <CalendarDays className="h-5 w-5" style={{ color: "#4f8fe6" }} />
+                <CardTitle className="flex items-center gap-2 text-lg text-foreground" style={{ fontFamily: "Manrope, sans-serif" }}>
+                  <CalendarDays className="h-5 w-5 text-primary" />
                   {t.todaysAppointments}
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 {isLoading ? (
-                  <div className="space-y-3">{[1, 2, 3].map((item) => <div key={item} className="h-20 animate-pulse rounded-xl" style={{ backgroundColor: "#eaf5ff" }} />)}</div>
+                  <div className="space-y-3">{[1, 2, 3].map((item) => <div key={item} className="h-20 animate-pulse rounded-xl bg-muted/70" />)}</div>
                 ) : !data?.todayAppointments.length ? (
-                  <p className="py-6 text-center text-sm" style={{ color: "#5a7a8a", fontFamily: "Inter, sans-serif" }}>{t.noAppointmentsToday}</p>
+                  <p className="py-6 text-center text-sm text-muted-foreground" style={{ fontFamily: "Inter, sans-serif" }}>{t.noAppointmentsToday}</p>
                 ) : (
                   <div className="space-y-3">
                     {data.todayAppointments.map((appointment: any) => {
                       const status = statusConfig[appointment.status] ?? statusConfig.pending;
                       return (
-                        <div key={appointment.id} className="flex flex-col gap-3 rounded-xl bg-[#f4f8fd] p-4 transition-colors hover:bg-[#eaf5ff] sm:flex-row sm:items-center sm:justify-between">
+                        <div key={appointment.id} className="flex flex-col gap-3 rounded-xl bg-background/70 p-4 transition-colors hover:bg-accent/60 sm:flex-row sm:items-center sm:justify-between">
                           <div className="min-w-0">
-                            <p className="text-sm font-medium text-[#1a2e3b]" style={{ fontFamily: "Inter, sans-serif" }}>{appointment.start_time?.slice(0, 5)} - {appointment.end_time?.slice(0, 5)}</p>
-                            <p className="truncate text-sm font-medium text-[#1a2e3b]" style={{ fontFamily: "Inter, sans-serif" }}>{getPatientName(appointment, t.patient)}</p>
-                            <p className="text-xs" style={{ color: "#5a7a8a", fontFamily: "Inter, sans-serif" }}>{getDoctorName(appointment, t.doctor)}</p>
+                            <p className="text-sm font-medium text-foreground" style={{ fontFamily: "Inter, sans-serif" }}>{appointment.start_time?.slice(0, 5)} - {appointment.end_time?.slice(0, 5)}</p>
+                            <p className="truncate text-sm font-medium text-foreground" style={{ fontFamily: "Inter, sans-serif" }}>{getPatientName(appointment, t.patient)}</p>
+                            <p className="text-xs text-muted-foreground" style={{ fontFamily: "Inter, sans-serif" }}>{getDoctorName(appointment, t.doctor)}</p>
                           </div>
                           <Badge variant="outline" className={cn("rounded-full border px-3 py-1", status.color)} style={{ fontFamily: "Inter, sans-serif" }}>{status.label}</Badge>
                         </div>
@@ -252,33 +252,33 @@ export default function StaffDashboard() {
         </div>
 
         <motion.div custom={7} variants={fadeUp}>
-          <Card className="rounded-2xl border border-[#b5d1cc] bg-white shadow-[0_2px_12px_rgba(79,143,230,0.08)]">
+          <Card className="rounded-2xl border border-border bg-card shadow-soft">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg text-[#1a2e3b]" style={{ fontFamily: "Manrope, sans-serif" }}>
-                <Stethoscope className="h-5 w-5" style={{ color: "#4f8fe6" }} />
+              <CardTitle className="flex items-center gap-2 text-lg text-foreground" style={{ fontFamily: "Manrope, sans-serif" }}>
+                <Stethoscope className="h-5 w-5 text-primary" />
                 {t.doctorAvailabilitySummary}
               </CardTitle>
             </CardHeader>
             <CardContent>
               {isLoading ? (
-                <div className="space-y-3">{[1, 2, 3, 4].map((item) => <div key={item} className="h-16 animate-pulse rounded-xl" style={{ backgroundColor: "#eaf5ff" }} />)}</div>
+                <div className="space-y-3">{[1, 2, 3, 4].map((item) => <div key={item} className="h-16 animate-pulse rounded-xl bg-muted/70" />)}</div>
               ) : !data?.doctorAvailability.length ? (
-                <p className="py-6 text-center text-sm" style={{ color: "#5a7a8a", fontFamily: "Inter, sans-serif" }}>{t.noDoctorsAvailable}</p>
+                <p className="py-6 text-center text-sm text-muted-foreground" style={{ fontFamily: "Inter, sans-serif" }}>{t.noDoctorsAvailable}</p>
               ) : (
                 <div className="space-y-3" style={{ maxHeight: "480px", overflowY: "auto" }}>
                   {data.doctorAvailability.map((doctor: any) => (
-                    <div key={doctor.id} className="flex flex-col gap-3 rounded-xl bg-[#f4f8fd] p-4 transition-colors hover:bg-[#eaf5ff] sm:flex-row sm:items-center sm:justify-between">
+                    <div key={doctor.id} className="flex flex-col gap-3 rounded-xl bg-background/70 p-4 transition-colors hover:bg-accent/60 sm:flex-row sm:items-center sm:justify-between">
                       <div>
-                        <p className="text-sm font-medium text-[#1a2e3b]" style={{ fontFamily: "Inter, sans-serif" }}>{doctor.name}</p>
-                        <p className="text-xs" style={{ color: "#5a7a8a", fontFamily: "Inter, sans-serif" }}>{t.todaysSlotCount.replace("{{count}}", String(doctor.todaySlotCount))}</p>
+                        <p className="text-sm font-medium text-foreground" style={{ fontFamily: "Inter, sans-serif" }}>{doctor.name}</p>
+                        <p className="text-xs text-muted-foreground" style={{ fontFamily: "Inter, sans-serif" }}>{t.todaysSlotCount.replace("{{count}}", String(doctor.todaySlotCount))}</p>
                       </div>
                       <Badge
                         variant="outline"
                         className={cn(
                           "rounded-full border px-3 py-1",
                           doctor.isAvailableToday
-                            ? "border-[#b5d1cc] bg-[#e6f4ef] text-[#65a98f]"
-                            : "border-[#b5d1cc] bg-[#f4f8fd] text-[#5a7a8a]",
+                            ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-200"
+                            : "border-slate-200 bg-slate-100 text-slate-600 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-300",
                         )}
                         style={{ fontFamily: "Inter, sans-serif" }}
                       >

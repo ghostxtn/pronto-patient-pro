@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { cn } from "@/lib/utils";
 import api, { request } from "@/services/api";
 
 const fadeUp = {
@@ -255,11 +256,11 @@ export default function ManageDoctors() {
             <div>
               <h1
                 className="text-3xl font-display font-bold"
-                style={{ color: "#1a2e3b", fontFamily: "Manrope, sans-serif", fontWeight: 700 }}
+                style={{ fontFamily: "Manrope, sans-serif", fontWeight: 700 }}
               >
                 {t.manageDoctors}
               </h1>
-              <p className="mt-1 text-muted-foreground" style={{ color: "#5a7a8a" }}>
+              <p className="mt-1 text-muted-foreground">
                 {doctors?.length ?? 0} {t.registeredDoctors}
               </p>
             </div>
@@ -269,14 +270,7 @@ export default function ManageDoctors() {
                 setNewDoctor(emptyNewDoctor);
                 setAddOpen(true);
               }}
-              className="rounded-xl px-5 py-2.5 text-sm font-semibold text-white transition-colors"
-              style={{ background: "#4f8fe6" }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = "#2f75ca";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = "#4f8fe6";
-              }}
+              className="rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
             >
               {t.addDoctorAction}
             </button>
@@ -286,51 +280,36 @@ export default function ManageDoctors() {
         <div className="mb-4 flex gap-2">
           <button
             onClick={() => setStatusFilter("active")}
-            style={{
-              background: statusFilter === "active" ? "#4f8fe6" : "white",
-              color: statusFilter === "active" ? "white" : "#5a7a8a",
-              border: `1.5px solid ${statusFilter === "active" ? "#4f8fe6" : "#b5d1cc"}`,
-              borderRadius: "10px",
-              padding: "6px 18px",
-              fontSize: "0.875rem",
-              fontWeight: 500,
-              cursor: "pointer",
-              transition: "all 0.15s",
-            }}
+            className={cn(
+              "rounded-[10px] border px-[18px] py-[6px] text-sm font-medium transition-all",
+              statusFilter === "active"
+                ? "border-primary bg-primary text-primary-foreground"
+                : "border-border bg-card text-muted-foreground hover:bg-muted/70",
+            )}
           >
             {t.active}
           </button>
 
           <button
             onClick={() => setStatusFilter("inactive")}
-            style={{
-              background: statusFilter === "inactive" ? "#4f8fe6" : "white",
-              color: statusFilter === "inactive" ? "white" : "#5a7a8a",
-              border: `1.5px solid ${statusFilter === "inactive" ? "#4f8fe6" : "#b5d1cc"}`,
-              borderRadius: "10px",
-              padding: "6px 18px",
-              fontSize: "0.875rem",
-              fontWeight: 500,
-              cursor: "pointer",
-              transition: "all 0.15s",
-            }}
+            className={cn(
+              "rounded-[10px] border px-[18px] py-[6px] text-sm font-medium transition-all",
+              statusFilter === "inactive"
+                ? "border-primary bg-primary text-primary-foreground"
+                : "border-border bg-card text-muted-foreground hover:bg-muted/70",
+            )}
           >
             {t.inactive}
           </button>
 
           <button
             onClick={() => setStatusFilter("all")}
-            style={{
-              background: statusFilter === "all" ? "#4f8fe6" : "white",
-              color: statusFilter === "all" ? "white" : "#5a7a8a",
-              border: `1.5px solid ${statusFilter === "all" ? "#4f8fe6" : "#b5d1cc"}`,
-              borderRadius: "10px",
-              padding: "6px 18px",
-              fontSize: "0.875rem",
-              fontWeight: 500,
-              cursor: "pointer",
-              transition: "all 0.15s",
-            }}
+            className={cn(
+              "rounded-[10px] border px-[18px] py-[6px] text-sm font-medium transition-all",
+              statusFilter === "all"
+                ? "border-primary bg-primary text-primary-foreground"
+                : "border-border bg-card text-muted-foreground hover:bg-muted/70",
+            )}
           >
             {t.all}
           </button>
@@ -347,53 +326,45 @@ export default function ManageDoctors() {
         </motion.div>
 
         <motion.div custom={2} variants={fadeUp}>
-          <Card
-            style={{
-              background: "white",
-              border: "1px solid #b5d1cc",
-              borderRadius: "16px",
-              boxShadow: "0 2px 12px rgba(79,143,230,0.08)",
-              overflow: "visible",
-            }}
-          >
+          <Card className="overflow-visible rounded-2xl border border-border bg-card shadow-sm">
             <CardContent className="p-0">
               <div className="overflow-x-auto overflow-y-auto max-h-[560px]">
                 <table className="w-full">
                   <thead>
-                    <tr className="text-left" style={{ background: "#f4f8fd", borderBottom: "1px solid #b5d1cc" }}>
+                    <tr className="border-b border-border bg-muted/50 text-left">
                       <th
                         className="p-4 text-sm font-medium text-muted-foreground"
-                        style={{ color: "#5a7a8a", fontSize: "0.8rem", fontWeight: 600, padding: "12px 16px" }}
+                        style={{ fontSize: "0.8rem", fontWeight: 600, padding: "12px 16px" }}
                       >
                         {t.doctor}
                       </th>
                       <th
                         className="hidden p-4 text-sm font-medium text-muted-foreground md:table-cell"
-                        style={{ color: "#5a7a8a", fontSize: "0.8rem", fontWeight: 600, padding: "12px 16px" }}
+                        style={{ fontSize: "0.8rem", fontWeight: 600, padding: "12px 16px" }}
                       >
                         {t.specialization}
                       </th>
                       <th
                         className="hidden p-4 text-sm font-medium text-muted-foreground lg:table-cell"
-                        style={{ color: "#5a7a8a", fontSize: "0.8rem", fontWeight: 600, padding: "12px 16px" }}
+                        style={{ fontSize: "0.8rem", fontWeight: 600, padding: "12px 16px" }}
                       >
                         {t.experience}
                       </th>
                       <th
                         className="hidden p-4 text-sm font-medium text-muted-foreground lg:table-cell"
-                        style={{ color: "#5a7a8a", fontSize: "0.8rem", fontWeight: 600, padding: "12px 16px" }}
+                        style={{ fontSize: "0.8rem", fontWeight: 600, padding: "12px 16px" }}
                       >
                         {t.fee}
                       </th>
                       <th
                         className="p-4 text-sm font-medium text-muted-foreground"
-                        style={{ color: "#5a7a8a", fontSize: "0.8rem", fontWeight: 600, padding: "12px 16px" }}
+                        style={{ fontSize: "0.8rem", fontWeight: 600, padding: "12px 16px" }}
                       >
                         {t.status}
                       </th>
                       <th
                         className="p-4 text-right text-sm font-medium text-muted-foreground"
-                        style={{ color: "#5a7a8a", fontSize: "0.8rem", fontWeight: 600, padding: "12px 16px" }}
+                        style={{ fontSize: "0.8rem", fontWeight: 600, padding: "12px 16px" }}
                       >
                         {t.actions}
                       </th>
@@ -410,14 +381,7 @@ export default function ManageDoctors() {
                       return (
                         <tr
                           key={doc.id}
-                          className="transition-colors last:border-0"
-                          style={{ borderBottom: "1px solid #f0f4f8", background: "white" }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.background = "#f4f8fd";
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.background = "white";
-                          }}
+                          className="border-b border-border bg-card transition-colors last:border-0 hover:bg-muted/40"
                         >
                           <td className="p-4">
                             <div className="flex items-center gap-3">
@@ -431,34 +395,22 @@ export default function ManageDoctors() {
                                     borderRadius: "12px",
                                     objectFit: "cover",
                                     objectPosition: "top center",
-                                    border: "2px solid #b5d1cc",
                                   }}
+                                  className="border-2 border-border"
                                 />
                               ) : (
                                 <div
-                                  style={{
-                                    width: 52,
-                                    height: 52,
-                                    borderRadius: "12px",
-                                    background: "#eaf5ff",
-                                    color: "#4f8fe6",
-                                    display: "flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    fontSize: "0.875rem",
-                                    fontWeight: 700,
-                                    border: "2px solid #b5d1cc",
-                                  }}
+                                  className="flex h-[52px] w-[52px] items-center justify-center rounded-[12px] border-2 border-border bg-primary/10 text-sm font-bold text-primary"
                                 >
                                   {getDoctorInitials(doc)}
                                 </div>
                               )}
 
                               <div className="min-w-0">
-                                <p className="font-medium text-sm" style={{ color: "#1a2e3b", fontWeight: 600, fontSize: "0.9rem" }}>
+                                <p className="text-sm font-medium text-foreground" style={{ fontWeight: 600, fontSize: "0.9rem" }}>
                                   {name}
                                 </p>
-                                <p className="text-xs text-muted-foreground" style={{ color: "#5a7a8a", fontSize: "0.78rem" }}>
+                                <p className="text-xs text-muted-foreground" style={{ fontSize: "0.78rem" }}>
                                   {doc.email ?? doc.profiles?.email ?? ""}
                                 </p>
                                 <div className="mt-2">
@@ -481,15 +433,7 @@ export default function ManageDoctors() {
                                     size="sm"
                                     disabled={isUploading || !userId}
                                     onClick={() => fileInputRefs.current[userId]?.click()}
-                                    style={{
-                                      border: "1.5px solid #b5d1cc",
-                                      borderRadius: "8px",
-                                      padding: "3px 10px",
-                                      fontSize: "0.75rem",
-                                      color: "#5a7a8a",
-                                      background: "white",
-                                      cursor: "pointer",
-                                    }}
+                                    className="h-auto rounded-lg border-border bg-card px-[10px] py-[3px] text-[0.75rem] text-muted-foreground"
                                   >
                                     {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                                     {t.uploadPhoto}
@@ -516,8 +460,8 @@ export default function ManageDoctors() {
                               variant="outline"
                               className={
                                 doc.is_active
-                                  ? "border-[#b5d1cc] bg-[#e6f4ef] text-[#65a98f]"
-                                  : "border-[#fca5a5]/30 bg-[#fef2f2] text-[#e05252]"
+                                  ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-200"
+                                  : "border-slate-200 bg-slate-100 text-slate-600 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-300"
                               }
                             >
                               {doc.is_active ? t.active : t.inactive}
@@ -676,21 +620,21 @@ export default function ManageDoctors() {
 
       {addOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="w-[420px] space-y-4 rounded-xl bg-white p-6 shadow-xl">
-            <h2 className="text-lg font-semibold">{t.addDoctorAction}</h2>
+          <div className="w-[420px] space-y-4 rounded-xl border border-border bg-card p-6 shadow-xl">
+            <h2 className="text-lg font-semibold text-foreground">{t.addDoctorAction}</h2>
 
             <input
               placeholder={t.firstName}
               value={newDoctor.firstName}
               onChange={(e) => setNewDoctor({ ...newDoctor, firstName: e.target.value })}
-              className="w-full rounded border p-2"
+              className="w-full rounded-md border border-input bg-background p-2 text-foreground"
             />
 
             <input
               placeholder={t.lastName}
               value={newDoctor.lastName}
               onChange={(e) => setNewDoctor({ ...newDoctor, lastName: e.target.value })}
-              className="w-full rounded border p-2"
+              className="w-full rounded-md border border-input bg-background p-2 text-foreground"
             />
 
             <input
@@ -698,7 +642,7 @@ export default function ManageDoctors() {
               autoComplete="off"
               value={newDoctor.email}
               onChange={(e) => setNewDoctor({ ...newDoctor, email: e.target.value })}
-              className="w-full rounded border p-2"
+              className="w-full rounded-md border border-input bg-background p-2 text-foreground"
             />
 
             <input
@@ -707,13 +651,13 @@ export default function ManageDoctors() {
               autoComplete="new-password"
               value={newDoctor.password}
               onChange={(e) => setNewDoctor({ ...newDoctor, password: e.target.value })}
-              className="w-full rounded border p-2"
+              className="w-full rounded-md border border-input bg-background p-2 text-foreground"
             />
 
             <select
               value={newDoctor.specializationId}
               onChange={(e) => setNewDoctor({ ...newDoctor, specializationId: e.target.value })}
-              className="w-full rounded border p-2"
+              className="w-full rounded-md border border-input bg-background p-2 text-foreground"
             >
               <option value="">{t.selectSpecialization}</option>
               {specializations?.map((specialization: any) => (
@@ -727,28 +671,28 @@ export default function ManageDoctors() {
               placeholder={t.title}
               value={newDoctor.title}
               onChange={(e) => setNewDoctor({ ...newDoctor, title: e.target.value })}
-              className="w-full rounded border p-2"
+              className="w-full rounded-md border border-input bg-background p-2 text-foreground"
             />
 
             <textarea
               placeholder="Bio"
               value={newDoctor.bio}
               onChange={(e) => setNewDoctor({ ...newDoctor, bio: e.target.value })}
-              className="w-full rounded border p-2"
+              className="w-full rounded-md border border-input bg-background p-2 text-foreground"
             />
 
             <input
               placeholder={t.phone}
               value={newDoctor.phone}
               onChange={(e) => setNewDoctor({ ...newDoctor, phone: e.target.value })}
-              className="w-full rounded border p-2"
+              className="w-full rounded-md border border-input bg-background p-2 text-foreground"
             />
 
             <div className="flex justify-end gap-2">
-              <button onClick={() => setAddOpen(false)} className="rounded border px-3 py-2">
+              <button onClick={() => setAddOpen(false)} className="rounded-md border border-border px-3 py-2 text-foreground">
                 {t.cancel}
               </button>
-              <button onClick={createDoctor} className="rounded bg-blue-600 px-4 py-2 text-white">
+              <button onClick={createDoctor} className="rounded-md bg-primary px-4 py-2 text-primary-foreground">
                 {t.create}
               </button>
             </div>

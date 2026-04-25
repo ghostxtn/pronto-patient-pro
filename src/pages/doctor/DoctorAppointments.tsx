@@ -130,7 +130,7 @@ export default function DoctorAppointments() {
   const renderList = (list: typeof appointments) => {
     if (!list || list.length === 0) {
       return (
-        <div className="text-center py-12 text-sm" style={{ color: "#5a7a8a", fontFamily: "Inter, sans-serif" }}>
+        <div className="py-12 text-center text-sm text-muted-foreground" style={{ fontFamily: "Inter, sans-serif" }}>
           {t.noAppointmentsInCategory}
         </div>
       );
@@ -140,22 +140,22 @@ export default function DoctorAppointments() {
         {list.map((apt, i) => { const patient = apt.profiles; const status = statusConfig[apt.status]; const StatusIcon = status.icon; return (
           <motion.div key={apt.id} custom={i} variants={fadeUp} initial="hidden" animate="visible">
             <Card
-              className="cursor-pointer rounded-2xl border border-[#b5d1cc] bg-white shadow-[0_2px_12px_rgba(79,143,230,0.08)] transition-all duration-200 hover:border-[#4f8fe6] hover:shadow-[0_8px_22px_rgba(79,143,230,0.14)]"
+              className="cursor-pointer rounded-2xl border border-border bg-card shadow-sm transition-all duration-200 hover:border-primary/50 hover:shadow-md"
               onClick={() => { setDetailId(apt.id); }}
             >
               <CardContent className="p-5">
                 <div className="flex items-center justify-between gap-4">
                   <div className="flex items-center gap-4 min-w-0">
-                    <div className="h-12 w-12 rounded-xl flex items-center justify-center flex-shrink-0" style={{ backgroundColor: "#eaf5ff" }}>
-                      <span className="font-bold text-sm" style={{ color: "#4f8fe6", fontFamily: "Manrope, sans-serif" }}>
+                    <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-primary/10">
+                      <span className="text-sm font-bold text-primary" style={{ fontFamily: "Manrope, sans-serif" }}>
                         {patient?.full_name?.[0] || "P"}
                       </span>
                     </div>
                     <div className="min-w-0">
-                      <div className="font-semibold truncate text-[#1a2e3b]" style={{ fontFamily: "Manrope, sans-serif" }}>
+                      <div className="truncate font-semibold text-foreground" style={{ fontFamily: "Manrope, sans-serif" }}>
                         {patient?.full_name || t.patient}
                       </div>
-                      <div className="flex items-center gap-3 text-sm mt-0.5" style={{ color: "#5a7a8a", fontFamily: "Inter, sans-serif" }}>
+                      <div className="mt-0.5 flex items-center gap-3 text-sm text-muted-foreground" style={{ fontFamily: "Inter, sans-serif" }}>
                         <span className="flex items-center gap-1"><CalendarDays className="h-3 w-3" />{format(parseISO(apt.appointment_date), "MMM d, yyyy")}</span>
                         <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{apt.start_time.slice(0, 5)}</span>
                       </div>
@@ -166,7 +166,7 @@ export default function DoctorAppointments() {
                       <Button
                         size="sm"
                         variant="outline"
-                        className="rounded-full text-xs border-[#b5d1cc] text-[#65a98f] hover:bg-[#e6f4ef] hover:text-[#65a98f]"
+                        className="rounded-full border-border text-xs text-[#65a98f] hover:bg-[#e6f4ef] hover:text-[#65a98f] dark:hover:bg-emerald-500/10"
                         style={{ fontFamily: "Inter, sans-serif" }}
                         onClick={(e) => { e.stopPropagation(); updateStatus.mutate({ id: apt.id, status: "completed" }); }}
                       >
@@ -184,8 +184,8 @@ export default function DoctorAppointments() {
                   </div>
                 </div>
                 {apt.notes && (
-                  <div className="mt-3 p-2 rounded-lg text-xs flex items-start gap-2" style={{ backgroundColor: "#f4f8fd", color: "#5a7a8a" }}>
-                    <FileText className="h-3 w-3 mt-0.5 flex-shrink-0" style={{ color: "#4f8fe6" }} />
+                  <div className="mt-3 flex items-start gap-2 rounded-lg bg-muted/60 p-2 text-xs text-muted-foreground">
+                    <FileText className="mt-0.5 h-3 w-3 flex-shrink-0 text-primary" />
                     <span className="line-clamp-1" style={{ fontFamily: "Inter, sans-serif" }}>{apt.notes}</span>
                   </div>
                 )}
@@ -199,30 +199,30 @@ export default function DoctorAppointments() {
 
   return (
     <AppLayout>
-      <motion.div initial="hidden" animate="visible" className="space-y-6 rounded-[28px] bg-[#f4f8fd] p-1">
+      <motion.div initial="hidden" animate="visible" className="space-y-6 rounded-[28px] bg-background/40 p-1">
         <motion.div custom={0} variants={fadeUp}>
-          <h1 className="text-3xl font-bold tracking-tight text-[#1a2e3b]" style={{ fontFamily: "Manrope, sans-serif" }}>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground" style={{ fontFamily: "Manrope, sans-serif" }}>
             {t.appointments}
           </h1>
-          <p className="mt-2 text-sm text-[#5a7a8a]" style={{ fontFamily: "Inter, sans-serif" }}>
+          <p className="mt-2 text-sm text-muted-foreground" style={{ fontFamily: "Inter, sans-serif" }}>
             {t.appointmentsDesc}
           </p>
         </motion.div>
         <Tabs defaultValue="confirmed">
           <motion.div custom={1} variants={fadeUp}>
-            <TabsList className="rounded-xl mb-6 bg-white border border-[#b5d1cc] shadow-[0_2px_8px_rgba(79,143,230,0.06)]">
-              <TabsTrigger value="confirmed" className="rounded-lg data-[state=active]:bg-[#eaf5ff] data-[state=active]:text-[#4f8fe6]" style={{ fontFamily: "Inter, sans-serif" }}>
+            <TabsList className="mb-6 rounded-xl border border-border bg-card shadow-sm">
+              <TabsTrigger value="confirmed" className="rounded-lg data-[state=active]:bg-primary/10 data-[state=active]:text-primary" style={{ fontFamily: "Inter, sans-serif" }}>
                 {t.confirmed} ({confirmed.length})
               </TabsTrigger>
-              <TabsTrigger value="completed" className="rounded-lg data-[state=active]:bg-[#e6f4ef] data-[state=active]:text-[#65a98f]" style={{ fontFamily: "Inter, sans-serif" }}>
+              <TabsTrigger value="completed" className="rounded-lg data-[state=active]:bg-emerald-500/10 data-[state=active]:text-emerald-600 dark:data-[state=active]:text-emerald-400" style={{ fontFamily: "Inter, sans-serif" }}>
                 {t.completed} ({completed.length})
               </TabsTrigger>
-              <TabsTrigger value="cancelled" className="rounded-lg data-[state=active]:bg-[#fef2f2] data-[state=active]:text-[#e05252]" style={{ fontFamily: "Inter, sans-serif" }}>
+              <TabsTrigger value="cancelled" className="rounded-lg data-[state=active]:bg-red-500/10 data-[state=active]:text-red-600 dark:data-[state=active]:text-red-400" style={{ fontFamily: "Inter, sans-serif" }}>
                 {t.cancelled} ({cancelled.length})
               </TabsTrigger>
             </TabsList>
           </motion.div>
-          {isLoading ? <div className="space-y-3" style={{ maxHeight: "560px", overflowY: "auto" }}>{[1, 2, 3].map((i) => <div key={i} className="rounded-2xl border border-[#b5d1cc] bg-white shadow-[0_2px_12px_rgba(79,143,230,0.08)] animate-pulse h-20" />)}</div> : (<><TabsContent value="confirmed">{renderList(confirmed)}</TabsContent><TabsContent value="completed">{renderList(completed)}</TabsContent><TabsContent value="cancelled">{renderList(cancelled)}</TabsContent></>)}
+          {isLoading ? <div className="space-y-3" style={{ maxHeight: "560px", overflowY: "auto" }}>{[1, 2, 3].map((i) => <div key={i} className="h-20 animate-pulse rounded-2xl border border-border bg-card shadow-sm" />)}</div> : (<><TabsContent value="confirmed">{renderList(confirmed)}</TabsContent><TabsContent value="completed">{renderList(completed)}</TabsContent><TabsContent value="cancelled">{renderList(cancelled)}</TabsContent></>)}
         </Tabs>
       </motion.div>
 

@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { tr } from "date-fns/locale";
 import { motion } from "framer-motion";
 import { Views, type View } from "react-big-calendar";
 import { CalendarDays, ChevronRight, PanelLeftOpen, Search } from "lucide-react";
@@ -21,6 +20,7 @@ import {
   DrawerTitle,
 } from "@/components/ui/drawer";
 import { Input } from "@/components/ui/input";
+import { getDateFnsLocale, getIntlLocale } from "@/lib/date-localization";
 import { cn } from "@/lib/utils";
 import type { AvailabilitySlot } from "@/types/calendar";
 
@@ -65,7 +65,7 @@ interface DoctorSummary {
 
 function getDoctorDisplayName(
   doctor: Pick<DoctorSummary, "email" | "firstName" | "lastName">,
-  fallback = "Doktor",
+  fallback = "Doctor",
 ) {
   const fullName = `${doctor.firstName ?? ""} ${doctor.lastName ?? ""}`.trim();
   return fullName || doctor.email || fallback;
@@ -86,11 +86,13 @@ function DoctorSelectionList({
   isLoading,
   selectedDoctorId,
   onSelect,
+  t,
 }: {
   doctors: DoctorSummary[];
   isLoading: boolean;
   selectedDoctorId: string | null;
   onSelect: (doctorId: string) => void;
+  t: ReturnType<typeof useLanguage>["t"];
 }) {
   if (isLoading) {
     return (
@@ -103,7 +105,7 @@ function DoctorSelectionList({
   }
 
   if (!doctors.length) {
-    return <p className="py-8 text-center text-sm text-muted-foreground">Filtreyle eşleşen doktor bulunamadı.</p>;
+    return <p className="py-8 text-center text-sm text-muted-foreground">{t.noDoctorsAvailable}</p>;
   }
 
   return (
@@ -143,16 +145,16 @@ function DoctorSelectionList({
                   </p>
                   {doctor.isAvailableToday ? (
                     <span className="shrink-0 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 leading-none">
-                      {doctor.todaySlotCount} slot
+                      {doctor.todaySlotCount} {t.activeSlots}
                     </span>
                   ) : (
                     <span className="shrink-0 rounded-full border border-border/60 bg-muted/60 px-2 py-0.5 text-[10px] font-medium text-muted-foreground leading-none">
-                      Bugün Pasif
+                      {t.today} {t.unavailable}
                     </span>
                   )}
                 </div>
                 <p className="truncate text-xs text-muted-foreground mt-0.5">
-                  {doctor.specialization?.name ?? "Branş belirtilmedi"}
+                  {doctor.specialization?.name ?? t.specialtyNotSpecified}
                 </p>
               </div>
             </div>
@@ -163,17 +165,17 @@ function DoctorSelectionList({
   );
 }
 
-function SelectedDoctorContext({ doctor }: { doctor: DoctorSummary | null }) {
+function SelectedDoctorContext({ doctor, t }: { doctor: DoctorSummary | null; t: ReturnType<typeof useLanguage>["t"] }) {
   if (!doctor) {
     return (
       <div className="rounded-[24px] border border-dashed border-border/60 bg-background/60 px-4 py-5 text-sm text-muted-foreground">
-        Takvimi odağa almak için bir doktor seçin.
+        {t.calendarViewDesc}
       </div>
     );
   }
 
   return (
-    <div className="rounded-[24px] border border-primary/15 bg-primary/5 px-4 py-4">
+    <div className="scheduler-rail-selected-doctor rounded-[24px] px-4 py-4">
       <div className="flex items-start gap-3">
         <div
           className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg text-sm font-semibold text-white shadow-soft"
@@ -184,20 +186,20 @@ function SelectedDoctorContext({ doctor }: { doctor: DoctorSummary | null }) {
 
         <div className="min-w-0 space-y-1">
           <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-primary">
-            Seçili Doktor
+            {t.doctor}
           </p>
           <h2 className="truncate text-lg font-display font-semibold text-foreground">
             {getDoctorDisplayName(doctor)}
           </h2>
           <p className="truncate text-sm text-muted-foreground">
-            {doctor.specialization?.name ?? "Branş belirtilmedi"}
+            {doctor.specialization?.name ?? t.specialtyNotSpecified}
           </p>
         </div>
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
         <Badge variant="outline" className="rounded-full border-border/60 bg-card text-foreground">
-          {doctor.isAvailableToday ? `${doctor.todaySlotCount} aktif slot` : "Bugün Pasif"}
+          {doctor.isAvailableToday ? `${doctor.todaySlotCount} ${t.activeSlots}` : `${t.today} ${t.unavailable}`}
         </Badge>
         <Badge
           variant="outline"
@@ -208,7 +210,7 @@ function SelectedDoctorContext({ doctor }: { doctor: DoctorSummary | null }) {
               : "border-border/60 bg-card text-muted-foreground",
           )}
         >
-          {doctor.isAvailableToday ? "Bugün Müsait" : "Bugün Pasif"}
+          {doctor.isAvailableToday ? `${t.today} ${t.available}` : `${t.today} ${t.unavailable}`}
         </Badge>
       </div>
     </div>
@@ -230,6 +232,8 @@ function StaffSchedulerRail({
   isLoading,
   selectedDoctorId,
   onSelectDoctor,
+  t,
+  lang,
   mobile = false,
 }: {
   calendarDate: Date;
@@ -246,24 +250,26 @@ function StaffSchedulerRail({
   isLoading: boolean;
   selectedDoctorId: string | null;
   onSelectDoctor: (doctorId: string) => void;
+  t: ReturnType<typeof useLanguage>["t"];
+  lang: ReturnType<typeof useLanguage>["lang"];
   mobile?: boolean;
 }) {
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-[32px] border border-border/60 bg-card/95 shadow-soft">
+    <div className="scheduler-rail-shell flex h-full min-h-0 flex-col overflow-hidden rounded-[32px]">
       <div className="min-h-0 flex-1 overflow-y-auto scrollbar-thin">
         <section className="border-b border-border/50 px-4 py-4">
           <div className="mb-2">
-            <h2 className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">Doktor Odağı</h2>
+            <h2 className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">{t.doctorList}</h2>
           </div>
 
-          <div className="rounded-[26px] border border-border/60 bg-background/72 p-3 shadow-soft">
+          <div className="scheduler-rail-card rounded-[26px] p-3">
             <div className="mb-3 flex items-center justify-between gap-3">
               <div>
                 <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
-                  Tarih gezgini
+                  {t.date}
                 </p>
                 <p className="mt-1 text-sm font-semibold text-foreground">
-                  {calendarDate.toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" })}
+                  {calendarDate.toLocaleDateString(getIntlLocale(lang), { day: "numeric", month: "long", year: "numeric" })}
                 </p>
               </div>
 
@@ -271,10 +277,10 @@ function StaffSchedulerRail({
                 type="button"
                 variant="outline"
                 size="sm"
-                className="rounded-full border-border/60 bg-card"
+                className="rounded-full border-[color:hsl(var(--calendar-sidebar-border))] bg-[hsl(var(--card))] hover:bg-[hsl(var(--calendar-mini-hover))]"
                 onClick={onToday}
               >
-                Bugün
+                {t.today}
               </Button>
             </div>
 
@@ -282,7 +288,7 @@ function StaffSchedulerRail({
               mode="single"
               selected={calendarDate}
               month={calendarMonth}
-              locale={tr}
+              locale={getDateFnsLocale(lang)}
               onMonthChange={onMonthChange}
               onSelect={(date) => date && onDateSelect(date)}
               className="w-full rounded-[20px] bg-transparent p-0"
@@ -291,20 +297,25 @@ function StaffSchedulerRail({
                 month: "space-y-3",
                 caption: "relative flex items-center justify-center px-8 pt-1",
                 caption_label: "text-sm font-semibold text-foreground",
-                nav_button: "h-8 w-8 rounded-full border border-border/60 bg-card p-0 opacity-100 hover:bg-accent",
+                nav_button:
+                  "h-8 w-8 rounded-full border border-[color:hsl(var(--calendar-sidebar-border))] bg-[hsl(var(--card))] p-0 opacity-100 hover:bg-[hsl(var(--calendar-mini-hover))]",
                 table: "w-full border-collapse",
-                head_cell: "w-9 text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground",
+                head_cell:
+                  "w-9 text-[11px] font-medium uppercase tracking-[0.12em] text-[color:hsl(var(--calendar-muted))]",
                 row: "mt-1.5 flex w-full",
                 cell: "h-9 w-9 p-0 text-center text-sm",
-                day: "h-9 w-9 rounded-full p-0 text-sm font-medium text-foreground hover:bg-accent/70",
+                day:
+                  "h-9 w-9 rounded-full p-0 text-sm font-medium text-foreground hover:bg-[hsl(var(--calendar-mini-hover))]",
                 day_today: "bg-accent text-accent-foreground",
                 day_selected: "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground",
+                day_outside: "text-[color:hsl(var(--calendar-disabled))] opacity-100",
+                day_disabled: "text-[color:hsl(var(--calendar-disabled))] opacity-100",
               }}
             />
           </div>
 
           <div className="mt-4">
-            <SelectedDoctorContext doctor={selectedDoctor} />
+            <SelectedDoctorContext doctor={selectedDoctor} t={t} />
           </div>
         </section>
 
@@ -312,9 +323,9 @@ function StaffSchedulerRail({
           <div className="shrink-0 space-y-4">
             <div>
               <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
-                Doktorlar
+                {t.doctorList}
               </p>
-              <h2 className="text-lg font-display font-semibold text-foreground">Arama ve Filtreler</h2>
+              <h2 className="text-lg font-display font-semibold text-foreground">{t.search}</h2>
             </div>
 
             <div className="relative">
@@ -322,7 +333,7 @@ function StaffSchedulerRail({
               <Input
                 value={searchValue}
                 onChange={(event) => onSearchChange(event.target.value)}
-                placeholder="Doktor veya branş ara"
+                placeholder={t.searchByNameOrSpecialty}
                 className="rounded-full border-border/60 bg-background/70 pl-9"
               />
             </div>
@@ -338,7 +349,7 @@ function StaffSchedulerRail({
                 )}
                 onClick={() => onFilterModeChange("all")}
               >
-                Tüm Doktorlar
+                {t.doctors}
               </Button>
               <Button
                 type="button"
@@ -350,7 +361,7 @@ function StaffSchedulerRail({
                 )}
                 onClick={() => onFilterModeChange("available")}
               >
-                Bugün Müsait
+                {t.today} {t.available}
               </Button>
             </div>
           </div>
@@ -362,6 +373,7 @@ function StaffSchedulerRail({
                 isLoading={isLoading}
                 selectedDoctorId={selectedDoctorId}
                 onSelect={onSelectDoctor}
+                t={t}
               />
             </div>
           </div>
@@ -372,7 +384,7 @@ function StaffSchedulerRail({
 }
 
 export default function StaffDoctors() {
-  const { t } = useLanguage();
+  const { lang, t } = useLanguage();
   const { user } = useAuth();
   const previousCompactLayoutRef = useRef(false);
   const [isCompactLayout, setIsCompactLayout] = useState(false);
@@ -495,7 +507,7 @@ export default function StaffDoctors() {
   }, [calendarView, hasAutoCompactView, isCompactLayout]);
 
   const filteredDoctors = useMemo(() => {
-    const normalizedQuery = searchValue.trim().toLocaleLowerCase("tr-TR");
+    const normalizedQuery = searchValue.trim().toLocaleLowerCase(getIntlLocale(lang));
 
     return doctors
       .map((doctor) => ({
@@ -517,11 +529,11 @@ export default function StaffDoctors() {
           doctor.email ?? "",
         ]
           .join(" ")
-          .toLocaleLowerCase("tr-TR");
+          .toLocaleLowerCase(getIntlLocale(lang));
 
         return haystack.includes(normalizedQuery);
       });
-  }, [doctorAvailabilityMap, doctors, filterMode, searchValue]);
+  }, [doctorAvailabilityMap, doctors, filterMode, lang, searchValue]);
 
   const selectedDoctor = useMemo(
     () =>
@@ -584,6 +596,8 @@ export default function StaffDoctors() {
                 isLoading={isLoading}
                 selectedDoctorId={selectedDoctorId}
                 onSelectDoctor={handleDoctorSelect}
+                t={t}
+                lang={lang}
               />
             </div>
           </motion.aside>
@@ -604,12 +618,12 @@ export default function StaffDoctors() {
                       {selectedDoctor ? getDoctorDisplayName(selectedDoctor, t.doctor) : t.doctor}
                     </h2>
                     <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                      <span>{calendarDate.toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" })}</span>
+                      <span>{calendarDate.toLocaleDateString(getIntlLocale(lang), { day: "numeric", month: "long", year: "numeric" })}</span>
                       {selectedDoctor ? <span className="text-border">/</span> : null}
                       {selectedDoctor ? (
                         <span>{selectedDoctor.specialization?.name ?? t.specialtyNotSpecified}</span>
                       ) : null}
-                      {calendarView ? <span className="rounded-full bg-accent/70 px-2 py-0.5 text-[11px] font-medium text-foreground/80">{calendarView === Views.DAY ? "Gun odagi" : calendarView === Views.WEEK ? "Hafta" : calendarView === Views.MONTH ? "Ay" : "Ajanda"}</span> : null}
+                      {calendarView ? <span className="rounded-full bg-accent/70 px-2 py-0.5 text-[11px] font-medium text-foreground/80">{calendarView === Views.DAY ? t.day : calendarView === Views.WEEK ? t.week : calendarView === Views.MONTH ? t.month : t.agenda}</span> : null}
                     </div>
                   </div>
 
@@ -696,6 +710,8 @@ export default function StaffDoctors() {
               isLoading={isLoading}
               selectedDoctorId={selectedDoctorId}
               onSelectDoctor={handleDoctorSelect}
+              t={t}
+              lang={lang}
               mobile
             />
           </div>

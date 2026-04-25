@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/services/api";
@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { format, isBefore, isToday } from "date-fns";
+import { getDateFnsLocale } from "@/lib/date-localization";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import {
@@ -33,9 +34,10 @@ const fadeUp = {
 export default function DoctorProfile() {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
-  const { t } = useLanguage();
+  const { lang, t } = useLanguage();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const locale = useMemo(() => getDateFnsLocale(lang), [lang]);
 
   const dayNames = [t.sunday, t.monday, t.tuesday, t.wednesday, t.thursday, t.friday, t.saturday];
 
@@ -96,8 +98,29 @@ export default function DoctorProfile() {
   });
 
   const weeklyAvailability = availability?.filter((slot) => !slot.specific_date) || [];
-  const availableDays = weeklyAvailability.map((a) => a.day_of_week);
-  const isDateDisabled = (date: Date) => { if (isBefore(date, new Date()) && !isToday(date)) return true; return !availableDays.includes(date.getDay()); };
+  const specificDateAvailability = availability?.filter((slot) => Boolean(slot.specific_date)) || [];
+  const availableDays = weeklyAvailability
+    .map((slot) => slot.day_of_week)
+    .filter((day): day is number => typeof day === "number");
+  const availableSpecificDates = new Set(
+    specificDateAvailability
+      .map((slot) => slot.specific_date)
+      .filter((date): date is string => Boolean(date)),
+  );
+  const isDateDisabled = (date: Date) => {
+    if (isBefore(date, new Date()) && !isToday(date)) return true;
+
+    const dateKey = format(date, "yyyy-MM-dd");
+    if (availableSpecificDates.has(dateKey)) {
+      return false;
+    }
+
+    if (availableDays.length > 0) {
+      return !availableDays.includes(date.getDay());
+    }
+
+    return availableSpecificDates.size > 0;
+  };
   const availableSlots = slots;
 
   if (isLoading) return <AppLayout><div className="flex items-center justify-center py-20"><div className="h-8 w-8 rounded-full border-2 border-primary border-t-transparent animate-spin" /></div></AppLayout>;
@@ -114,12 +137,12 @@ export default function DoctorProfile() {
     <AppLayout>
       <motion.div initial="hidden" animate="visible">
         <motion.div custom={0} variants={fadeUp}>
-          <Button variant="ghost" size="sm" className="mb-4" style={{ color: "#5a7a8a" }} onClick={() => navigate("/patient/doctors")}><ArrowLeft className="h-4 w-4 mr-1" /> {t.backToDoctors}</Button>
+          <Button variant="ghost" size="sm" className="mb-4 text-muted-foreground hover:text-foreground" onClick={() => navigate("/patient/doctors")}><ArrowLeft className="mr-1 h-4 w-4" /> {t.backToDoctors}</Button>
         </motion.div>
 
         <div className="grid lg:grid-cols-3 gap-6">
           <motion.div className="lg:col-span-1 space-y-4" custom={1} variants={fadeUp}>
-            <div style={{ background: "white", border: "1px solid #b5d1cc", borderRadius: "16px", padding: "24px", boxShadow: "0 2px 12px rgba(79,143,230,0.08)" }}>
+            <div className="rounded-2xl border border-border bg-card p-6 shadow-soft">
               <div className="flex flex-col items-center text-center">
                 {(doctor.avatar_url || doctor.avatarUrl || doctor.profiles?.avatar_url) ? (
                   <img
@@ -142,23 +165,23 @@ export default function DoctorProfile() {
                     </span>
                   </div>
                 )}
-                <h1 className="text-xl font-display font-bold" style={{ color: "#1a2e3b", fontFamily: "Manrope, sans-serif", fontWeight: 700 }}>Dr. {profile?.full_name || "Unknown"}</h1>
-                <span style={{ background: "#e6f4ef", color: "#65a98f", border: "1.5px solid #b5d1cc", borderRadius: "999px", padding: "4px 14px", fontSize: "0.82rem", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: "6px", marginTop: "8px" }}>
+                <h1 className="text-xl font-display font-bold text-foreground" style={{ fontFamily: "Manrope, sans-serif", fontWeight: 700 }}>Dr. {profile?.full_name || "Unknown"}</h1>
+                <span className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3.5 py-1 text-[0.82rem] font-semibold text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-200">
                   <Icon style={{ width: 14, height: 14 }} />
                   {spec?.name || "General"}
                 </span>
               </div>
             </div>
-            {doctor.bio && (<div style={{ background: "white", border: "1px solid #b5d1cc", borderRadius: "16px", padding: "24px", boxShadow: "0 2px 12px rgba(79,143,230,0.08)" }}><h3 className="font-display font-semibold mb-2 flex items-center gap-2" style={{ color: "#1a2e3b", fontFamily: "Manrope, sans-serif", fontWeight: 600, marginBottom: "8px", display: "flex", alignItems: "center", gap: "8px" }}><FileText style={{ color: "#4f8fe6", width: 16, height: 16 }} /> {t.about}</h3><p className="text-sm text-muted-foreground" style={{ color: "#5a7a8a", fontSize: "0.875rem" }}>{doctor.bio}</p></div>)}
-            <div style={{ background: "white", border: "1px solid #b5d1cc", borderRadius: "16px", padding: "24px", boxShadow: "0 2px 12px rgba(79,143,230,0.08)" }}>
-              <h3 className="font-display font-semibold mb-3 flex items-center gap-2" style={{ color: "#1a2e3b", fontFamily: "Manrope, sans-serif", fontWeight: 600, marginBottom: "8px", display: "flex", alignItems: "center", gap: "8px" }}><Clock style={{ color: "#4f8fe6", width: 16, height: 16 }} /> {t.weeklySchedule}</h3>
+            {doctor.bio && (<div className="rounded-2xl border border-border bg-card p-6 shadow-soft"><h3 className="mb-2 flex items-center gap-2 font-display font-semibold text-foreground" style={{ fontFamily: "Manrope, sans-serif", fontWeight: 600 }}><FileText className="h-4 w-4 text-primary" /> {t.about}</h3><p className="text-sm text-muted-foreground">{doctor.bio}</p></div>)}
+            <div className="rounded-2xl border border-border bg-card p-6 shadow-soft">
+              <h3 className="mb-3 flex items-center gap-2 font-display font-semibold text-foreground" style={{ fontFamily: "Manrope, sans-serif", fontWeight: 600 }}><Clock className="h-4 w-4 text-primary" /> {t.weeklySchedule}</h3>
               <div className="space-y-2">
                 {dayNames.map((day, idx) => {
                   const daySlots = weeklyAvailability.filter((a) => a.day_of_week === idx);
                   return (
                     <div key={day} className="flex items-center justify-between text-sm">
-                      <span className={cn("font-medium", daySlots && daySlots.length > 0 ? "text-foreground" : "text-muted-foreground")} style={daySlots && daySlots.length > 0 ? { color: "#1a2e3b", fontWeight: 600 } : { color: "#b5d1cc" }}>{day}</span>
-                      {daySlots && daySlots.length > 0 ? <span className="text-muted-foreground" style={{ color: "#65a98f", fontSize: "0.85rem" }}>{daySlots.map((s) => `${s.start_time.slice(0, 5)} - ${s.end_time.slice(0, 5)}`).join(", ")}</span> : <span className="text-muted-foreground/50 text-xs" style={{ color: "#b5d1cc", fontSize: "0.75rem" }}>{t.unavailable}</span>}
+                      <span className={cn("font-medium", daySlots && daySlots.length > 0 ? "text-foreground" : "text-muted-foreground")} style={daySlots && daySlots.length > 0 ? { fontWeight: 600 } : undefined}>{day}</span>
+                      {daySlots && daySlots.length > 0 ? <span className="text-[0.85rem] text-emerald-600 dark:text-emerald-300">{daySlots.map((s) => `${s.start_time.slice(0, 5)} - ${s.end_time.slice(0, 5)}`).join(", ")}</span> : <span className="text-xs text-muted-foreground/70">{t.unavailable}</span>}
                     </div>
                   );
                 })}
@@ -167,23 +190,23 @@ export default function DoctorProfile() {
           </motion.div>
 
           <motion.div className="lg:col-span-2 space-y-4" custom={2} variants={fadeUp}>
-            <div style={{ background: "white", border: "1px solid #b5d1cc", borderRadius: "16px", padding: "24px", boxShadow: "0 2px 12px rgba(79,143,230,0.08)" }}>
-              <h2 className="text-xl font-display font-bold mb-1 flex items-center gap-2" style={{ color: "#1a2e3b", fontFamily: "Manrope, sans-serif", fontWeight: 700, display: "flex", alignItems: "center", gap: "8px" }}><CalendarCheck style={{ color: "#4f8fe6", width: 20, height: 20 }} /> {t.bookAnAppointment}</h2>
-              <p className="text-sm text-muted-foreground mb-6" style={{ color: "#5a7a8a", fontSize: "0.875rem", marginBottom: "24px" }}>{t.selectDateAndTime}</p>
+            <div className="rounded-2xl border border-border bg-card p-6 shadow-soft">
+              <h2 className="mb-1 flex items-center gap-2 text-xl font-display font-bold text-foreground" style={{ fontFamily: "Manrope, sans-serif", fontWeight: 700 }}><CalendarCheck className="h-5 w-5 text-primary" /> {t.bookAnAppointment}</h2>
+              <p className="mb-6 text-sm text-muted-foreground">{t.selectDateAndTime}</p>
               <div className="grid md:grid-cols-2 gap-6">
                 <div>
-                  <h3 className="text-sm font-semibold mb-3" style={{ color: "#1a2e3b", fontWeight: 600, fontSize: "0.875rem", marginBottom: "12px" }}>{t.selectDate}</h3>
+                  <h3 className="mb-3 text-sm font-semibold text-foreground">{t.selectDate}</h3>
                   <div className="calendar-wrapper">
                     <style>{`
                       .calendar-wrapper button.rdp-day_selected,
                       .calendar-wrapper button.rdp-day_selected:hover,
                       .calendar-wrapper button.rdp-day_selected:focus {
-                        background-color: #4f8fe6 !important;
-                        color: white !important;
+                        background-color: hsl(var(--primary)) !important;
+                        color: hsl(var(--primary-foreground)) !important;
                         border-radius: 10px !important;
                       }
                       .calendar-wrapper button.rdp-day:not(.rdp-day_selected):hover {
-                        background-color: #eaf5ff !important;
+                        background-color: hsl(var(--accent)) !important;
                         border-radius: 10px !important;
                       }
                     `}</style>
@@ -193,7 +216,8 @@ export default function DoctorProfile() {
                       onSelect={(date) => { setSelectedDate(date); setSelectedSlot(null); }}
                       disabled={isDateDisabled}
                       fromDate={new Date()}
-                      className="p-3 pointer-events-auto rounded-xl border w-full"
+                      locale={locale}
+                      className="pointer-events-auto w-full rounded-xl border border-border bg-background p-3"
                       classNames={{
                         months: "flex flex-col w-full",
                         month: "space-y-4 w-full",
@@ -203,34 +227,34 @@ export default function DoctorProfile() {
                         head_cell: "text-muted-foreground rounded-md flex-1 text-center font-normal text-[0.8rem]",
                         cell: "flex-1 h-9 text-center text-sm p-0 relative focus-within:relative focus-within:z-20",
                         day: "h-9 w-full p-0 font-normal aria-selected:opacity-100 rounded-[10px]",
-                        day_selected: "bg-[#4f8fe6] text-white rounded-[10px]",
-                        day_today: "border border-[#b5d1cc] text-[#4f8fe6] font-bold rounded-[10px]",
+                        day_selected: "rounded-[10px] bg-primary text-primary-foreground",
+                        day_today: "rounded-[10px] border border-primary/30 text-primary font-bold",
                       }}
                     />
                   </div>
                 </div>
                 <div>
-                  <h3 className="text-sm font-semibold mb-3" style={{ color: "#1a2e3b", fontWeight: 600, fontSize: "0.875rem", marginBottom: "12px" }}>{selectedDate ? `${t.availableSlots} — ${format(selectedDate, "EEE, MMM d")}` : t.selectDateFirst}</h3>
-                  {selectedDate ? (availableSlots.length > 0 ? (<div className="grid grid-cols-3 gap-2">{availableSlots.map((slot) => (<button key={slot.startTime} onClick={() => setSelectedSlot(slot)} style={{ padding: "8px", borderRadius: "10px", fontSize: "0.85rem", fontWeight: 500, border: `1.5px solid ${selectedSlot?.startTime === slot.startTime ? "#4f8fe6" : "#b5d1cc"}`, background: selectedSlot?.startTime === slot.startTime ? "#eaf5ff" : "white", color: selectedSlot?.startTime === slot.startTime ? "#4f8fe6" : "#1a2e3b", cursor: "pointer", transition: "all 0.15s" }}>{slot.startTime}</button>))}</div>) : (<div className="text-center py-8 text-muted-foreground text-sm">{t.noSlotsAvailable}</div>)) : (<div className="text-center py-8 text-muted-foreground text-sm">{t.pickDate}</div>)}
+                  <h3 className="mb-3 text-sm font-semibold text-foreground">{selectedDate ? `${t.availableSlots} - ${format(selectedDate, "EEE, MMM d", { locale })}` : t.selectDateFirst}</h3>
+                  {selectedDate ? (availableSlots.length > 0 ? (<div className="grid grid-cols-3 gap-2">{availableSlots.map((slot) => (<button key={slot.startTime} onClick={() => setSelectedSlot(slot)} className={cn("rounded-[10px] border px-2 py-2 text-[0.85rem] font-medium transition-all", selectedSlot?.startTime === slot.startTime ? "border-primary bg-primary/10 text-primary" : "border-border bg-background text-foreground hover:bg-accent")}>{slot.startTime}</button>))}</div>) : (<div className="py-8 text-center text-sm text-muted-foreground">{t.noSlotsAvailable}</div>)) : (<div className="py-8 text-center text-sm text-muted-foreground">{t.pickDate}</div>)}
                 </div>
               </div>
             </div>
 
             {selectedSlot && selectedDate && (
-              <motion.div style={{ background: "white", border: "1px solid #b5d1cc", borderRadius: "16px", padding: "24px", boxShadow: "0 2px 12px rgba(79,143,230,0.08)" }} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
-                <h3 className="font-display font-semibold mb-3">{t.additionalNotes}</h3>
+              <motion.div className="rounded-2xl border border-border bg-card p-6 shadow-soft" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
+                <h3 className="mb-3 font-display font-semibold text-foreground">{t.additionalNotes}</h3>
                 <Textarea placeholder={t.symptomsPlaceholder} value={notes} onChange={(e) => setNotes(e.target.value)} className="rounded-xl mb-4" rows={3} />
-                <div style={{ background: "white", border: "1px solid #b5d1cc", borderRadius: "16px", padding: "24px", boxShadow: "0 2px 12px rgba(79,143,230,0.08)", marginBottom: "16px" }}>
-                  <h4 className="text-sm font-semibold mb-2">{t.bookingSummary}</h4>
+                <div className="mb-4 rounded-2xl border border-border bg-background/70 p-6">
+                  <h4 className="mb-2 text-sm font-semibold text-foreground">{t.bookingSummary}</h4>
                   <div className="grid grid-cols-2 gap-2 text-sm">
-                    <span className="text-muted-foreground" style={{ color: "#5a7a8a", fontSize: "0.875rem" }}>{t.doctor}</span><span className="font-medium" style={{ color: "#1a2e3b", fontWeight: 600, fontSize: "0.875rem" }}>Dr. {profile?.full_name}</span>
-                    <span className="text-muted-foreground" style={{ color: "#5a7a8a", fontSize: "0.875rem" }}>{t.specialty}</span><span className="font-medium" style={{ color: "#1a2e3b", fontWeight: 600, fontSize: "0.875rem" }}>{spec?.name}</span>
-                    <span className="text-muted-foreground" style={{ color: "#5a7a8a", fontSize: "0.875rem" }}>{t.date}</span><span className="font-medium" style={{ color: "#1a2e3b", fontWeight: 600, fontSize: "0.875rem" }}>{format(selectedDate, "EEEE, MMMM d, yyyy")}</span>
-                    <span className="text-muted-foreground" style={{ color: "#5a7a8a", fontSize: "0.875rem" }}>{t.time}</span><span className="font-medium" style={{ color: "#1a2e3b", fontWeight: 600, fontSize: "0.875rem" }}>{selectedSlot.startTime} — {selectedSlot.endTime}</span>
-                    <span className="text-muted-foreground" style={{ color: "#5a7a8a", fontSize: "0.875rem" }}>{t.fee}</span><span className="font-medium" style={{ color: "#1a2e3b", fontWeight: 600, fontSize: "0.875rem" }}>{doctor.consultation_fee ?? doctor.consultationFee ?? "-"}</span>
+                    <span className="text-muted-foreground">{t.doctor}</span><span className="font-medium text-foreground">Dr. {profile?.full_name}</span>
+                    <span className="text-muted-foreground">{t.specialty}</span><span className="font-medium text-foreground">{spec?.name}</span>
+                    <span className="text-muted-foreground">{t.date}</span><span className="font-medium text-foreground">{format(selectedDate, "EEEE, MMMM d, yyyy", { locale })}</span>
+                    <span className="text-muted-foreground">{t.time}</span><span className="font-medium text-foreground">{selectedSlot.startTime} - {selectedSlot.endTime}</span>
+                    <span className="text-muted-foreground">{t.fee}</span><span className="font-medium text-foreground">{doctor.consultation_fee ?? doctor.consultationFee ?? "-"}</span>
                   </div>
                 </div>
-                <Button className="w-full rounded-xl h-11 shadow-soft" style={{ background: "#4f8fe6", color: "white", borderRadius: "12px", height: "44px", width: "100%", fontWeight: 600, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }} onClick={() => bookMutation.mutate()} disabled={bookMutation.isPending}>
+                <Button className="h-11 w-full rounded-xl shadow-soft" onClick={() => bookMutation.mutate()} disabled={bookMutation.isPending}>
                   {bookMutation.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> {t.booking}</> : <><CalendarCheck className="mr-2 h-4 w-4" /> {t.confirmBooking}</>}
                 </Button>
               </motion.div>

@@ -20,6 +20,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Button } from "@/components/ui/button";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
+import ThemeToggle from "@/components/ThemeToggle";
 import { useClinicBranding } from "@/hooks/useClinicBranding";
 import api from "@/services/api";
 import { getDefaultRouteByRole } from "@/lib/auth-routing";
@@ -143,7 +144,7 @@ export default function AppLayout({
                   <rect x="13" y="22" width="18" height="22" rx="9" fill="#4f8fe6" />
                 </svg>
               )}
-              <span className="font-display font-bold text-lg hidden sm:inline" style={{ color: "#1a2e3b" }}>
+              <span className="hidden font-display text-lg font-bold text-foreground sm:inline">
                 {clinicName}
               </span>
             </Link>
@@ -171,10 +172,11 @@ export default function AppLayout({
           </nav>
 
           <div className="flex items-center gap-1">
+            <ThemeToggle className="h-10 w-10 rounded-xl text-muted-foreground hover:bg-muted hover:text-foreground" />
             <LanguageSwitcher />
             <span className="text-sm text-muted-foreground hidden lg:block">{user?.email}</span>
             <button
-              className="md:hidden flex items-center justify-center w-10 h-10 rounded-xl border border-[#b5d1cc] text-[#5a7a8a] hover:bg-[#eaf5ff] transition-colors"
+              className="md:hidden flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-background/80 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
               onClick={() => setMenuOpen(!menuOpen)}
               aria-label={t.menu}
             >
@@ -194,8 +196,7 @@ export default function AppLayout({
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
             transition={{ duration: 0.22, ease: "easeOut" }}
-            className="md:hidden overflow-hidden border-b sticky top-16 z-40 bg-white/95 backdrop-blur-md"
-            style={{ borderColor: "#b5d1cc" }}
+            className="sticky top-16 z-40 overflow-hidden border-b border-border bg-card/95 backdrop-blur-md md:hidden"
           >
             <div className="container flex flex-col gap-1 py-3">
               {links.map((link) => (
@@ -206,8 +207,8 @@ export default function AppLayout({
                   className={cn(
                     "flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors",
                     isActiveLink(link.to)
-                      ? "bg-[#eaf5ff] text-[#4f8fe6]"
-                      : "text-[#5a7a8a] hover:bg-[#f4f8fd] hover:text-[#1a2e3b]",
+                      ? "bg-accent text-accent-foreground"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground",
                   )}
                 >
                   <link.icon className="h-4 w-4" />
@@ -215,11 +216,11 @@ export default function AppLayout({
                 </Link>
               ))}
 
-              <div className="mt-2 pt-2 border-t flex items-center justify-between px-2" style={{ borderColor: "#b5d1cc" }}>
-                <span className="text-xs text-[#5a7a8a]">{user?.email}</span>
+              <div className="mt-2 flex items-center justify-between border-t border-border px-2 pt-2">
+                <span className="text-xs text-muted-foreground">{user?.email}</span>
                 <button
                   onClick={logout}
-                  className="flex items-center gap-1 text-xs text-[#5a7a8a] hover:text-[#e05252] transition-colors"
+                  className="flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-destructive"
                 >
                   <LogOut className="h-3.5 w-3.5" />
                   {t.logoutLabel}

@@ -1,4 +1,5 @@
 import {
+  IsDateString,
   IsBoolean,
   IsInt,
   IsOptional,
@@ -14,6 +15,10 @@ export class UpdateAvailabilityDto {
   @Min(0)
   @Max(6)
   dayOfWeek?: number;
+
+  @IsOptional()
+  @IsDateString()
+  specificDate?: string;
 
   @IsOptional()
   @IsString()

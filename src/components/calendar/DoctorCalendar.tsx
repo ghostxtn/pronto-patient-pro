@@ -4,7 +4,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Calendar as BigCalendar,
   Views,
-  dateFnsLocalizer,
   type EventPropGetter,
   type SlotInfo,
   type ToolbarProps,
@@ -28,7 +27,6 @@ import {
   startOfWeek,
   subDays,
 } from "date-fns";
-import { tr } from "date-fns/locale";
 import {
   Ban,
   ChevronDown,
@@ -88,7 +86,17 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useLanguage } from "@/contexts/LanguageContext";
 import { useIsMobile } from "@/hooks/use-mobile";
+import {
+  createCalendarLocalizer,
+  formatCalendarHeaderDay as formatCalendarHeaderDayLabel,
+  getCalendarDayLabels,
+  formatCalendarRangeLabel,
+  getCalendarMessages,
+  getCalendarViewLabels,
+} from "@/lib/calendar-i18n";
+import { getDateFnsLocale, getIntlLocale } from "@/lib/date-localization";
 import { cn } from "@/lib/utils";
 import {
   Appointment,
@@ -103,15 +111,6 @@ import {
 } from "@/utils/calendarUtils";
 import TimeGrid from "react-big-calendar/lib/TimeGrid";
 
-const locales = { tr };
-
-const localizer = dateFnsLocalizer({
-  format,
-  parse,
-  startOfWeek: (date) => startOfWeek(date, { weekStartsOn: 1, locale: tr }),
-  getDay,
-  locales,
-});
 
 const calendarMessages = {
   today: "Bugün",
@@ -207,6 +206,10 @@ interface CustomToolbarProps extends ToolbarProps<SchedulerEvent, object> {
   onManageAvailability: () => void;
   calendarTitle: string;
   specializationName?: string;
+  todayLabel: string;
+  manageLabel: string;
+  rangeLabel: string;
+  viewLabels: Record<string, string>;
 }
 
 interface AvailabilityDraftPreview {
@@ -342,7 +345,7 @@ const CALENDAR_END_HOUR = 21;
 const CALENDAR_START_MINUTES = CALENDAR_START_HOUR * 60;
 const CALENDAR_END_MINUTES = CALENDAR_END_HOUR * 60;
 
-const dayLabels: Record<number, string> = {
+const fallbackDayLabels: Record<number, string> = {
   0: "Pazar",
   1: "Pazartesi",
   2: "Sali",
@@ -422,8 +425,8 @@ function compareOverrides(left: AvailabilityOverride, right: AvailabilityOverrid
   return left.id.localeCompare(right.id);
 }
 
-function getRollingWeekRange(date: Date) {
-  const anchor = startOfWeek(startOfDay(date), { weekStartsOn: 1, locale: tr });
+function getRollingWeekRange(date: Date, locale: ReturnType<typeof getDateFnsLocale>) {
+  const anchor = startOfWeek(startOfDay(date), { weekStartsOn: 1, locale });
   return Array.from({ length: 7 }, (_, index) => addDays(anchor, index));
 }
 
@@ -451,6 +454,16 @@ function minutesToTime(totalMinutes: number) {
   const hours = String(Math.floor(totalMinutes / 60)).padStart(2, "0");
   const minutes = String(totalMinutes % 60).padStart(2, "0");
   return `${hours}:${minutes}`;
+}
+
+function applyTemplate(
+  template: string,
+  values: Record<string, string | number>,
+) {
+  return Object.entries(values).reduce(
+    (result, [key, value]) => result.replaceAll(`{{${key}}}`, String(value)),
+    template,
+  );
 }
 
 function subtractBlockedRange(
@@ -631,7 +644,7 @@ function formatDurationLabel(durationMinutes: number) {
   return minutes === 0 ? `${hours} sa` : `${hours} sa ${minutes} dk`;
 }
 
-function getDateRange(date: Date, view: View) {
+function getDateRange(date: Date, view: View, locale: ReturnType<typeof getDateFnsLocale>) {
   switch (view) {
     case Views.MONTH:
       return {
@@ -640,8 +653,8 @@ function getDateRange(date: Date, view: View) {
       };
     case Views.WEEK:
       return {
-        rangeStart: getRollingWeekRange(date)[0],
-        rangeEnd: getRollingWeekRange(date)[6],
+        rangeStart: getRollingWeekRange(date, locale)[0],
+        rangeEnd: getRollingWeekRange(date, locale)[6],
       };
     case Views.DAY:
       return {
@@ -655,43 +668,10 @@ function getDateRange(date: Date, view: View) {
       };
     default:
       return {
-        rangeStart: startOfWeek(date, { weekStartsOn: 1, locale: tr }),
-        rangeEnd: endOfWeek(date, { weekStartsOn: 1, locale: tr }),
+        rangeStart: startOfWeek(date, { weekStartsOn: 1, locale }),
+        rangeEnd: endOfWeek(date, { weekStartsOn: 1, locale }),
       };
   }
-}
-
-function formatToolbarRangeLabel(date: Date, view: View) {
-  if (view === Views.WEEK) {
-    const [weekStart, , , , , , weekEnd] = getRollingWeekRange(date);
-
-    if (
-      format(weekStart, "MMMM yyyy", { locale: tr }) ===
-      format(weekEnd, "MMMM yyyy", { locale: tr })
-    ) {
-      return `${format(weekStart, "d", { locale: tr })} - ${format(
-        weekEnd,
-        "d MMMM yyyy",
-        { locale: tr },
-      )}`;
-    }
-
-    return `${format(weekStart, "d MMM", { locale: tr })} - ${format(
-      weekEnd,
-      "d MMM yyyy",
-      { locale: tr },
-    )}`;
-  }
-
-  if (view === Views.DAY) {
-    return format(date, "d MMMM yyyy, EEEE", { locale: tr });
-  }
-
-  if (view === Views.MONTH) {
-    return format(date, "MMMM yyyy", { locale: tr });
-  }
-
-  return `Ajanda - ${format(date, "d MMMM yyyy", { locale: tr })}`;
 }
 
 const TimeGridComponent =
@@ -702,30 +682,6 @@ interface RollingWeekViewProps {
   [key: string]: unknown;
 }
 
-const RollingWeekView = Object.assign(
-  function RollingWeekView(props: RollingWeekViewProps) {
-    const range = getRollingWeekRange(props.date);
-    return <TimeGridComponent {...props} range={range} eventOffset={15} />;
-  },
-  {
-    range: getRollingWeekRange,
-    navigate(date: Date, action: string) {
-      switch (action) {
-        case "PREV":
-          return addDays(date, -7);
-        case "NEXT":
-          return addDays(date, 7);
-        case "TODAY":
-          return new Date();
-        default:
-          return date;
-      }
-    },
-    title(date: Date) {
-      return formatToolbarRangeLabel(date, Views.WEEK);
-    },
-  },
-);
 
 function getCalendarScrollContainer(calendarShell: HTMLElement | null) {
   return calendarShell?.querySelector(".rbc-time-content") as HTMLElement | null;
@@ -806,12 +762,6 @@ function getPatientName(patient: PatientLookupRecord) {
     .trim();
 }
 
-function formatCalendarHeaderDay(date: Date) {
-  return format(date, "EEE", { locale: tr })
-    .replace(".", "")
-    .toLocaleUpperCase("tr-TR");
-}
-
 function normalizeAppointmentStatus(status?: string): AppointmentVisualStatus {
   const normalized = (status ?? "").toLowerCase();
 
@@ -827,13 +777,16 @@ function normalizeAppointmentStatus(status?: string): AppointmentVisualStatus {
 }
 
 const CustomToolbar = ({
-  date,
   onNavigate,
   onView,
   view,
   onManageAvailability,
   calendarTitle,
   specializationName,
+  todayLabel,
+  manageLabel,
+  rangeLabel,
+  viewLabels,
 }: CustomToolbarProps) => (
   <div className="scheduler-toolbar-shell">
     <div className="scheduler-toolbar-row">
@@ -861,9 +814,7 @@ const CustomToolbar = ({
         >
           <ChevronLeft className="h-4 w-4" />
         </Button>
-        <span className="scheduler-toolbar-title">
-          {formatToolbarRangeLabel(date, view)}
-        </span>
+        <span className="scheduler-toolbar-title">{rangeLabel}</span>
         <Button
           type="button"
           variant="ghost"
@@ -879,7 +830,7 @@ const CustomToolbar = ({
           className="scheduler-toolbar-today-button"
           onClick={() => onNavigate("TODAY")}
         >
-          Bugün
+          {todayLabel}
         </Button>
       </div>
 
@@ -891,7 +842,7 @@ const CustomToolbar = ({
               variant="outline"
               className="scheduler-toolbar-view-button"
             >
-              {toolbarViewLabels[view]}
+              {viewLabels[view] ?? view}
               <ChevronDown className="ml-2 h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
@@ -905,7 +856,7 @@ const CustomToolbar = ({
                   view === toolbarView && "bg-accent text-foreground",
                 )}
               >
-                {toolbarViewLabels[toolbarView]}
+                {viewLabels[toolbarView] ?? toolbarView}
               </DropdownMenuItem>
             ))}
           </DropdownMenuContent>
@@ -918,7 +869,7 @@ const CustomToolbar = ({
           onClick={onManageAvailability}
         >
           <Settings2 className="mr-2 h-4 w-4" />
-          Müsaitlik Paneli
+          {manageLabel}
         </Button>
       </div>
     </div>
@@ -1022,11 +973,13 @@ function CalendarEventContent({
   title,
   view,
   defaultDuration,
+  t,
 }: {
   event: SchedulerEvent;
   title: string;
   view?: string;
   defaultDuration: number;
+  t: ReturnType<typeof useLanguage>["t"];
 }) {
   const timeRange = `${format(event.start, "HH:mm")} - ${format(event.end, "HH:mm")}`;
 
@@ -1045,7 +998,7 @@ function CalendarEventContent({
       <div className="avail-surface-label">
         <span className="avail-surface-time">{timeLabel}</span>
         {slotCount > 0 ? (
-          <span className="avail-surface-slots">{slotCount} slot</span>
+          <span className="avail-surface-slots">{slotCount} {t.activeSlots}</span>
         ) : null}
       </div>
     );
@@ -1067,7 +1020,7 @@ function CalendarEventContent({
   if (event.type === "draft") {
     return (
       <div className="flex h-full flex-col justify-start gap-0.5 overflow-hidden">
-        <span style={{ fontSize: "10px", opacity: 0.7, fontWeight: 400 }}>Taslak</span>
+        <span style={{ fontSize: "10px", opacity: 0.7, fontWeight: 400 }}>{t.pending}</span>
         <span style={{ fontSize: "12px", fontWeight: 600, color: "rgba(99, 102, 241, 0.9)" }}>
           {timeRange}
         </span>
@@ -1091,10 +1044,10 @@ function CalendarEventContent({
           : "scheduler-agenda-event-custom-hours";
     const agendaLabel =
       event.type === "appointment"
-        ? "Randevu"
+        ? t.appointments
         : event.type === "blackout"
-          ? "Kapalı Gün"
-          : "Blok";
+          ? t.closeDay
+          : t.addException;
 
     return (
       <div className={cn("scheduler-agenda-event", agendaToneClass)}>
@@ -1261,8 +1214,14 @@ export function DoctorCalendar({
   calendarView,
   onCalendarViewChange,
 }: DoctorCalendarProps) {
+  const { lang, t } = useLanguage();
   const isMobile = useIsMobile();
   const queryClient = useQueryClient();
+  const locale = useMemo(() => getDateFnsLocale(lang), [lang]);
+  const intlLocale = useMemo(() => getIntlLocale(lang), [lang]);
+  const resolvedCalendarMessages = useMemo(() => getCalendarMessages(t), [t]);
+  const resolvedToolbarViewLabels = useMemo(() => getCalendarViewLabels(t), [t]);
+  const resolvedCalendarLocalizer = useMemo(() => createCalendarLocalizer(lang), [lang]);
   const calendarShellRef = useRef<HTMLDivElement | null>(null);
   const quickActionPanelRef = useRef<HTMLDivElement | null>(null);
   const hasAutoScrolledToCurrentTimeRef = useRef(false);
@@ -1275,6 +1234,36 @@ export function DoctorCalendar({
   )
     ? defaultDuration
     : 30;
+  const resolvedDayLabels = useMemo(
+    () => getCalendarDayLabels?.(t) ?? fallbackDayLabels,
+    [t],
+  );
+  const rollingWeekView = useMemo(
+    () =>
+      Object.assign(
+        function RollingWeekView(props: RollingWeekViewProps) {
+          const range = getRollingWeekRange(props.date, locale);
+          return <TimeGridComponent {...props} range={range} eventOffset={15} />;
+        },
+        {
+          range: (date: Date) => getRollingWeekRange(date, locale),
+          navigate(date: Date, action: string) {
+            switch (action) {
+              case "PREV":
+                return addDays(date, -7);
+              case "NEXT":
+                return addDays(date, 7);
+              case "TODAY":
+                return new Date();
+              default:
+                return date;
+            }
+          },
+          title: (date: Date) => formatCalendarRangeLabel(date, Views.WEEK, lang, t),
+        },
+      ),
+    [lang, locale, t],
+  );
   const durationAlignedTimes = useMemo(() => {
     const times: string[] = [];
     const totalMinutes = 24 * 60;
@@ -1384,8 +1373,8 @@ export function DoctorCalendar({
   };
 
   const { rangeStart, rangeEnd } = useMemo(
-    () => getDateRange(resolvedCurrentDate, resolvedView),
-    [resolvedCurrentDate, resolvedView],
+    () => getDateRange(resolvedCurrentDate, resolvedView, locale),
+    [locale, resolvedCurrentDate, resolvedView],
   );
 
   const overrideRangeStart = useMemo(
@@ -1995,7 +1984,7 @@ export function DoctorCalendar({
       open: true,
       start,
       end,
-      dateLabel: format(start, "d MMMM yyyy, EEEE", { locale: tr }),
+      dateLabel: format(start, "d MMMM yyyy, EEEE", { locale }),
       timeLabel: `${format(start, "HH:mm")} - ${format(end, "HH:mm")}`,
     };
 
@@ -2334,7 +2323,7 @@ export function DoctorCalendar({
       start: slotInfo.start,
       end: slotInfo.end,
       dayOfWeek: slotInfo.start.getDay(),
-      dateLabel: format(slotInfo.start, "d MMMM yyyy, EEEE", { locale: tr }),
+      dateLabel: format(slotInfo.start, "d MMMM yyyy, EEEE", { locale }),
       timeLabel: `${format(slotInfo.start, "HH:mm")} - ${format(
         slotInfo.end,
         "HH:mm",
@@ -2810,7 +2799,7 @@ export function DoctorCalendar({
   }
 
   const surfaceContextTitle =
-    doctorName ?? (mode === "staff" ? "Doktor takvimi" : "Kendi takviminiz");
+    doctorName ?? (mode === "staff" ? t.doctorList : t.mySchedule);
 
   const quickActionBadge =
     quickActionSlotStatus === "available" || quickActionSlotStatus === "gap"
@@ -2847,7 +2836,7 @@ export function DoctorCalendar({
 
   const isQuickActionEditable = Boolean(quickActionSlot);
   const quickActionDatePillLabel = quickActionSlot
-    ? format(quickActionSlot.start, "EEE, d MMMM", { locale: tr })
+    ? format(quickActionSlot.start, "EEE, d MMMM", { locale })
     : "";
 
   const canBlockSelectedRange =
@@ -2882,7 +2871,7 @@ export function DoctorCalendar({
         start: nextStart,
         end: nextEnd,
         dayOfWeek: nextStart.getDay(),
-        dateLabel: format(nextStart, "d MMMM yyyy, EEEE", { locale: tr }),
+        dateLabel: format(nextStart, "d MMMM yyyy, EEEE", { locale }),
         timeLabel: `${format(nextStart, "HH:mm")} - ${format(nextEnd, "HH:mm")}`,
         override: nextBlockingOverride ?? null,
         availabilityTarget: nextAvailabilityTarget,
@@ -3286,23 +3275,23 @@ export function DoctorCalendar({
           "scheduler-week-header",
           currentDay && "scheduler-week-header-today",
         )}
-        title="Sağ tık: günlük istisna ekle."
+        title={t.addException}
       >
         <span className="scheduler-week-header-day">
-          {formatCalendarHeaderDay(date)}
+          {formatCalendarHeaderDayLabel(date, lang)}
         </span>
         <span className="scheduler-week-header-date">
-          {format(date, "d", { locale: tr })}
+          {format(date, "d", { locale })}
         </span>
         <span className="scheduler-week-header-meta">
           {daySlotCount > 0 ? (
             <>
-              <span>{daySlotCount} slot</span>
+              <span>{daySlotCount} {t.activeSlots}</span>
               {dayApptCount > 0 ? (
                 <>
                   <span className="scheduler-week-header-sep">·</span>
                   <span className="scheduler-week-header-booked">
-                    {dayApptCount} dolu
+                    {dayApptCount} {t.appointments.toLowerCase()}
                   </span>
                 </>
               ) : null}
@@ -3326,7 +3315,7 @@ export function DoctorCalendar({
           month: true,
           agenda: true,
           day: true,
-          week: RollingWeekView,
+          week: rollingWeekView,
         }}
         components={{
           header: ({ date }) => renderWeekHeader(date),
@@ -3348,6 +3337,10 @@ export function DoctorCalendar({
               {...toolbarProps}
               calendarTitle={surfaceContextTitle}
               specializationName={specializationName}
+              todayLabel={t.today}
+              manageLabel={t.manageAvailability}
+              rangeLabel={formatCalendarRangeLabel(resolvedCurrentDate, resolvedView, lang, t)}
+              viewLabels={resolvedToolbarViewLabels}
               onManageAvailability={() => {
                 resetCalendarActiveState();
                 setIsAvailabilitySheetOpen(true);
@@ -3360,10 +3353,11 @@ export function DoctorCalendar({
               title={title}
               view={resolvedView}
               defaultDuration={resolvedDefaultDuration}
+              t={t}
             />
           ),
         }}
-        localizer={localizer}
+        localizer={resolvedCalendarLocalizer}
         events={events}
         backgroundEvents={[
           ...availabilitySurfaceEvents,
@@ -3384,7 +3378,7 @@ export function DoctorCalendar({
           minHeight: 0,
           overflow: "hidden",
         }}
-        messages={calendarMessages}
+        messages={resolvedCalendarMessages}
         eventPropGetter={eventPropGetter}
         backgroundEventPropGetter={eventPropGetter}
         enableAutoScroll={false}
@@ -3432,7 +3426,7 @@ export function DoctorCalendar({
         onSelectEvent={handleSelectEvent}
         selectable={!isMobile || resolvedView === Views.MONTH}
         popup
-        culture="tr"
+        culture={intlLocale}
         step={resolvedDefaultDuration}
         timeslots={1}
         min={setMinutes(setHours(new Date(), CALENDAR_START_HOUR), 0)}
@@ -3557,7 +3551,7 @@ export function DoctorCalendar({
                             onMonthChange={setQuickActionCalendarMonth}
                             onSelect={handleQuickActionDateSelect}
                             fixedWeeks
-                            locale={tr}
+                            locale={locale}
                             weekStartsOn={1}
                             className="p-0"
                             classNames={{
@@ -4097,11 +4091,9 @@ export function DoctorCalendar({
       >
         <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-lg">
           <SheetHeader className="pb-2">
-            <SheetTitle className="text-lg font-semibold">Müsaitlik Paneli</SheetTitle>
+            <SheetTitle className="text-lg font-semibold">{t.manageAvailability}</SheetTitle>
             <SheetDescription className="text-sm text-muted-foreground">
-              Haftalık slotlar panelden düzenlenir, aktiflik durumunu
-              degistirebilir veya yeni slot ekleyebilirsiniz. Takvimdeki yesil alanlar
-              yalnizca gosterimdir.
+              {t.calendarOverviewDesc}
             </SheetDescription>
           </SheetHeader>
 
@@ -4110,10 +4102,10 @@ export function DoctorCalendar({
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                    Haftalik Slotlar
+                    {t.weeklySlots}
                   </h3>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    Duzenli calisma saatlerinizi yonetin.
+                    {t.weeklySlotsDesc}
                   </p>
                 </div>
                 <Button
@@ -4122,7 +4114,7 @@ export function DoctorCalendar({
                   className="rounded-xl text-sm"
                   onClick={() => setAvailabilityModal({ open: true, mode: "create" })}
                 >
-                  + Yeni Slot Ekle
+                  + {t.availabilityCreateTitle}
                 </Button>
               </div>
 
@@ -4135,10 +4127,10 @@ export function DoctorCalendar({
                     >
                       <div className="flex items-center gap-3 min-w-0">
                         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-xs font-bold text-primary">
-                          {dayLabels[slot.day_of_week]?.slice(0, 3)}
+                          {resolvedDayLabels[slot.day_of_week]?.slice(0, 3)}
                         </div>
                         <div className="min-w-0">
-                          <div className="text-sm font-semibold leading-tight">{dayLabels[slot.day_of_week]}</div>
+                          <div className="text-sm font-semibold leading-tight">{resolvedDayLabels[slot.day_of_week]}</div>
                           <div className="text-xs text-muted-foreground">
                             {formatTimeRange(slot.start_time, slot.end_time)} · {slot.slot_duration} dk
                           </div>
@@ -4152,15 +4144,15 @@ export function DoctorCalendar({
                             api.availability
                               .update(slot.id, { isActive: checked })
                               .then(() => {
-                                toast.success("Musaitlik durumu guncellendi");
+                                toast.success(t.availabilityStatusUpdated);
                                 return queryClient.invalidateQueries({ queryKey: ["availability", doctorId] });
                               })
                               .then(() => queryClient.invalidateQueries({ queryKey: ["doctor-calendar", doctorId] }))
                               .catch((error: unknown) => {
-                                toast.error(error instanceof Error ? error.message : "Musaitlik durumu guncellenemedi");
+                                toast.error(error instanceof Error ? error.message : t.availabilityStatusUpdateFailed);
                               });
                           }}
-                          aria-label={`${dayLabels[slot.day_of_week]} musaitlik durumu`}
+                          aria-label={`${resolvedDayLabels[slot.day_of_week]} ${t.manageAvailability}`}
                         />
                         <Button
                           type="button"
@@ -4186,7 +4178,7 @@ export function DoctorCalendar({
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed py-8 text-center">
-                  <p className="text-sm text-muted-foreground">Henuz tanimli musaitlik slotu bulunmuyor.</p>
+                  <p className="text-sm text-muted-foreground">{t.noAvailabilitySlotsDefined}</p>
                 </div>
               )}
             </section>
@@ -4195,10 +4187,10 @@ export function DoctorCalendar({
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                    Istisnalar
+                    {t.exceptions}
                   </h3>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    Son 30 gun ve gelecek icin kapanis ve bloklu zaman istisnalari.
+                    {t.exceptionsDesc}
                   </p>
                 </div>
                 <Button
@@ -4215,7 +4207,7 @@ export function DoctorCalendar({
                     })
                   }
                 >
-                  + Istisna Ekle
+                  + {t.addException}
                 </Button>
               </div>
 
@@ -4229,6 +4221,8 @@ export function DoctorCalendar({
                 <div className="space-y-2">
                   {sortedOverrides.map((override) => {
                     const badge = getOverrideBadge(override.type);
+                    const badgeLabel =
+                      override.type === "blackout" ? t.closeDay : t.defineCustomHours;
                     return (
                       <div
                         key={override.id}
@@ -4239,11 +4233,11 @@ export function DoctorCalendar({
                             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-xs font-bold"
                             style={{ backgroundColor: `${badge.color}18`, color: badge.color }}
                           >
-                            {format(parseDateOnly(override.date), "dd", { locale: tr })}
+                            {format(parseDateOnly(override.date), "dd", { locale })}
                           </div>
                           <div className="min-w-0">
                             <div className="text-sm font-semibold leading-tight">
-                              {format(parseDateOnly(override.date), "d MMMM yyyy", { locale: tr })}
+                              {format(parseDateOnly(override.date), "d MMMM yyyy", { locale })}
                             </div>
                             <div className="flex items-center gap-1.5 mt-0.5">
                               <span
@@ -4253,7 +4247,7 @@ export function DoctorCalendar({
                                   color: badge.color,
                                 }}
                               >
-                                {badge.label}
+                                {badgeLabel}
                               </span>
                               {override.type === "custom_hours" && override.start_time && override.end_time ? (
                                 <span className="text-xs text-muted-foreground">
@@ -4290,7 +4284,7 @@ export function DoctorCalendar({
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed py-8 text-center">
-                  <p className="text-sm text-muted-foreground">Tanimli istisna bulunmuyor.</p>
+                  <p className="text-sm text-muted-foreground">{t.noExceptionsDefined}</p>
                 </div>
               )}
             </section>
@@ -4301,19 +4295,19 @@ export function DoctorCalendar({
       <AlertDialog open={Boolean(slotToDelete)} onOpenChange={() => {}}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Musaitlik silinsin mi?</AlertDialogTitle>
+            <AlertDialogTitle>{t.deleteAvailabilityTitle}</AlertDialogTitle>
             <AlertDialogDescription>
               {slotToDelete
-                ? `${dayLabels[slotToDelete.day_of_week]} gunundeki ${formatTimeRange(
-                    slotToDelete.start_time,
-                    slotToDelete.end_time,
-                  )} araligi kaldirilacak.`
-                : "Bu musaitlik slotu kaldirilacak."}
+                ? applyTemplate(t.deleteAvailabilityRangeDesc, {
+                    day: resolvedDayLabels[slotToDelete.day_of_week],
+                    range: formatTimeRange(slotToDelete.start_time, slotToDelete.end_time),
+                  })
+                : t.deleteAvailabilityDesc}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setSlotToDelete(null)}>
-              İptal
+              {t.cancel}
             </AlertDialogCancel>
             <Button
               variant="destructive"
@@ -4324,7 +4318,7 @@ export function DoctorCalendar({
                 }
               }}
             >
-              {removeAvailability.isPending ? "Siliniyor..." : "Sil"}
+              {removeAvailability.isPending ? t.deleting : t.delete}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -4333,18 +4327,18 @@ export function DoctorCalendar({
       <AlertDialog open={Boolean(overrideToDelete)} onOpenChange={() => {}}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Istisna silinsin mi?</AlertDialogTitle>
+            <AlertDialogTitle>{t.deleteOverrideTitle}</AlertDialogTitle>
             <AlertDialogDescription>
               {overrideToDelete
-                ? `${format(parseDateOnly(overrideToDelete.date), "d MMMM yyyy", {
-                    locale: tr,
-                  })} tarihli istisna kaldirilacak.`
-                : "Bu istisna kaldirilacak."}
+                ? applyTemplate(t.deleteOverrideDateDesc, {
+                    date: format(parseDateOnly(overrideToDelete.date), "d MMMM yyyy", { locale }),
+                  })
+                : t.deleteOverrideDesc}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setOverrideToDelete(null)}>
-              İptal
+              {t.cancel}
             </AlertDialogCancel>
             <Button
               variant="destructive"
@@ -4355,7 +4349,7 @@ export function DoctorCalendar({
                 }
               }}
             >
-              {removeOverride.isPending ? "Siliniyor..." : "Sil"}
+              {removeOverride.isPending ? t.deleting : t.delete}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>

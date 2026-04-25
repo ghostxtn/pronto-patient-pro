@@ -29,6 +29,7 @@ export const appointments = pgTable('appointments', {
   status: varchar('status', { length: 20 }).notNull().default('pending'),
   type: varchar('type', { length: 50 }),
   notes: text('notes'),
+  reminder_sent_at: timestamp('reminder_sent_at'),
   created_at: timestamp('created_at').defaultNow().notNull(),
   updated_at: timestamp('updated_at').defaultNow().notNull(),
 });

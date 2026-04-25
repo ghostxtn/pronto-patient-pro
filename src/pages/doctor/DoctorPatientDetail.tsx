@@ -261,22 +261,22 @@ export default function DoctorPatientDetail() {
 
   return (
     <AppLayout>
-      <motion.div initial="hidden" animate="visible" className="space-y-6 rounded-[28px] bg-[#f4f8fd] p-1">
+      <motion.div initial="hidden" animate="visible" className="space-y-6 rounded-[28px] bg-background/40 p-1">
         <motion.div custom={0} variants={fadeUp}>
           <Button
             type="button"
             variant="ghost"
             className="mb-4 rounded-xl px-0 hover:bg-transparent"
-            style={{ color: "#4f8fe6", fontFamily: "Inter, sans-serif" }}
+            style={{ fontFamily: "Inter, sans-serif" }}
             onClick={() => navigate("/doctor/patients")}
           >
-            <ArrowLeft className="mr-2 h-4 w-4" />
+            <ArrowLeft className="mr-2 h-4 w-4 text-primary" />
             Hastalara Dön
           </Button>
         </motion.div>
 
         <motion.div custom={1} variants={fadeUp}>
-          <Card className="rounded-2xl border border-[#b5d1cc] bg-white shadow-[0_2px_12px_rgba(79,143,230,0.08)]">
+          <Card className="rounded-2xl border border-border bg-card shadow-sm">
             <CardContent className="flex flex-col gap-4 p-6 md:flex-row md:items-start md:justify-between">
               <div className="space-y-1">
                 {isPatientLoading ? (
@@ -287,9 +287,9 @@ export default function DoctorPatientDetail() {
                   </>
                 ) : (
                   <>
-                    <h1 className="text-3xl font-bold text-[#1a2e3b]" style={{ fontFamily: "Manrope, sans-serif" }}>{patientName}</h1>
-                    <p className="text-sm" style={{ color: "#5a7a8a", fontFamily: "Inter, sans-serif" }}>{patient?.email || "E-posta bilgisi yok"}</p>
-                    <p className="text-sm" style={{ color: "#5a7a8a", fontFamily: "Inter, sans-serif" }}>{patient?.phone || "Telefon bilgisi yok"}</p>
+                    <h1 className="text-3xl font-bold text-foreground" style={{ fontFamily: "Manrope, sans-serif" }}>{patientName}</h1>
+                    <p className="text-sm text-muted-foreground" style={{ fontFamily: "Inter, sans-serif" }}>{patient?.email || "E-posta bilgisi yok"}</p>
+                    <p className="text-sm text-muted-foreground" style={{ fontFamily: "Inter, sans-serif" }}>{patient?.phone || "Telefon bilgisi yok"}</p>
                   </>
                 )}
               </div>
@@ -297,7 +297,7 @@ export default function DoctorPatientDetail() {
               <Button
                 type="button"
                 variant="outline"
-                className="rounded-xl border-[#b5d1cc] text-[#4f8fe6] hover:bg-[#eaf5ff] hover:text-[#2f75ca]"
+                className="rounded-xl border-border text-primary hover:bg-primary/10 hover:text-primary"
                 style={{ fontFamily: "Inter, sans-serif" }}
                 onClick={() => navigate("/doctor/patients")}
               >
@@ -309,18 +309,18 @@ export default function DoctorPatientDetail() {
 
         <div className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
           <motion.div custom={2} variants={fadeUp} className="space-y-6">
-            <Card className="rounded-2xl border border-[#b5d1cc] bg-white shadow-[0_2px_12px_rgba(79,143,230,0.08)]">
+            <Card className="rounded-2xl border border-border bg-card shadow-sm">
               <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
                 <div>
-                  <CardTitle className="text-xl text-[#1a2e3b]" style={{ fontFamily: "Manrope, sans-serif" }}>Klinik Notlar</CardTitle>
-                  <p className="mt-1 text-sm" style={{ color: "#5a7a8a", fontFamily: "Inter, sans-serif" }}>
+                  <CardTitle className="text-xl text-foreground" style={{ fontFamily: "Manrope, sans-serif" }}>Klinik Notlar</CardTitle>
+                  <p className="mt-1 text-sm text-muted-foreground" style={{ fontFamily: "Inter, sans-serif" }}>
                     Hastaya ait klinik değerlendirmeler ve tedavi notları.
                   </p>
                 </div>
                 <Button
                   type="button"
                   variant="outline"
-                  className="rounded-xl border-[#b5d1cc] text-[#4f8fe6] hover:bg-[#eaf5ff] hover:text-[#2f75ca]"
+                  className="rounded-xl border-border text-primary hover:bg-primary/10 hover:text-primary"
                   style={{ fontFamily: "Inter, sans-serif" }}
                   onClick={() => setIsFormOpen((current) => !current)}
                 >
@@ -330,7 +330,7 @@ export default function DoctorPatientDetail() {
               </CardHeader>
               <CardContent className="space-y-4">
                 {isFormOpen ? (
-                  <div className="space-y-4 rounded-2xl p-4" style={{ backgroundColor: "#f4f8fd" }}>
+                  <div className="space-y-4 rounded-2xl bg-muted/50 p-4">
                     <div className="space-y-2">
                       <Label htmlFor="clinical-note-diagnosis" style={{ color: "#1a2e3b", fontFamily: "Inter, sans-serif" }}>Tanı</Label>
                       <Textarea
@@ -377,8 +377,8 @@ export default function DoctorPatientDetail() {
 
                     <div className="flex flex-wrap gap-3">
                       <button
-                        className="rounded-xl px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-                        style={{ backgroundColor: "#4f8fe6", fontFamily: "Inter, sans-serif" }}
+                        className="rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
+                        style={{ fontFamily: "Inter, sans-serif" }}
                         onClick={() => createClinicalNote.mutate()}
                         disabled={!hasAtLeastOneField || createClinicalNote.isPending}
                       >
@@ -391,7 +391,7 @@ export default function DoctorPatientDetail() {
                         type="button"
                         variant="ghost"
                         className="rounded-xl"
-                        style={{ color: "#5a7a8a" }}
+                        style={{ fontFamily: "Inter, sans-serif" }}
                         onClick={() => setIsFormOpen(false)}
                       >
                         Vazgeç
@@ -414,23 +414,23 @@ export default function DoctorPatientDetail() {
                 ) : clinicalNotes && clinicalNotes.length > 0 ? (
                   <div className="space-y-4">
                     {clinicalNotes.map((note) => (
-                      <Card key={note.id} className="rounded-2xl border border-[#b5d1cc] bg-white shadow-none">
+                      <Card key={note.id} className="rounded-2xl border border-border bg-card shadow-none">
                         <CardHeader className="space-y-2 pb-3">
                           <div className="flex items-center gap-3">
-                            <div className="rounded-full p-2" style={{ backgroundColor: "#eaf5ff" }}>
-                              <UserRound className="h-4 w-4" style={{ color: "#4f8fe6" }} />
+                            <div className="rounded-full bg-primary/10 p-2">
+                              <UserRound className="h-4 w-4 text-primary" />
                             </div>
                             <div>
-                              <CardTitle className="text-base font-semibold text-[#1a2e3b]" style={{ fontFamily: "Manrope, sans-serif" }}>
+                              <CardTitle className="text-base font-semibold text-foreground" style={{ fontFamily: "Manrope, sans-serif" }}>
                                 {[note.doctor.title, note.doctor.firstName, note.doctor.lastName].filter(Boolean).join(" ")}
                               </CardTitle>
-                              <p className="text-xs" style={{ color: "#5a7a8a", fontFamily: "Inter, sans-serif" }}>
+                              <p className="text-xs text-muted-foreground" style={{ fontFamily: "Inter, sans-serif" }}>
                                 {format(new Date(note.created_at), "d MMMM yyyy, HH:mm", { locale: tr })}
                               </p>
                             </div>
                           </div>
                         </CardHeader>
-                        <CardContent className="space-y-3 text-sm" style={{ color: "#1a2e3b", fontFamily: "Inter, sans-serif" }}>
+                        <CardContent className="space-y-3 text-sm text-foreground" style={{ fontFamily: "Inter, sans-serif" }}>
                           {note.diagnosis ? (
                             <p><span className="font-medium">Tanı:</span> {note.diagnosis}</p>
                           ) : null}
@@ -448,7 +448,7 @@ export default function DoctorPatientDetail() {
                     ))}
                   </div>
                 ) : (
-                  <div className="rounded-2xl border border-dashed border-[#b5d1cc] p-6 text-sm" style={{ color: "#5a7a8a", fontFamily: "Inter, sans-serif" }}>
+                  <div className="rounded-2xl border border-dashed border-border p-6 text-sm text-muted-foreground" style={{ fontFamily: "Inter, sans-serif" }}>
                     Bu hasta için henüz klinik not eklenmemiş.
                   </div>
                 )}
@@ -457,7 +457,7 @@ export default function DoctorPatientDetail() {
           </motion.div>
 
           <motion.div custom={3} variants={fadeUp}>
-            <Card className="rounded-2xl border border-[#b5d1cc] bg-white shadow-[0_2px_12px_rgba(79,143,230,0.08)]">
+            <Card className="rounded-2xl border border-border bg-card shadow-sm">
               <CardHeader>
                 <CardTitle className="text-xl text-[#1a2e3b]" style={{ fontFamily: "Manrope, sans-serif" }}>Randevu Geçmişi</CardTitle>
                 <p className="text-sm" style={{ color: "#5a7a8a", fontFamily: "Inter, sans-serif" }}>
@@ -482,18 +482,18 @@ export default function DoctorPatientDetail() {
                       <button
                         key={appointment.id}
                         type="button"
-                        className="w-full rounded-2xl border border-[#b5d1cc] bg-white p-4 text-left transition-colors hover:bg-[#eaf5ff] hover:border-[#4f8fe6]"
+                        className="w-full rounded-2xl border border-border bg-card p-4 text-left transition-colors hover:border-primary/50 hover:bg-primary/5"
                         onClick={() => setSelectedAppointmentId(appointment.id)}
                       >
                         <div className="flex flex-col gap-3">
                           <div className="flex items-start justify-between gap-3">
                             <div>
-                              <p className="font-medium text-[#1a2e3b]" style={{ fontFamily: "Manrope, sans-serif" }}>
+                              <p className="font-medium text-foreground" style={{ fontFamily: "Manrope, sans-serif" }}>
                                 {format(parseISO(appointment.appointment_date), "d MMMM yyyy", {
                                   locale: tr,
                                 })}
                               </p>
-                              <p className="text-sm" style={{ color: "#5a7a8a", fontFamily: "Inter, sans-serif" }}>
+                              <p className="text-sm text-muted-foreground" style={{ fontFamily: "Inter, sans-serif" }}>
                                 {appointment.start_time.slice(0, 5)} - {appointment.end_time.slice(0, 5)}
                               </p>
                             </div>
@@ -503,8 +503,8 @@ export default function DoctorPatientDetail() {
                             </Badge>
                           </div>
                           {appointment.notes ? (
-                            <div className="flex items-start gap-2 text-sm" style={{ color: "#5a7a8a", fontFamily: "Inter, sans-serif" }}>
-                              <FileText className="mt-0.5 h-4 w-4 flex-shrink-0" style={{ color: "#4f8fe6" }} />
+                            <div className="flex items-start gap-2 text-sm text-muted-foreground" style={{ fontFamily: "Inter, sans-serif" }}>
+                              <FileText className="mt-0.5 h-4 w-4 flex-shrink-0 text-primary" />
                               <span className="line-clamp-2">{appointment.notes}</span>
                             </div>
                           ) : null}
@@ -513,7 +513,7 @@ export default function DoctorPatientDetail() {
                     );
                   })
                 ) : (
-                  <div className="rounded-2xl border border-dashed border-[#b5d1cc] p-6 text-sm" style={{ color: "#5a7a8a", fontFamily: "Inter, sans-serif" }}>
+                  <div className="rounded-2xl border border-dashed border-border p-6 text-sm text-muted-foreground" style={{ fontFamily: "Inter, sans-serif" }}>
                     Henüz tamamlanmış randevu bulunmuyor.
                   </div>
                 )}

@@ -70,30 +70,30 @@ export default function ResetPassword() {
     <AuthScreen>
       <div className="text-center mb-8">
         <h1
-          className="text-2xl font-medium tracking-tight text-[#1a2e3b]"
+          className="text-2xl font-medium tracking-tight text-foreground"
           style={{ fontFamily: "Manrope, sans-serif" }}
         >
           {t.resetPasswordTitle}
         </h1>
-        <p className="mt-1 text-sm font-light text-[#5a7a8a]">
+        <p className="mt-1 text-sm font-light text-muted-foreground">
           {t.resetPasswordDesc}
         </p>
       </div>
 
       {success ? (
         <div className="space-y-5">
-          <div className="rounded-2xl border border-[#d7eadf] bg-[#f6fbf8] px-4 py-4 text-sm text-[#335b4a]">
+          <div className="rounded-2xl border border-emerald-500/25 bg-emerald-500/10 px-4 py-4 text-sm text-emerald-700 dark:text-emerald-300">
             {t.passwordUpdatedRedirect}
           </div>
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="password" className="text-[11px] font-medium uppercase tracking-widest text-[#5a7a8a]">
+            <Label htmlFor="password" className="text-[11px] font-medium uppercase tracking-widest text-muted-foreground">
               {t.newPassword}
             </Label>
             <div className="relative">
-              <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#7c96a4]" />
+              <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 id="password"
                 type="password"
@@ -108,11 +108,11 @@ export default function ResetPassword() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="confirmPassword" className="text-[11px] font-medium uppercase tracking-widest text-[#5a7a8a]">
+            <Label htmlFor="confirmPassword" className="text-[11px] font-medium uppercase tracking-widest text-muted-foreground">
               {t.confirmNewPassword}
             </Label>
             <div className="relative">
-              <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#7c96a4]" />
+              <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 id="confirmPassword"
                 type="password"
@@ -127,19 +127,19 @@ export default function ResetPassword() {
           </div>
 
           {!token ? (
-            <p className="rounded-xl border border-[#f3d0d0] bg-[#fff6f6] px-4 py-3 text-sm text-[#a24b4b]">
+            <p className="rounded-xl border border-destructive/25 bg-destructive/10 px-4 py-3 text-sm text-destructive">
               {t.resetPasswordInvalid}
             </p>
           ) : null}
 
           {error ? (
-            <p className="rounded-xl border border-[#f3d0d0] bg-[#fff6f6] px-4 py-3 text-sm text-[#a24b4b]">
+            <p className="rounded-xl border border-destructive/25 bg-destructive/10 px-4 py-3 text-sm text-destructive">
               {error}
             </p>
           ) : null}
 
           {!error && validationError ? (
-            <p className="rounded-xl border border-[#f5e6c7] bg-[#fffaf0] px-4 py-3 text-sm text-[#8a6732]">
+            <p className="rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-300">
               {validationError}
             </p>
           ) : null}
@@ -155,8 +155,8 @@ export default function ResetPassword() {
         </form>
       )}
 
-      <p className="mt-6 text-center text-sm text-[#5a7a8a]">
-        <Link to="/auth" className="font-medium text-[#005cae] hover:underline">
+      <p className="mt-6 text-center text-sm text-muted-foreground">
+        <Link to="/auth" className="font-medium text-primary hover:underline">
           {t.backToLogin}
         </Link>
       </p>

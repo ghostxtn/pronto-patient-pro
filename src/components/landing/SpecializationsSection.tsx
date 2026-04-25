@@ -61,7 +61,7 @@ export default function SpecialtiesSection({
     <motion.section
       {...sectionMotionProps}
       ref={sectionRef}
-      className="relative z-[10] w-full bg-[#f4f8fd] px-6 py-20 md:px-12 lg:px-20"
+      className="relative z-[10] w-full bg-homepage-shell px-6 py-20 md:px-12 lg:px-20"
     >
       <style>{".spec-scroll-container::-webkit-scrollbar { display: none; }"}</style>
 
@@ -72,7 +72,7 @@ export default function SpecialtiesSection({
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, amount: 0.3 }}
             transition={{ duration: 0.6, ease: appleEase }}
-            className="text-[2rem] font-bold text-[#1a2e3b]"
+            className="text-[2rem] font-bold text-homepage-ink"
             style={{ fontFamily: "Manrope, sans-serif" }}
           >
             {t.specialtiesPageTitle}
@@ -86,7 +86,7 @@ export default function SpecialtiesSection({
           >
             <SmartLink
               href="/specialties"
-              className="shrink-0 text-sm font-medium text-[#4f8fe6] transition-colors duration-200 hover:text-[#2f75ca]"
+              className="shrink-0 text-sm font-medium text-homepage-brand transition-colors duration-200 hover:text-homepage-brand-deep"
               style={{ fontFamily: "Inter, sans-serif" }}
             >
               {t.viewAll} →
@@ -99,7 +99,7 @@ export default function SpecialtiesSection({
             {Array.from({ length: 6 }).map((_, i) => (
               <div
                 key={i}
-                className="min-h-[420px] w-[300px] shrink-0 overflow-hidden rounded-[18px] border border-[#e8f0f8] bg-white shadow-[0_2px_16px_rgba(79,143,230,0.08)] lg:w-auto"
+                className="min-h-[420px] w-[300px] shrink-0 overflow-hidden rounded-[18px] border border-homepage-border bg-homepage-card shadow-[0_2px_16px_rgba(79,143,230,0.08)] lg:w-auto"
               >
                 <div className="h-[260px] overflow-hidden rounded-t-[18px] rounded-b-none bg-[linear-gradient(160deg,#eaf5ff_0%,#c8e6f5_55%,#b5d1cc_100%)]" />
                 <div className="rounded-b-[18px] rounded-t-none px-[22px] pb-6 pt-5">
@@ -113,14 +113,14 @@ export default function SpecialtiesSection({
             ))}
           </div>
         ) : hasLoadedEmpty ? (
-          <div style={{ textAlign: "center", color: "#5a7a8a", padding: 40 }}>{t.noActiveSpecialties}</div>
+          <div style={{ textAlign: "center", color: "rgb(var(--homepage-muted))", padding: 40 }}>{t.noActiveSpecialties}</div>
         ) : (
           <div className={useGridMode ? "" : "relative px-0 md:px-6"}>
             {!useGridMode ? (
               <button
                 type="button"
                 onClick={() => scrollRef.current?.scrollBy({ left: -340, behavior: "smooth" })}
-                className="hidden md:flex absolute left-[-20px] top-1/2 z-10 h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border-[1.5px] border-[#b5d1cc] bg-white shadow-[0_2px_12px_rgba(79,143,230,0.15)]"
+                className="hidden md:flex absolute left-[-20px] top-1/2 z-10 h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border-[1.5px] border-homepage-border bg-homepage-card shadow-[0_2px_12px_rgba(79,143,230,0.15)]"
                 style={{ opacity: canScrollLeft ? 1 : 0.3, pointerEvents: canScrollLeft ? "auto" : "none" }}
               >
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
@@ -133,7 +133,7 @@ export default function SpecialtiesSection({
               <button
                 type="button"
                 onClick={() => scrollRef.current?.scrollBy({ left: 340, behavior: "smooth" })}
-                className="hidden md:flex absolute right-[-20px] top-1/2 z-10 h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border-[1.5px] border-[#b5d1cc] bg-white shadow-[0_2px_12px_rgba(79,143,230,0.15)]"
+                className="hidden md:flex absolute right-[-20px] top-1/2 z-10 h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border-[1.5px] border-homepage-border bg-homepage-card shadow-[0_2px_12px_rgba(79,143,230,0.15)]"
                 style={{ opacity: canScrollRight ? 1 : 0.3, pointerEvents: canScrollRight ? "auto" : "none" }}
               >
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
@@ -224,11 +224,11 @@ export default function SpecialtiesSection({
                   <div style={{ height: "16px" }} />
 
                   <div className="min-h-[150px]" style={{ padding: "0 8px 8px", display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center", gap: "0" }}>
-                    <h3 style={{ fontSize: "24px", fontWeight: "700", fontFamily: "Manrope, sans-serif", color: "#1a2e3b", marginBottom: "8px", letterSpacing: "-0.3px", lineHeight: "1.2" }}>
+                    <h3 style={{ fontSize: "24px", fontWeight: "700", fontFamily: "Manrope, sans-serif", color: "rgb(var(--homepage-ink))", marginBottom: "8px", letterSpacing: "-0.3px", lineHeight: "1.2" }}>
                       {specialty.name}
                     </h3>
 
-                    <p style={{ fontSize: "15px", fontWeight: "400", fontFamily: "Inter, sans-serif", color: "#5a7a8a", marginBottom: "0", lineHeight: "1.5", maxWidth: "220px" }}>
+                    <p style={{ fontSize: "15px", fontWeight: "400", fontFamily: "Inter, sans-serif", color: "rgb(var(--homepage-muted))", marginBottom: "0", lineHeight: "1.5", maxWidth: "220px" }}>
                       {specialty.description}
                     </p>
 
