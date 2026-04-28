@@ -13,8 +13,9 @@ export function useClinicBranding() {
 
   const { data: clinic } = useQuery<ClinicBranding>({
     queryKey: ["clinic-branding", user?.clinic_id],
-    queryFn: () => api.clinics.get(user!.clinic_id!),
+    queryFn: () => api.clinics.branding(),
     enabled: Boolean(user?.clinic_id),
+    retry: false,
     staleTime: 1000 * 60 * 5,
   });
 

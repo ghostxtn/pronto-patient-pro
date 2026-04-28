@@ -80,18 +80,18 @@ export function shapeDoctorDiscovery(
         specialtyName,
         imageSrc: record.avatarUrl?.trim() || presentation?.imageSrc || DOCTOR_FALLBACK_IMAGE,
         previewText:
-          presentation?.previewText ||
+          (lang === "tr" ? presentation?.previewTextTr : presentation?.previewText) ||
           record.bio?.trim() ||
           (lang === "tr"
-            ? "Klinik koordinasyon ve dogru yonlendirme odakli hasta surecinde calisir."
+            ? "Klinik koordinasyon ve doğru yönlendirme odaklı hasta sürecinde çalışır."
             : "Works with a patient flow focused on clinical coordination and accurate direction."),
         biography: presentation?.shortBio || record.bio?.trim() || undefined,
         focusTags:
-          presentation?.focusTags?.length
-            ? presentation.focusTags
+          (lang === "tr" ? presentation?.focusTagsTr : presentation?.focusTags)?.length
+            ? (lang === "tr" ? presentation?.focusTagsTr : presentation?.focusTags)!
             : specialtyName
               ? [specialtyName]
-              : [lang === "tr" ? "Klinik Surec" : "Clinic Flow"],
+              : [lang === "tr" ? "Klinik Süreç" : "Clinic Flow"],
         listingPriority: presentation?.listingPriority,
       };
 

@@ -1,8 +1,8 @@
 import { useEffect, useState, type ElementType } from "react";
 import { format, parseISO } from "date-fns";
-import { enUS, tr as trLocale } from "date-fns/locale";
 import { AlertCircle, CheckCircle2, XCircle } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { getDateFnsLocale } from "@/lib/date-localization";
 import type { Appointment } from "@/types/calendar";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -49,7 +49,7 @@ export function AppointmentDetailSheet({
   onStatusUpdate,
 }: AppointmentDetailSheetProps) {
   const { lang, t } = useLanguage();
-  const locale = lang === "tr" ? trLocale : enUS;
+  const locale = getDateFnsLocale(lang);
 
   // Normalize "canceled" (backend typo) to "cancelled"
   const statusKey = appointment?.status === "canceled" ? "cancelled" : appointment?.status;
@@ -65,17 +65,17 @@ export function AppointmentDetailSheet({
   // Visual config for each transition button
   const TRANSITION_META: Record<string, { label: string; base: string; selected: string }> = {
     confirmed: {
-      label: "Onayla",
+      label: t.confirm,
       base: "border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100",
       selected: "border-emerald-600 bg-emerald-600 text-white",
     },
     completed: {
-      label: "Tamamland\u0131",
+      label: t.markCompleted,
       base: "border-blue-200 bg-blue-50 text-blue-800 hover:bg-blue-100",
       selected: "border-blue-600 bg-blue-600 text-white",
     },
     cancelled: {
-      label: "\u0130ptal Et",
+      label: t.cancelAppointment,
       base: "border-red-200 bg-red-50 text-red-800 hover:bg-red-100",
       selected: "border-red-600 bg-red-600 text-white",
     },
@@ -161,13 +161,13 @@ export function AppointmentDetailSheet({
             {/* INFO GRID */}
             <div className="px-6 pb-5 grid grid-cols-2 gap-3">
               <div className="rounded-2xl bg-muted/50 p-3.5">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground mb-1.5">Tarih</p>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground mb-1.5">{t.date}</p>
                 <p className="text-sm font-semibold text-foreground leading-snug">
                   {format(parseISO(appointment.appointment_date), "EEE, d MMM yyyy", { locale })}
                 </p>
               </div>
               <div className="rounded-2xl bg-muted/50 p-3.5">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground mb-1.5">Saat</p>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground mb-1.5">{t.time}</p>
                 <p className="text-sm font-semibold text-foreground leading-snug">
                   {appointment.start_time.slice(0, 5)} {"\u2013"} {appointment.end_time.slice(0, 5)}
                 </p>
@@ -176,13 +176,13 @@ export function AppointmentDetailSheet({
                   const [eh, em] = appointment.end_time.split(":").map(Number);
                   const dur = (eh * 60 + em) - (sh * 60 + sm);
                   return dur > 0 ? (
-                    <p className="text-[11px] text-muted-foreground mt-0.5">{dur} dk</p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">{t.durationMinutes.replace("{{count}}", String(dur))}</p>
                   ) : null;
                 })()}
               </div>
               {appointment.notes ? (
                 <div className="col-span-2 rounded-2xl bg-muted/50 p-3.5">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground mb-1.5">Not</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground mb-1.5">{t.notes}</p>
                   <p className="text-sm text-foreground leading-relaxed">{appointment.notes}</p>
                 </div>
               ) : null}
@@ -194,13 +194,13 @@ export function AppointmentDetailSheet({
               {validTransitions.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-1">
                   {statusKey === "completed"
-                    ? "Bu randevu tamamland\u0131, durum de\u011fi\u015ftirilemez."
-                    : "Bu randevu iptal edildi, durum de\u011fi\u015ftirilemez."}
+                    ? t.completedStatusLocked
+                    : t.cancelledStatusLocked}
                 </p>
               ) : (
                 <>
                   <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground mb-3">
-                    Durum G\u00fcncelle
+                    {t.updateStatus}
                   </p>
                   <div className="flex gap-2 flex-wrap">
                     {validTransitions.map((s) => {
@@ -233,7 +233,7 @@ export function AppointmentDetailSheet({
                         : "bg-muted text-muted-foreground cursor-not-allowed opacity-60",
                     )}
                   >
-                    {pendingStatus ? "De\u011fi\u015fikli\u011fi Kaydet" : "Bir durum se\u00e7in"}
+                    {pendingStatus ? t.saveChange : t.chooseStatus}
                   </button>
                 </>
               )}

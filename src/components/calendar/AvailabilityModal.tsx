@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
-import { tr } from "date-fns/locale";
 import { CalendarIcon, Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import api, { ApiError } from "@/services/api";
@@ -24,6 +23,7 @@ import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { getDateFnsLocale } from "@/lib/date-localization";
 
 export interface AvailabilityModalProps {
   open: boolean;
@@ -60,7 +60,8 @@ export function AvailabilityModal({
   onDraftChange,
   onSaved,
 }: AvailabilityModalProps) {
-  const { t } = useLanguage();
+  const { lang, t } = useLanguage();
+  const locale = useMemo(() => getDateFnsLocale(lang), [lang]);
   const dayOptions = [
     { value: "1", label: t.monday },
     { value: "2", label: t.tuesday },
@@ -220,8 +221,8 @@ export function AvailabilityModal({
             {mode !== "edit" ? (
               <Tabs value={slotType} onValueChange={(value) => setSlotType(value as "weekly" | "specific")}>
                 <TabsList className="w-full rounded-xl">
-                  <TabsTrigger value="weekly" className="flex-1 rounded-xl">Haftalık Tekrar</TabsTrigger>
-                  <TabsTrigger value="specific" className="flex-1 rounded-xl">Tarihe Özel</TabsTrigger>
+                  <TabsTrigger value="weekly" className="flex-1 rounded-xl">{t.weeklyRepeat}</TabsTrigger>
+                  <TabsTrigger value="specific" className="flex-1 rounded-xl">{t.specificDate}</TabsTrigger>
                 </TabsList>
               </Tabs>
             ) : null}
@@ -244,7 +245,7 @@ export function AvailabilityModal({
               </div>
             ) : (
               <div className="space-y-2">
-                <Label>Tarih</Label>
+                <Label>{t.date}</Label>
                 <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
                   <PopoverTrigger asChild>
                     <Button
@@ -253,8 +254,8 @@ export function AvailabilityModal({
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       {specificDate
-                        ? format(parseISO(specificDate + "T00:00:00"), "d MMMM yyyy", { locale: tr })
-                        : "Tarih seçin"}
+                        ? format(parseISO(specificDate + "T00:00:00"), "d MMMM yyyy", { locale })
+                        : t.selectDatePlaceholder}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
@@ -266,7 +267,7 @@ export function AvailabilityModal({
                         setCalendarOpen(false);
                       }}
                       disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
-                      locale={tr}
+                      locale={locale}
                       initialFocus
                     />
                   </PopoverContent>

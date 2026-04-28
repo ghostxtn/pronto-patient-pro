@@ -52,19 +52,21 @@ export default function DoctorProfile() {
   const [notes, setNotes] = useState("");
   const [slots, setSlots] = useState<SlotOption[]>([]);
 
-  const { data: doctor, isLoading } = useQuery({
-    queryKey: ["doctor", id],
-    queryFn: async () => api.doctors.get(id!),
+  const { data: doctor, isError: isDoctorError, isLoading } = useQuery({
+    queryKey: ["doctor-booking-profile", id],
+    queryFn: async () => api.doctors.bookingProfile(id!),
     enabled: !!id,
+    retry: false,
   });
 
-  const { data: availability } = useQuery({
+  const { data: availability, isError: isAvailabilityError } = useQuery({
     queryKey: ["doctor-availability", id],
     queryFn: async () => {
       const data = await api.availability.listByDoctor(id!);
       return data.filter((slot: any) => slot.is_active !== false);
     },
     enabled: !!id,
+    retry: false,
   });
 
   useEffect(() => {
@@ -124,6 +126,7 @@ export default function DoctorProfile() {
   const availableSlots = slots;
 
   if (isLoading) return <AppLayout><div className="flex items-center justify-center py-20"><div className="h-8 w-8 rounded-full border-2 border-primary border-t-transparent animate-spin" /></div></AppLayout>;
+  if (isDoctorError) return <AppLayout><div className="text-center py-20"><h2 className="font-display font-bold text-xl mb-2">{t.doctorsLoadError}</h2><Button variant="outline" onClick={() => navigate("/patient/doctors")}>{t.backToDoctors}</Button></div></AppLayout>;
   if (!doctor) return <AppLayout><div className="text-center py-20"><h2 className="font-display font-bold text-xl mb-2">{t.doctorNotFound}</h2><Button variant="outline" onClick={() => navigate("/patient/doctors")}>{t.backToDoctors}</Button></div></AppLayout>;
 
   const profile = {
@@ -175,6 +178,11 @@ export default function DoctorProfile() {
             {doctor.bio && (<div className="rounded-2xl border border-border bg-card p-6 shadow-soft"><h3 className="mb-2 flex items-center gap-2 font-display font-semibold text-foreground" style={{ fontFamily: "Manrope, sans-serif", fontWeight: 600 }}><FileText className="h-4 w-4 text-primary" /> {t.about}</h3><p className="text-sm text-muted-foreground">{doctor.bio}</p></div>)}
             <div className="rounded-2xl border border-border bg-card p-6 shadow-soft">
               <h3 className="mb-3 flex items-center gap-2 font-display font-semibold text-foreground" style={{ fontFamily: "Manrope, sans-serif", fontWeight: 600 }}><Clock className="h-4 w-4 text-primary" /> {t.weeklySchedule}</h3>
+              {isAvailabilityError ? (
+                <div className="rounded-xl border border-border bg-background/70 p-4 text-sm text-muted-foreground">
+                  {t.doctorsLoadError}
+                </div>
+              ) : null}
               <div className="space-y-2">
                 {dayNames.map((day, idx) => {
                   const daySlots = weeklyAvailability.filter((a) => a.day_of_week === idx);

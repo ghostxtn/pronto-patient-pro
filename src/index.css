@@ -201,6 +201,57 @@
     --info: 199 89% 48%;
     --info-foreground: 0 0% 100%;
 
+    --calendar-surface: 222 30% 10%;
+    --calendar-gutter: 222 36% 8%;
+    --calendar-grid-strong: 222 18% 24%;
+    --calendar-grid-soft: 222 16% 18%;
+    --calendar-grid-vertical: 222 16% 20%;
+    --calendar-selected-wash: 217 29% 16%;
+    --calendar-selected-border: 221 58% 38%;
+    --calendar-selected-header: 217 29% 16%;
+    --calendar-today-accent: 221 83% 63%;
+    --calendar-toolbar-border: 222 15% 20%;
+    --calendar-muted: 217 17% 69%;
+    --calendar-gutter-fg: 215 20% 72%;
+    --calendar-muted-soft: 215 16% 58%;
+    --calendar-disabled: 215 14% 42%;
+    --calendar-shadow: 0 0% 0%;
+    --calendar-event-outline: 222 18% 24%;
+    --calendar-appointment-pending-bg: 34 35% 18%;
+    --calendar-appointment-pending-accent: 38 92% 58%;
+    --calendar-appointment-pending-fg: 38 88% 78%;
+    --calendar-appointment-pending-meta: 38 62% 68%;
+    --calendar-appointment-confirmed-bg: 217 34% 18%;
+    --calendar-appointment-confirmed-accent: 211 90% 62%;
+    --calendar-appointment-confirmed-fg: 212 90% 82%;
+    --calendar-appointment-confirmed-meta: 212 60% 72%;
+    --calendar-appointment-completed-bg: 154 30% 17%;
+    --calendar-appointment-completed-accent: 158 64% 52%;
+    --calendar-appointment-completed-fg: 151 52% 76%;
+    --calendar-appointment-completed-meta: 151 38% 66%;
+    --calendar-appointment-cancelled-bg: 217 18% 16%;
+    --calendar-appointment-cancelled-accent: 216 15% 58%;
+    --calendar-appointment-cancelled-fg: 216 18% 72%;
+    --calendar-appointment-cancelled-meta: 216 15% 62%;
+    --calendar-appointment-blocked-bg: 0 36% 18%;
+    --calendar-appointment-blocked-accent: 0 72% 62%;
+    --calendar-appointment-blocked-fg: 0 78% 82%;
+    --calendar-appointment-blocked-meta: 0 52% 72%;
+    --calendar-availability-bg: 142 28% 16%;
+    --calendar-availability-border: 142 34% 30%;
+    --calendar-availability-fg: 142 48% 74%;
+    --calendar-blackout-bg: 0 36% 18%;
+    --calendar-blackout-accent: 0 72% 62%;
+    --calendar-blackout-fg: 0 78% 82%;
+    --calendar-blackout-meta: 0 52% 72%;
+    --calendar-blackout-hatch: 0 72% 62%;
+    --calendar-custom-hours-bg: 28 34% 17%;
+    --calendar-custom-hours-accent: 28 92% 58%;
+    --calendar-custom-hours-fg: 30 88% 78%;
+    --calendar-custom-hours-meta: 30 62% 68%;
+    --calendar-sidebar-border: 222 15% 20%;
+    --calendar-mini-hover: 217 29% 16%;
+
     --landing-bg: 222 47% 6%;
     --landing-fg: 220 16% 90%;
     --landing-muted: 222 15% 22%;
@@ -1430,6 +1481,20 @@
 
   .dark .scheduler-calendar-shell .rbc-header,
   .dark .scheduler-week-header,
+  .dark .scheduler-calendar-shell,
+  .dark .scheduler-calendar-shell .rbc-calendar,
+  .dark .scheduler-calendar-shell .rbc-time-view,
+  .dark .scheduler-calendar-shell .rbc-month-view,
+  .dark .scheduler-calendar-shell .rbc-month-row,
+  .dark .scheduler-calendar-shell .rbc-month-row .rbc-row-bg,
+  .dark .scheduler-calendar-shell .rbc-day-bg,
+  .dark .scheduler-calendar-shell .rbc-day-slot,
+  .dark .scheduler-calendar-shell .rbc-agenda-view,
+  .dark .scheduler-calendar-shell .rbc-agenda-table,
+  .dark .scheduler-calendar-shell .rbc-agenda-content,
+  .dark .scheduler-calendar-shell .rbc-agenda-date-cell,
+  .dark .scheduler-calendar-shell .rbc-agenda-time-cell,
+  .dark .scheduler-calendar-shell .rbc-agenda-event-cell,
   .dark .scheduler-calendar-shell .rbc-time-gutter,
   .dark .scheduler-calendar-shell .rbc-time-gutter .rbc-timeslot-group,
   .dark .scheduler-calendar-shell .rbc-timeslot-group,
@@ -1454,6 +1519,25 @@
     background-color: hsl(var(--accent) / 0.45);
   }
 
+  .dark .scheduler-calendar-shell .rbc-off-range-bg {
+    background-color: hsl(var(--background) / 0.42);
+  }
+
+  .dark .scheduler-calendar-shell .rbc-off-range,
+  .dark .scheduler-calendar-shell .rbc-date-cell {
+    color: hsl(var(--muted-foreground));
+  }
+
+  .dark .scheduler-calendar-shell .rbc-date-cell.rbc-now,
+  .dark .scheduler-calendar-shell .rbc-button-link {
+    color: hsl(var(--foreground));
+  }
+
+  .dark .scheduler-calendar-shell .rbc-agenda-empty {
+    color: hsl(var(--muted-foreground));
+    background-color: hsl(var(--card));
+  }
+
   .dark .scheduler-calendar-shell .rbc-header,
   .dark .scheduler-calendar-shell .rbc-time-header-cell,
   .dark .scheduler-calendar-shell .rbc-time-content > * + * > .rbc-day-slot,
@@ -1462,7 +1546,11 @@
   .dark .scheduler-calendar-shell .rbc-time-view,
   .dark .scheduler-calendar-shell .rbc-time-content,
   .dark .scheduler-calendar-shell .rbc-month-view,
-  .dark .scheduler-calendar-shell .rbc-month-row + .rbc-month-row {
+  .dark .scheduler-calendar-shell .rbc-month-row + .rbc-month-row,
+  .dark .scheduler-calendar-shell .rbc-agenda-view,
+  .dark .scheduler-calendar-shell .rbc-agenda-table,
+  .dark .scheduler-calendar-shell .rbc-agenda-table tbody > tr > td,
+  .dark .scheduler-calendar-shell .rbc-agenda-table thead > tr > th {
     border-color: hsl(var(--border) / 0.8);
   }
 

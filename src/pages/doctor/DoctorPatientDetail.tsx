@@ -1,7 +1,6 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
-import { tr } from "date-fns/locale";
 import { motion } from "framer-motion";
 import {
   AlertCircle,
@@ -24,6 +23,8 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLanguage } from "@/contexts/LanguageContext";
+import { getDateFnsLocale } from "@/lib/date-localization";
 import { cn } from "@/lib/utils";
 import api from "@/services/api";
 import type { Appointment, ClinicalNote } from "@/types/calendar";
@@ -81,8 +82,8 @@ interface AppointmentResponse {
   profiles?: AppointmentProfile | null;
 }
 
-function getPatientName(patient?: PatientRecord | AppointmentProfile | null) {
-  if (!patient) return "İsimsiz Hasta";
+function getPatientName(patient: PatientRecord | AppointmentProfile | null | undefined, fallback: string) {
+  if (!patient) return fallback;
 
   return (
     patient.full_name
@@ -91,7 +92,7 @@ function getPatientName(patient?: PatientRecord | AppointmentProfile | null) {
       .filter(Boolean)
       .join(" ")
       .trim()
-  ) || "İsimsiz Hasta";
+  ) || fallback;
 }
 
 function toAppointment(
@@ -124,19 +125,19 @@ function toAppointment(
         ?? fallbackPatient?.lastName
         ?? fallbackPatient?.last_name
         ?? "",
-      fullName: getPatientName(patientProfile ?? fallbackPatient),
+      fullName: getPatientName(patientProfile ?? fallbackPatient, ""),
       email: patientProfile?.email ?? fallbackPatient?.email ?? undefined,
       phone: patientProfile?.phone ?? fallbackPatient?.phone ?? undefined,
     },
   };
 }
 
-function getStatusConfig(status: string) {
+function getStatusConfig(status: string, t: ReturnType<typeof useLanguage>["t"]) {
   const config: Record<string, { color: string; icon: React.ElementType; label: string }> = {
-    pending: { color: "border-[rgba(245,166,35,0.3)] bg-[#fff8e6] text-[#f5a623]", icon: AlertCircle, label: "Bekliyor" },
-    confirmed: { color: "border-[#b5d1cc] bg-[#eaf5ff] text-[#4f8fe6]", icon: CheckCircle2, label: "Onaylandı" },
-    completed: { color: "border-[#b5d1cc] bg-[#e6f4ef] text-[#65a98f]", icon: CheckCircle2, label: "Tamamlandı" },
-    cancelled: { color: "border-[rgba(252,165,165,0.3)] bg-[#fef2f2] text-[#e05252]", icon: XCircle, label: "İptal" },
+    pending: { color: "border-[rgba(245,166,35,0.3)] bg-[#fff8e6] text-[#f5a623]", icon: AlertCircle, label: t.pending },
+    confirmed: { color: "border-[#b5d1cc] bg-[#eaf5ff] text-[#4f8fe6]", icon: CheckCircle2, label: t.confirmed },
+    completed: { color: "border-[#b5d1cc] bg-[#e6f4ef] text-[#65a98f]", icon: CheckCircle2, label: t.completed },
+    cancelled: { color: "border-[rgba(252,165,165,0.3)] bg-[#fef2f2] text-[#e05252]", icon: XCircle, label: t.cancelled },
   };
 
   return config[status] ?? config.pending;
@@ -147,6 +148,8 @@ export default function DoctorPatientDetail() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { lang, t } = useLanguage();
+  const locale = useMemo(() => getDateFnsLocale(lang), [lang]);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [diagnosis, setDiagnosis] = useState("");
   const [treatment, setTreatment] = useState("");
@@ -207,7 +210,7 @@ export default function DoctorPatientDetail() {
   const createClinicalNote = useMutation({
     mutationFn: async () => {
       if (!id || !doctorRecord?.id) {
-        throw new Error("Eksik doktor veya hasta bilgisi");
+        throw new Error(t.doctorPatientRequired);
       }
 
       const payload: {
@@ -230,7 +233,7 @@ export default function DoctorPatientDetail() {
       return api.clinicalNotes.create(payload);
     },
     onSuccess: () => {
-      toast.success("Klinik not kaydedildi");
+      toast.success(t.clinicalNoteSaved);
       setIsFormOpen(false);
       setDiagnosis("");
       setTreatment("");
@@ -239,11 +242,11 @@ export default function DoctorPatientDetail() {
       queryClient.invalidateQueries({ queryKey: ["doctor-patient-clinical-notes", id] });
     },
     onError: (error: unknown) => {
-      toast.error(error instanceof Error ? error.message : "Klinik not kaydedilemedi");
+      toast.error(error instanceof Error ? error.message : t.clinicalNoteSaveFailed);
     },
   });
 
-  const patientName = getPatientName(patient);
+  const patientName = getPatientName(patient, t.unnamedPatient);
   const hasAtLeastOneField = [diagnosis, treatment, prescription, notes].some(
     (value) => value.trim().length > 0,
   );
@@ -271,7 +274,7 @@ export default function DoctorPatientDetail() {
             onClick={() => navigate("/doctor/patients")}
           >
             <ArrowLeft className="mr-2 h-4 w-4 text-primary" />
-            Hastalara Dön
+            {t.backToPatients}
           </Button>
         </motion.div>
 
@@ -288,8 +291,8 @@ export default function DoctorPatientDetail() {
                 ) : (
                   <>
                     <h1 className="text-3xl font-bold text-foreground" style={{ fontFamily: "Manrope, sans-serif" }}>{patientName}</h1>
-                    <p className="text-sm text-muted-foreground" style={{ fontFamily: "Inter, sans-serif" }}>{patient?.email || "E-posta bilgisi yok"}</p>
-                    <p className="text-sm text-muted-foreground" style={{ fontFamily: "Inter, sans-serif" }}>{patient?.phone || "Telefon bilgisi yok"}</p>
+                    <p className="text-sm text-muted-foreground" style={{ fontFamily: "Inter, sans-serif" }}>{patient?.email || t.noEmailInfo}</p>
+                    <p className="text-sm text-muted-foreground" style={{ fontFamily: "Inter, sans-serif" }}>{patient?.phone || t.noPhoneInfo}</p>
                   </>
                 )}
               </div>
@@ -301,7 +304,7 @@ export default function DoctorPatientDetail() {
                 style={{ fontFamily: "Inter, sans-serif" }}
                 onClick={() => navigate("/doctor/patients")}
               >
-                Geri
+                {t.back}
               </Button>
             </CardContent>
           </Card>
@@ -312,9 +315,9 @@ export default function DoctorPatientDetail() {
             <Card className="rounded-2xl border border-border bg-card shadow-sm">
               <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
                 <div>
-                  <CardTitle className="text-xl text-foreground" style={{ fontFamily: "Manrope, sans-serif" }}>Klinik Notlar</CardTitle>
+                  <CardTitle className="text-xl text-foreground" style={{ fontFamily: "Manrope, sans-serif" }}>{t.clinicalNotes}</CardTitle>
                   <p className="mt-1 text-sm text-muted-foreground" style={{ fontFamily: "Inter, sans-serif" }}>
-                    Hastaya ait klinik değerlendirmeler ve tedavi notları.
+                    {t.clinicalNotesDesc}
                   </p>
                 </div>
                 <Button
@@ -325,14 +328,14 @@ export default function DoctorPatientDetail() {
                   onClick={() => setIsFormOpen((current) => !current)}
                 >
                   <Plus className="mr-2 h-4 w-4" />
-                  Yeni Klinik Not Ekle
+                  {t.addClinicalNote}
                 </Button>
               </CardHeader>
               <CardContent className="space-y-4">
                 {isFormOpen ? (
                   <div className="space-y-4 rounded-2xl bg-muted/50 p-4">
                     <div className="space-y-2">
-                      <Label htmlFor="clinical-note-diagnosis" style={{ color: "#1a2e3b", fontFamily: "Inter, sans-serif" }}>Tanı</Label>
+                      <Label htmlFor="clinical-note-diagnosis" style={{ color: "#1a2e3b", fontFamily: "Inter, sans-serif" }}>{t.diagnosis}</Label>
                       <Textarea
                         id="clinical-note-diagnosis"
                         rows={3}
@@ -343,7 +346,7 @@ export default function DoctorPatientDetail() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="clinical-note-treatment" style={{ color: "#1a2e3b", fontFamily: "Inter, sans-serif" }}>Tedavi</Label>
+                      <Label htmlFor="clinical-note-treatment" style={{ color: "#1a2e3b", fontFamily: "Inter, sans-serif" }}>{t.treatment}</Label>
                       <Textarea
                         id="clinical-note-treatment"
                         rows={3}
@@ -354,7 +357,7 @@ export default function DoctorPatientDetail() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="clinical-note-prescription" style={{ color: "#1a2e3b", fontFamily: "Inter, sans-serif" }}>Reçete</Label>
+                      <Label htmlFor="clinical-note-prescription" style={{ color: "#1a2e3b", fontFamily: "Inter, sans-serif" }}>{t.prescription}</Label>
                       <Textarea
                         id="clinical-note-prescription"
                         rows={3}
@@ -365,7 +368,7 @@ export default function DoctorPatientDetail() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="clinical-note-notes" style={{ color: "#1a2e3b", fontFamily: "Inter, sans-serif" }}>Not</Label>
+                      <Label htmlFor="clinical-note-notes" style={{ color: "#1a2e3b", fontFamily: "Inter, sans-serif" }}>{t.notes}</Label>
                       <Textarea
                         id="clinical-note-notes"
                         rows={4}
@@ -385,7 +388,7 @@ export default function DoctorPatientDetail() {
                         {createClinicalNote.isPending ? (
                           <Loader2 className="mr-2 h-4 w-4 animate-spin inline" />
                         ) : null}
-                        Kaydet
+                        {t.save}
                       </button>
                       <Button
                         type="button"
@@ -394,7 +397,7 @@ export default function DoctorPatientDetail() {
                         style={{ fontFamily: "Inter, sans-serif" }}
                         onClick={() => setIsFormOpen(false)}
                       >
-                        Vazgeç
+                        {t.discard}
                       </Button>
                     </div>
                   </div>
@@ -425,23 +428,23 @@ export default function DoctorPatientDetail() {
                                 {[note.doctor.title, note.doctor.firstName, note.doctor.lastName].filter(Boolean).join(" ")}
                               </CardTitle>
                               <p className="text-xs text-muted-foreground" style={{ fontFamily: "Inter, sans-serif" }}>
-                                {format(new Date(note.created_at), "d MMMM yyyy, HH:mm", { locale: tr })}
+                                {format(new Date(note.created_at), "d MMMM yyyy, HH:mm", { locale })}
                               </p>
                             </div>
                           </div>
                         </CardHeader>
                         <CardContent className="space-y-3 text-sm text-foreground" style={{ fontFamily: "Inter, sans-serif" }}>
                           {note.diagnosis ? (
-                            <p><span className="font-medium">Tanı:</span> {note.diagnosis}</p>
+                            <p><span className="font-medium">{t.diagnosis}:</span> {note.diagnosis}</p>
                           ) : null}
                           {note.treatment ? (
-                            <p><span className="font-medium">Tedavi:</span> {note.treatment}</p>
+                            <p><span className="font-medium">{t.treatment}:</span> {note.treatment}</p>
                           ) : null}
                           {note.prescription ? (
-                            <p><span className="font-medium">Reçete:</span> {note.prescription}</p>
+                            <p><span className="font-medium">{t.prescription}:</span> {note.prescription}</p>
                           ) : null}
                           {note.notes ? (
-                            <p><span className="font-medium">Not:</span> {note.notes}</p>
+                            <p><span className="font-medium">{t.notes}:</span> {note.notes}</p>
                           ) : null}
                         </CardContent>
                       </Card>
@@ -449,7 +452,7 @@ export default function DoctorPatientDetail() {
                   </div>
                 ) : (
                   <div className="rounded-2xl border border-dashed border-border p-6 text-sm text-muted-foreground" style={{ fontFamily: "Inter, sans-serif" }}>
-                    Bu hasta için henüz klinik not eklenmemiş.
+                    {t.noClinicalNotes}
                   </div>
                 )}
               </CardContent>
@@ -459,9 +462,9 @@ export default function DoctorPatientDetail() {
           <motion.div custom={3} variants={fadeUp}>
             <Card className="rounded-2xl border border-border bg-card shadow-sm">
               <CardHeader>
-                <CardTitle className="text-xl text-[#1a2e3b]" style={{ fontFamily: "Manrope, sans-serif" }}>Randevu Geçmişi</CardTitle>
+                <CardTitle className="text-xl text-[#1a2e3b]" style={{ fontFamily: "Manrope, sans-serif" }}>{t.appointmentHistory}</CardTitle>
                 <p className="text-sm" style={{ color: "#5a7a8a", fontFamily: "Inter, sans-serif" }}>
-                  En yeni randevular üstte listelenir. Detay için karta tıklayın.
+                  {t.appointmentHistoryDesc}
                 </p>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -475,7 +478,7 @@ export default function DoctorPatientDetail() {
                   ))
                 ) : pastAppointments.length > 0 ? (
                   pastAppointments.map((appointment) => {
-                    const status = getStatusConfig(appointment.status);
+                    const status = getStatusConfig(appointment.status, t);
                     const StatusIcon = status.icon;
 
                     return (
@@ -490,7 +493,7 @@ export default function DoctorPatientDetail() {
                             <div>
                               <p className="font-medium text-foreground" style={{ fontFamily: "Manrope, sans-serif" }}>
                                 {format(parseISO(appointment.appointment_date), "d MMMM yyyy", {
-                                  locale: tr,
+                                  locale,
                                 })}
                               </p>
                               <p className="text-sm text-muted-foreground" style={{ fontFamily: "Inter, sans-serif" }}>
@@ -514,7 +517,7 @@ export default function DoctorPatientDetail() {
                   })
                 ) : (
                   <div className="rounded-2xl border border-dashed border-border p-6 text-sm text-muted-foreground" style={{ fontFamily: "Inter, sans-serif" }}>
-                    Henüz tamamlanmış randevu bulunmuyor.
+                    {t.noCompletedAppointments}
                   </div>
                 )}
               </CardContent>

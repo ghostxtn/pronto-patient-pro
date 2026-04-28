@@ -106,32 +106,28 @@ export default function StaffDashboard() {
       label: t.todaysAppointments,
       value: data?.todayAppointments.filter((appointment: any) => appointment.status !== "cancelled").length ?? 0,
       icon: CalendarDays,
-      iconBg: "#eaf5ff",
-      iconColor: "#4f8fe6",
+      iconClassName: "bg-blue-50 text-blue-600 dark:bg-blue-950/45 dark:text-blue-300",
       to: "/admin/appointments",
     },
     {
       label: t.pendingApprovals,
       value: data?.pendingAppointments.length ?? 0,
       icon: Clock3,
-      iconBg: "#fff8e6",
-      iconColor: "#f5a623",
+      iconClassName: "bg-amber-50 text-amber-600 dark:bg-amber-950/45 dark:text-amber-300",
       to: "/admin/appointments",
     },
     {
       label: t.totalPatientsStat,
       value: data?.totalPatients ?? 0,
       icon: Users,
-      iconBg: "#e6f4ef",
-      iconColor: "#65a98f",
+      iconClassName: "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/45 dark:text-emerald-300",
       to: "/admin/patients",
     },
     {
       label: t.activeDoctorsStat,
       value: data?.totalDoctors ?? 0,
       icon: Stethoscope,
-      iconBg: "#eaf5ff",
-      iconColor: "#2f75ca",
+      iconClassName: "bg-sky-50 text-sky-600 dark:bg-sky-950/45 dark:text-sky-300",
       to: "/staff/doctors",
     },
   ];
@@ -157,8 +153,8 @@ export default function StaffDashboard() {
               >
                 <CardContent className="p-5">
                   <div className="mb-4 flex items-start justify-between gap-3">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-xl" style={{ backgroundColor: card.iconBg }}>
-                      <card.icon className="h-5 w-5" style={{ color: card.iconColor }} />
+                    <div className={cn("flex h-12 w-12 items-center justify-center rounded-xl", card.iconClassName)}>
+                      <card.icon className="h-5 w-5" />
                     </div>
                     <TrendingUp className="h-4 w-4 shrink-0 text-emerald-500 dark:text-emerald-300" />
                   </div>

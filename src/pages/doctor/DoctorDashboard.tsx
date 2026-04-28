@@ -65,32 +65,28 @@ export default function DoctorDashboard() {
       icon: CalendarCheck,
       label: t.today,
       value: String(todayAppts.length),
-      iconBg: "#eaf5ff",
-      iconColor: "#4f8fe6",
+      iconClassName: "bg-blue-50 text-blue-600 dark:bg-blue-950/45 dark:text-blue-300",
       onClick: () => navigate("/doctor/schedule", { state: { view: "day" } }),
     },
     {
       icon: AlertCircle,
       label: t.pending,
       value: String(pending.length),
-      iconBg: "#fff8e6",
-      iconColor: "#f5a623",
+      iconClassName: "bg-amber-50 text-amber-600 dark:bg-amber-950/45 dark:text-amber-300",
       onClick: () => navigate("/doctor/appointments?status=pending"),
     },
     {
       icon: CheckCircle2,
       label: t.confirmed,
       value: String(confirmed.length),
-      iconBg: "#e6f4ef",
-      iconColor: "#65a98f",
+      iconClassName: "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/45 dark:text-emerald-300",
       onClick: () => navigate("/doctor/appointments?status=confirmed"),
     },
     {
       icon: Activity,
       label: t.total,
       value: String(total),
-      iconBg: "#eaf5ff",
-      iconColor: "#2f75ca",
+      iconClassName: "bg-sky-50 text-sky-600 dark:bg-sky-950/45 dark:text-sky-300",
       onClick: () => navigate("/doctor/appointments"),
     },
   ];
@@ -116,8 +112,8 @@ export default function DoctorDashboard() {
               >
                 <CardContent className="p-5">
                   <div className="mb-4 flex items-start justify-between gap-3">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-xl" style={{ backgroundColor: stat.iconBg }}>
-                      <stat.icon className="h-5 w-5" style={{ color: stat.iconColor }} />
+                    <div className={cn("flex h-12 w-12 items-center justify-center rounded-xl", stat.iconClassName)}>
+                      <stat.icon className="h-5 w-5" />
                     </div>
                     <TrendingUp className="h-4 w-4 shrink-0 text-emerald-500 dark:text-emerald-300" />
                   </div>

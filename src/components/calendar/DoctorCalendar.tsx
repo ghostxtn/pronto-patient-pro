@@ -29,8 +29,9 @@ import {
   startOfDay,
   startOfWeek,
   subDays,
+  type Locale,
 } from "date-fns";
-import { tr } from "date-fns/locale/tr";
+import { ar, enUS, es, fr, ru, tr } from "date-fns/locale";
 import {
   Ban,
   ChevronDown,
@@ -92,6 +93,8 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useLanguage } from "@/contexts/LanguageContext";
+import { getDateFnsLocale } from "@/lib/date-localization";
 import { cn } from "@/lib/utils";
 import {
   Appointment,
@@ -106,7 +109,7 @@ import {
 } from "@/utils/calendarUtils";
 import TimeGrid from "react-big-calendar/lib/TimeGrid";
 
-const locales = { tr };
+const locales = { ar, en: enUS, es, fr, ru, tr };
 
 const localizer = dateFnsLocalizer({
   format,
@@ -115,21 +118,6 @@ const localizer = dateFnsLocalizer({
   getDay,
   locales,
 });
-
-const calendarMessages = {
-  today: "Bugün",
-  previous: "Geri",
-  next: "İleri",
-  month: "Ay",
-  week: "Hafta",
-  day: "Gün",
-  agenda: "Ajanda",
-  date: "Tarih",
-  time: "Saat",
-  event: "Etkinlik",
-  noEventsInRange: "Bu aralıkta etkinlik yok",
-  showMore: (total: number) => `+${total} daha`,
-};
 
 type AppointmentVisualStatus =
   | "pending"
@@ -234,6 +222,7 @@ interface CustomToolbarProps extends ToolbarProps<SchedulerEvent, object> {
   onManageAvailability: () => void;
   calendarTitle: string;
   specializationName?: string;
+  labels: Record<string, string>;
 }
 
 interface AvailabilityDraftPreview {
@@ -412,11 +401,11 @@ function matchesAvailabilitySlotDate(slot: AvailabilitySlot, date: Date) {
 function getOverrideBadge(type: AvailabilityOverride["type"]) {
   return type === "blackout"
     ? {
-        label: "Kapalı Gün",
+        label: "Closed Day",
         color: OVERRIDE_EVENT_STYLES.blackout.accent,
       }
     : {
-        label: "Özel Saat",
+        label: "Custom Hours",
         color: OVERRIDE_EVENT_STYLES.custom_hours.accent,
       };
 }
@@ -787,7 +776,7 @@ function splitFullName(fullName: string) {
   }
 
   if (parts.length === 1) {
-    return { firstName: parts[0], lastName: "Hasta" };
+    return { firstName: parts[0], lastName: "" };
   }
 
   return {
@@ -803,10 +792,10 @@ function getPatientName(patient: PatientLookupRecord) {
     .trim();
 }
 
-function formatCalendarHeaderDay(date: Date) {
-  return format(date, "EEE", { locale: tr })
+function formatCalendarHeaderDay(date: Date, locale: Locale, lang: string) {
+  return format(date, "EEE", { locale })
     .replace(".", "")
-    .toLocaleUpperCase("tr-TR");
+    .toLocaleUpperCase(lang === "tr" ? "tr-TR" : undefined);
 }
 
 function normalizeAppointmentStatus(status?: string): AppointmentVisualStatus {
@@ -831,6 +820,7 @@ const CustomToolbar = ({
   onManageAvailability,
   calendarTitle,
   specializationName,
+  labels,
 }: CustomToolbarProps) => (
   <div className="scheduler-toolbar-shell">
     <div className="scheduler-toolbar-row">
@@ -877,7 +867,7 @@ const CustomToolbar = ({
             className="scheduler-toolbar-today-button"
             onClick={() => onNavigate("TODAY")}
           >
-            Bugün
+            {labels.today}
           </Button>
         </div>
 
@@ -889,7 +879,7 @@ const CustomToolbar = ({
                 variant="outline"
                 className="scheduler-toolbar-view-button"
               >
-                {toolbarViewLabels[view]}
+                {labels[view] ?? toolbarViewLabels[view]}
                 <ChevronDown className="ml-2 h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
@@ -903,7 +893,7 @@ const CustomToolbar = ({
                     view === toolbarView && "bg-accent text-foreground",
                   )}
                 >
-                  {toolbarViewLabels[toolbarView]}
+                  {labels[toolbarView] ?? toolbarViewLabels[toolbarView]}
                 </DropdownMenuItem>
               ))}
             </DropdownMenuContent>
@@ -916,7 +906,7 @@ const CustomToolbar = ({
             onClick={onManageAvailability}
           >
             <Settings2 className="mr-2 h-4 w-4" />
-            Müsaitlik Paneli
+            {labels.manageAvailability}
           </Button>
         </div>
       </div>
@@ -956,11 +946,13 @@ function CalendarEventContent({
   title,
   view,
   defaultDuration,
+  labels,
 }: {
   event: SchedulerEvent;
   title: string;
   view?: string;
   defaultDuration: number;
+  labels: { appointment: string; closedDay: string; block: string };
 }) {
   const timeRange = `${format(event.start, "HH:mm")} - ${format(event.end, "HH:mm")}`;
 
@@ -1008,10 +1000,10 @@ function CalendarEventContent({
           : "scheduler-agenda-event-custom-hours";
     const agendaLabel =
       event.type === "appointment"
-        ? "Randevu"
+        ? labels.appointment
         : event.type === "blackout"
-          ? "Kapalı Gün"
-          : "Blok";
+          ? labels.closedDay
+          : labels.block;
 
     return (
       <div className={cn("scheduler-agenda-event", agendaToneClass)}>
@@ -1204,7 +1196,7 @@ function getQuickActionPanelPosition(
 export function DoctorCalendar({
   doctorId,
   mode = "doctor",
-  doctorName = "Doktor",
+  doctorName,
   specializationName,
   defaultDuration = 30,
   calendarDate,
@@ -1212,6 +1204,8 @@ export function DoctorCalendar({
   calendarView,
   onCalendarViewChange,
 }: DoctorCalendarProps) {
+  const { lang, t } = useLanguage();
+  const locale = useMemo(() => getDateFnsLocale(lang), [lang]);
   const isMobile = useIsMobile();
   const queryClient = useQueryClient();
   const calendarShellRef = useRef<HTMLDivElement | null>(null);
@@ -1441,7 +1435,7 @@ export function DoctorCalendar({
   const removeAvailability = useMutation({
     mutationFn: async (slotId: string) => api.availability.remove(slotId),
     onSuccess: async () => {
-      toast.success("Musaitlik silindi");
+      toast.success(t.availabilityDeleted);
       setSlotToDelete(null);
       setDeleteSpecificSlotId(null);
       await queryClient.invalidateQueries({ queryKey: ["availability", doctorId] });
@@ -1449,14 +1443,14 @@ export function DoctorCalendar({
       await queryClient.invalidateQueries({ queryKey: ["doctor-calendar", doctorId] });
     },
     onError: (error: unknown) => {
-      toast.error(error instanceof Error ? error.message : "Musaitlik silinemedi");
+      toast.error(error instanceof Error ? error.message : t.availabilityDeleteFailed);
     },
   });
 
   const removeOverride = useMutation({
     mutationFn: async (overrideId: string) => api.availabilityOverrides.remove(overrideId),
     onSuccess: async () => {
-      toast.success("Istisna silindi");
+      toast.success(t.exceptionDeleted);
       setOverrideToDelete(null);
       await queryClient.invalidateQueries({
         queryKey: ["availability-overrides", doctorId],
@@ -1466,7 +1460,7 @@ export function DoctorCalendar({
       });
     },
     onError: (error: unknown) => {
-      toast.error(error instanceof Error ? error.message : "Istisna silinemedi");
+      toast.error(error instanceof Error ? error.message : t.exceptionDeleteFailed);
     },
   });
 
@@ -1483,7 +1477,7 @@ export function DoctorCalendar({
         endTime: payload.endTime,
       }),
     onSuccess: async () => {
-      toast.success("Musaitlik eklendi");
+      toast.success(t.availabilityAdded);
       resetCalendarActiveState();
       await queryClient.invalidateQueries({ queryKey: ["availability", doctorId] });
       await queryClient.refetchQueries({ queryKey: ["availability", doctorId] });
@@ -1491,7 +1485,7 @@ export function DoctorCalendar({
       await queryClient.refetchQueries({ queryKey: ["doctor-calendar", doctorId] });
     },
     onError: (error: unknown) => {
-      toast.error(error instanceof Error ? error.message : "Musaitlik eklenemedi");
+      toast.error(error instanceof Error ? error.message : t.availabilityAddFailed);
     },
   });
 
@@ -1537,13 +1531,11 @@ export function DoctorCalendar({
         });
 
       if (blackoutOverride) {
-        throw new Error("Bu gun zaten kapali olarak isaretlenmis.");
+        throw new Error(t.availabilityAlreadyClosed);
       }
 
       if (appointmentConflictExists(nextRange)) {
-        throw new Error(
-          "Secilen zaman araliginda randevu oldugu icin blok eklenemiyor.",
-        );
+        throw new Error(t.blockConflict);
       }
 
       return api.availabilityOverrides.create({
@@ -1556,7 +1548,7 @@ export function DoctorCalendar({
       });
     },
     onSuccess: async () => {
-      toast.success("Zaman bloklamasi eklendi");
+      toast.success(t.timeBlockAdded);
       setBlockActionState(null);
       setBlockReason("");
       closeQuickActionPanel();
@@ -1569,14 +1561,14 @@ export function DoctorCalendar({
       });
     },
     onError: (error: unknown) => {
-      toast.error(error instanceof Error ? error.message : "Zaman blogu eklenemedi");
+      toast.error(error instanceof Error ? error.message : t.timeBlockAddFailed);
     },
   });
 
   const createAppointmentFromCalendar = useMutation({
     mutationFn: async () => {
       if (!appointmentComposer) {
-        throw new Error("Randevu baglami bulunamadi");
+        throw new Error(t.appointmentContextMissing);
       }
 
       let patientId = selectedPatientId;
@@ -1584,7 +1576,7 @@ export function DoctorCalendar({
       if (appointmentMode === "manual") {
         const { firstName, lastName } = splitFullName(manualPatientName);
         if (!firstName || !lastName || !manualPatientPhone.trim()) {
-          throw new Error("Ad soyad ve telefon zorunludur");
+          throw new Error(t.fullNamePhoneRequired);
         }
 
         const createdPatient = await api.patients.create({
@@ -1598,7 +1590,7 @@ export function DoctorCalendar({
       }
 
       if (!patientId) {
-        throw new Error("Hasta secilmedi");
+        throw new Error(t.patientRequired);
       }
 
       return api.appointments.create({
@@ -1611,7 +1603,7 @@ export function DoctorCalendar({
       });
     },
     onSuccess: async () => {
-      toast.success("Randevu olusturuldu");
+      toast.success(t.appointmentCreated);
       setAppointmentComposer(null);
       setAppointmentMode("registered");
       setPatientSearch("");
@@ -1630,7 +1622,7 @@ export function DoctorCalendar({
       });
     },
     onError: (error: unknown) => {
-      toast.error(error instanceof Error ? error.message : "Randevu olusturulamadi");
+      toast.error(error instanceof Error ? error.message : t.appointmentCreateFailed);
     },
   });
 
@@ -1766,7 +1758,7 @@ export function DoctorCalendar({
 
     return availabilityWindows.map((window) => ({
       id: `availability-surface-${window.slotIds.join("-")}-${window.start.toISOString()}`,
-      title: "Musait",
+      title: t.available,
       start: window.start,
       end: window.end,
       type: "availability-surface",
@@ -1774,7 +1766,7 @@ export function DoctorCalendar({
         slotIds: window.slotIds,
       },
     }));
-  }, [availabilityWindows, resolvedView]);
+  }, [availabilityWindows, resolvedView, t.available]);
 
   const blackoutSurfaceEvents = useMemo<SchedulerEvent[]>(() => {
     if (resolvedView !== Views.WEEK && resolvedView !== Views.DAY) {
@@ -1791,7 +1783,7 @@ export function DoctorCalendar({
       return [
         {
           id: `blackout-surface-${override.id}`,
-          title: "Kapalı Gün",
+          title: t.closedDay,
           start: withTime(baseDate, "00:00"),
           end: withTime(baseDate, "23:59"),
           type: "blackout-surface" as const,
@@ -1801,7 +1793,7 @@ export function DoctorCalendar({
         },
       ];
     });
-  }, [data?.overrides, resolvedView]);
+  }, [data?.overrides, resolvedView, t.closedDay]);
 
   const events = useMemo<SchedulerEvent[]>(() => {
     if (!data) {
@@ -1809,9 +1801,12 @@ export function DoctorCalendar({
     }
 
     const appointmentEvents = appointmentsToEvents(data.appointments);
-    const overrideEvents = overridesToEvents(data.overrides);
+    const overrideEvents = overridesToEvents(data.overrides, {
+      closed: t.closed,
+      closedDay: t.closedDay,
+    });
     return [...overrideEvents, ...appointmentEvents];
-  }, [data]);
+  }, [data, t.closed, t.closedDay]);
 
   const sortedAvailabilitySlots = useMemo(
     () =>
@@ -1955,7 +1950,7 @@ export function DoctorCalendar({
       open: true,
       start,
       end,
-      dateLabel: format(start, "d MMMM yyyy, EEEE", { locale: tr }),
+      dateLabel: format(start, "d MMMM yyyy, EEEE", { locale }),
       timeLabel: `${format(start, "HH:mm")} - ${format(end, "HH:mm")}`,
     };
 
@@ -2362,7 +2357,7 @@ export function DoctorCalendar({
       start: slotInfo.start,
       end: slotInfo.end,
       dayOfWeek: slotInfo.start.getDay(),
-      dateLabel: format(slotInfo.start, "d MMMM yyyy, EEEE", { locale: tr }),
+      dateLabel: format(slotInfo.start, "d MMMM yyyy, EEEE", { locale }),
       timeLabel: `${format(slotInfo.start, "HH:mm")} - ${format(
         slotInfo.end,
         "HH:mm",
@@ -2736,6 +2731,46 @@ export function DoctorCalendar({
   const isLoading = isAvailabilityLoading || isCalendarLoading;
   const isError = isAvailabilityError || isCalendarError;
   const error = availabilityError ?? calendarError;
+  const localizedDayLabels = useMemo(
+    () => ({
+      0: t.sunday,
+      1: t.monday,
+      2: t.tuesday,
+      3: t.wednesday,
+      4: t.thursday,
+      5: t.friday,
+      6: t.saturday,
+    }) as Record<number, string>,
+    [t],
+  );
+  const calendarMessagesLocalized = useMemo(
+    () => ({
+      today: t.today,
+      previous: t.previous,
+      next: t.next,
+      month: t.month,
+      week: t.week,
+      day: t.day,
+      agenda: t.agenda,
+      date: t.date,
+      time: t.time,
+      event: t.event,
+      noEventsInRange: t.noEventsInRange,
+      showMore: (total: number) => t.moreCount.replace("{{count}}", String(total)),
+    }),
+    [t],
+  );
+  const toolbarLabels = useMemo(
+    () => ({
+      today: t.today,
+      [Views.MONTH]: t.month,
+      [Views.WEEK]: t.week,
+      [Views.DAY]: t.day,
+      [Views.AGENDA]: t.agenda,
+      manageAvailability: t.manageAvailability,
+    }),
+    [t],
+  );
 
   const quickActionSlotStatus = useMemo<SlotStatus | null>(() => {
     if (!quickActionSlot) {
@@ -2794,53 +2829,53 @@ export function DoctorCalendar({
   if (isError) {
     return (
       <Alert className="rounded-2xl">
-        <AlertTitle>Takvim yuklenemedi</AlertTitle>
+        <AlertTitle>{t.calendarCouldNotLoad}</AlertTitle>
         <AlertDescription>
-          {error instanceof Error ? error.message : "Bilinmeyen bir hata olustu."}
+          {error instanceof Error ? error.message : t.unknownError}
         </AlertDescription>
       </Alert>
     );
   }
 
   const surfaceContextTitle =
-    doctorName ?? (mode === "staff" ? "Doktor takvimi" : "Kendi takviminiz");
+    doctorName ?? (mode === "staff" ? t.doctorCalendar : t.ownCalendar);
 
   const quickActionBadge =
     quickActionSlotStatus === "available" || quickActionSlotStatus === "gap"
       ? {
-          label: "Musait zaman",
+          label: t.availableTime,
           className:
             "border-emerald-500/25 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
         }
       : quickActionSlotStatus === "overflow"
         ? {
-            label: "Sinir disi",
+            label: t.outsideAvailability,
             className:
               "border-amber-500/25 bg-amber-500/10 text-amber-700 dark:text-amber-300",
           }
         : quickActionSlotStatus === "conflict"
           ? {
-              label: "Cakisma var",
+              label: t.appointmentConflict,
               className:
                 "border-destructive/25 bg-destructive/10 text-destructive",
             }
           : {
-              label: "Musait degil",
+              label: t.unavailableTime,
               className: "border-border/70 bg-muted/60 text-muted-foreground",
             };
 
   const quickActionWarningMessage =
     quickActionSlotStatus === "overflow"
-      ? "Secim musaitlik sinirinin disina tasiyor"
+      ? t.selectionExceedsAvailability
       : quickActionSlotStatus === "conflict"
-        ? "Bu saatte randevu mevcut"
+        ? t.appointmentExistsAtTime
         : quickActionSlotStatus === "unavailable"
-          ? "Bu aralikta musaitlik tanimli degil"
+          ? t.noAvailabilityDefinedRange
           : null;
 
   const isQuickActionEditable = Boolean(quickActionSlot);
   const quickActionDatePillLabel = quickActionSlot
-    ? format(quickActionSlot.start, "EEE, d MMMM", { locale: tr })
+    ? format(quickActionSlot.start, "EEE, d MMMM", { locale })
     : "";
 
   const canBlockSelectedRange =
@@ -2875,7 +2910,7 @@ export function DoctorCalendar({
         start: nextStart,
         end: nextEnd,
         dayOfWeek: nextStart.getDay(),
-        dateLabel: format(nextStart, "d MMMM yyyy, EEEE", { locale: tr }),
+        dateLabel: format(nextStart, "d MMMM yyyy, EEEE", { locale }),
         timeLabel: `${format(nextStart, "HH:mm")} - ${format(nextEnd, "HH:mm")}`,
         override: nextBlockingOverride ?? null,
         availabilityTarget: nextAvailabilityTarget,
@@ -3075,7 +3110,7 @@ export function DoctorCalendar({
             onClick={handleQuickActionEditOverride}
           >
             <Pencil className="h-4 w-4" />
-            Istisnayi panelde duzenle
+            {t.editExceptionInPanel}
           </Button>
         </div>
       );
@@ -3098,7 +3133,7 @@ export function DoctorCalendar({
             ) : (
               <Plus className="h-4 w-4" />
             )}
-            Musaitlik ekle
+            {t.addAvailability}
           </Button>
         </div>
       );
@@ -3121,7 +3156,7 @@ export function DoctorCalendar({
             ) : (
               <Expand className="h-4 w-4" />
             )}
-            Musaitligi genislet
+            {t.expandAvailability}
           </Button>
           <Button
             type="button"
@@ -3130,7 +3165,7 @@ export function DoctorCalendar({
             disabled
           >
             <UserPlus className="h-4 w-4" />
-            Randevu Oluştur
+            {t.createAppointmentTitle}
           </Button>
         </div>
       );
@@ -3146,7 +3181,7 @@ export function DoctorCalendar({
             onClick={handleQuickActionOpenAppointmentComposer}
           >
             <UserPlus className="h-4 w-4" />
-            Randevu Oluştur
+            {t.createAppointmentTitle}
           </Button>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -3158,12 +3193,12 @@ export function DoctorCalendar({
                   disabled
                 >
                   <Ban className="h-4 w-4" />
-                  Blok istisnasi ekle
+                  {t.addBlockException}
                 </Button>
               </span>
             </TooltipTrigger>
             <TooltipContent>
-              Once cakisan randevuyu cozun
+              {t.resolveConflictFirst}
             </TooltipContent>
           </Tooltip>
         </div>
@@ -3178,7 +3213,7 @@ export function DoctorCalendar({
           onClick={handleQuickActionOpenAppointmentComposer}
         >
           <UserPlus className="h-4 w-4" />
-          Randevu Oluştur
+          {t.createAppointmentTitle}
         </Button>
         <Button
           type="button"
@@ -3187,7 +3222,7 @@ export function DoctorCalendar({
           onClick={handleQuickActionBlockTime}
         >
           <Ban className="h-4 w-4" />
-          Blok istisnasi ekle
+          {t.addBlockException}
         </Button>
       </div>
     );
@@ -3299,13 +3334,13 @@ export function DoctorCalendar({
           selectedDay && "scheduler-week-header-active",
           currentDay && "scheduler-week-header-today",
         )}
-        title="Sağ tık: günlük istisna ekle."
+        title={t.headerAddDailyExceptionHint}
       >
         <span className="scheduler-week-header-day">
-          {formatCalendarHeaderDay(date)}
+          {formatCalendarHeaderDay(date, locale, lang)}
         </span>
         <span className="scheduler-week-header-date">
-          {format(date, "d", { locale: tr })}
+          {format(date, "d", { locale })}
         </span>
         {totalSlots > 0 ? (
           <span className="scheduler-week-header-meta">
@@ -3315,18 +3350,17 @@ export function DoctorCalendar({
             <span className="scheduler-week-header-sep">{"\u00B7"}</span>
             {doluSlots === 0 ? (
               <span className="scheduler-week-header-booked">
-                <span className="scheduler-week-header-count-value">{totalSlots}</span>{" "}
-                {"bo\u015F"}
+                {t.slotsEmpty.replace("{{count}}", String(totalSlots))}
               </span>
             ) : (
               <>
                 <span className="scheduler-week-header-booked">
-                  <span className="scheduler-week-header-count-value">{doluSlots}</span> dolu
+                  {t.slotsFilled.replace("{{count}}", String(doluSlots))}
                 </span>
                 <span className="scheduler-week-header-sep">{"\u00B7"}</span>
                 <span className="scheduler-week-header-booked">
                   <span className="scheduler-week-header-count-value">{bosSlots}</span>{" "}
-                  {"bo\u015F"}
+                  {t.slotsEmpty.replace("{{count}}", String(bosSlots))}
                 </span>
               </>
             )}
@@ -3343,8 +3377,8 @@ export function DoctorCalendar({
               {doluSlots === 0 ? (
                 <>
                   <span className="scheduler-week-header-sep">·</span>
-                  <span className="scheduler-week-header-booked">
-                    <span className="scheduler-week-header-count-value">{totalSlots}</span> boÅŸ
+                    <span className="scheduler-week-header-booked">
+                    {t.slotsEmpty.replace("{{count}}", String(totalSlots))}
                   </span>
                 </>
               ) : null}
@@ -3407,6 +3441,7 @@ export function DoctorCalendar({
               {...toolbarProps}
               calendarTitle={surfaceContextTitle}
               specializationName={specializationName}
+              labels={toolbarLabels}
               onManageAvailability={() => {
                 resetCalendarActiveState();
                 setIsAvailabilitySheetOpen(true);
@@ -3419,6 +3454,11 @@ export function DoctorCalendar({
               title={title}
               view={resolvedView}
               defaultDuration={resolvedDefaultDuration}
+              labels={{
+                appointment: t.appointment,
+                closedDay: t.closedDay,
+                block: t.blockout,
+              }}
             />
           ),
           timeSlotWrapper: TimeSlotWrapper as any,
@@ -3457,7 +3497,7 @@ export function DoctorCalendar({
           minHeight: 0,
           overflow: "hidden",
         }}
-        messages={calendarMessages}
+        messages={calendarMessagesLocalized}
         eventPropGetter={eventPropGetter}
         backgroundEventPropGetter={backgroundEventPropGetter}
         enableAutoScroll={false}
@@ -3505,7 +3545,7 @@ export function DoctorCalendar({
         onSelectEvent={handleSelectEvent}
         selectable={!isMobile || resolvedView === Views.MONTH}
         popup
-        culture="tr"
+        culture={lang}
         step={resolvedDefaultDuration}
         timeslots={1}
         min={setMinutes(setHours(new Date(), CALENDAR_START_HOUR), 0)}
@@ -3783,11 +3823,11 @@ export function DoctorCalendar({
           <DrawerHeader>
             <DrawerTitle>
               {quickActionSlot?.kind === "blocked"
-                ? "Seçili İstisna"
-                : "Seçili Aralık"}
+                ? t.selectedException
+                : t.selectedRange}
             </DrawerTitle>
             <DrawerDescription>
-              Seçilen tarih ve saat aralığı için hızlı aksiyonlar.
+              {t.quickActionsDesc}
             </DrawerDescription>
           </DrawerHeader>
 
@@ -3796,25 +3836,25 @@ export function DoctorCalendar({
               <div className="rounded-2xl border border-border/70 bg-background p-4">
                 <div className="space-y-2 text-sm">
                   <div className="flex items-center justify-between gap-3">
-                    <span className="text-muted-foreground">Doktor</span>
+                    <span className="text-muted-foreground">{t.doctor}</span>
                     <span className="text-right font-medium text-foreground">
                       {doctorName}
                     </span>
                   </div>
                   <div className="flex items-center justify-between gap-3">
-                    <span className="text-muted-foreground">Tarih</span>
+                    <span className="text-muted-foreground">{t.date}</span>
                     <span className="text-right font-medium text-foreground">
                       {quickActionSlot.dateLabel}
                     </span>
                   </div>
                   <div className="flex items-center justify-between gap-3">
-                    <span className="text-muted-foreground">Saat</span>
+                    <span className="text-muted-foreground">{t.time}</span>
                     <span className="font-medium text-foreground">
                       {quickActionSlot.timeLabel}
                     </span>
                   </div>
                   <div className="flex items-center justify-between gap-3">
-                    <span className="text-muted-foreground">Durum</span>
+                    <span className="text-muted-foreground">{t.status}</span>
                     <Badge
                       variant="outline"
                       className={cn("rounded-full", quickActionBadge.className)}
@@ -3845,9 +3885,9 @@ export function DoctorCalendar({
       >
         <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-lg">
           <SheetHeader>
-            <SheetTitle>Randevu Oluştur</SheetTitle>
+            <SheetTitle>{t.createAppointmentTitle}</SheetTitle>
             <SheetDescription>
-              Seçilen müsait zaman için randevu oluşturun
+              {t.createAppointmentDesc}
             </SheetDescription>
           </SheetHeader>
 
@@ -3856,19 +3896,19 @@ export function DoctorCalendar({
               <div className="rounded-[24px] border border-border/60 bg-card/90 p-4 shadow-soft">
                 <div className="space-y-2 text-sm">
                   <div className="flex items-center justify-between gap-3">
-                    <span className="text-muted-foreground">Doktor</span>
+                    <span className="text-muted-foreground">{t.doctor}</span>
                     <span className="text-right font-medium text-foreground">
                       {doctorName}
                     </span>
                   </div>
                   <div className="flex items-center justify-between gap-3">
-                    <span className="text-muted-foreground">Tarih</span>
+                    <span className="text-muted-foreground">{t.date}</span>
                     <span className="text-right font-medium text-foreground">
                       {appointmentComposer.dateLabel}
                     </span>
                   </div>
                   <div className="flex items-center justify-between gap-3">
-                    <span className="text-muted-foreground">Saat</span>
+                    <span className="text-muted-foreground">{t.time}</span>
                     <span className="text-right font-medium text-foreground">
                       {appointmentComposer.timeLabel}
                     </span>
@@ -3888,7 +3928,7 @@ export function DoctorCalendar({
                     setManualPatientNote("");
                   }}
                 >
-                  Kayıtlı Hasta
+                  {t.registeredPatient}
                 </Button>
                 <Button
                   type="button"
@@ -3900,21 +3940,21 @@ export function DoctorCalendar({
                     setPatientSearch("");
                   }}
                 >
-                  Manuel Giriş
+                  {t.manualEntry}
                 </Button>
               </div>
 
               {appointmentMode === "registered" ? (
                 <div className="space-y-4 rounded-[24px] border border-border/60 bg-background/80 p-4">
                   <div className="space-y-2">
-                    <Label htmlFor="appointment-patient-search">Hasta ara</Label>
+                    <Label htmlFor="appointment-patient-search">{t.patientSearchLabel}</Label>
                     <div className="relative">
                       <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                       <Input
                         id="appointment-patient-search"
                         value={patientSearch}
                         onChange={(event) => setPatientSearch(event.target.value)}
-                        placeholder="Ad, telefon veya e-posta"
+                        placeholder={t.patientSearchPlaceholder}
                         className="rounded-xl pl-9"
                       />
                     </div>
@@ -3924,11 +3964,11 @@ export function DoctorCalendar({
                     {isPatientsLoading ? (
                       <div className="flex items-center gap-2 rounded-xl border border-border/60 bg-muted/30 p-3 text-sm text-muted-foreground">
                         <Loader2 className="h-4 w-4 animate-spin" />
-                        Hastalar yukleniyor...
+                        {t.patientsLoading}
                       </div>
                     ) : filteredPatients.length > 0 ? (
                       filteredPatients.map((patient) => {
-                        const patientName = getPatientName(patient) || "Isimsiz hasta";
+                        const patientName = getPatientName(patient) || t.unnamedPatient;
                         const isSelected = selectedPatientId === patient.id;
 
                         return (
@@ -3964,7 +4004,7 @@ export function DoctorCalendar({
                       })
                     ) : (
                       <div className="rounded-xl border border-dashed border-border/70 bg-muted/20 p-4 text-sm text-muted-foreground">
-                        Aramaya uyan kayitli hasta bulunamadi.
+                        {t.noRegisteredPatientMatches}
                       </div>
                     )}
                   </div>
@@ -3972,7 +4012,7 @@ export function DoctorCalendar({
               ) : (
                 <div className="space-y-4 rounded-[24px] border border-border/60 bg-background/80 p-4">
                   <div className="space-y-2">
-                    <Label htmlFor="manual-patient-name">Ad soyad</Label>
+                    <Label htmlFor="manual-patient-name">{t.manualPatientName}</Label>
                     <Input
                       id="manual-patient-name"
                       value={manualPatientName}
@@ -3982,7 +4022,7 @@ export function DoctorCalendar({
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="manual-patient-phone">Telefon</Label>
+                    <Label htmlFor="manual-patient-phone">{t.phone}</Label>
                     <Input
                       id="manual-patient-phone"
                       value={manualPatientPhone}
@@ -3992,7 +4032,7 @@ export function DoctorCalendar({
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="manual-patient-note">Hasta notu</Label>
+                    <Label htmlFor="manual-patient-note">{t.patientNote}</Label>
                     <Textarea
                       id="manual-patient-note"
                       value={manualPatientNote}
@@ -4009,14 +4049,14 @@ export function DoctorCalendar({
               )}
 
               <div className="space-y-2">
-                <Label htmlFor="appointment-notes">Randevu notu</Label>
+                <Label htmlFor="appointment-notes">{t.appointmentNote}</Label>
                 <Textarea
                   id="appointment-notes"
                   value={appointmentNotes}
                   onChange={(event) => setAppointmentNotes(event.target.value)}
                   rows={4}
                   className="rounded-2xl"
-                  placeholder="Opsiyonel ic not veya hasta talebi"
+                  placeholder={t.appointmentNote}
                 />
               </div>
 
@@ -4036,7 +4076,7 @@ export function DoctorCalendar({
                 ) : (
                   <UserPlus className="mr-2 h-4 w-4" />
                 )}
-                Randevuyu kaydet
+                {t.saveAppointment}
               </Button>
             </div>
           ) : null}
@@ -4054,9 +4094,9 @@ export function DoctorCalendar({
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Zaman Aralığını Blokla</AlertDialogTitle>
+            <AlertDialogTitle>{t.blockTimeRangeTitle}</AlertDialogTitle>
             <AlertDialogDescription>
-              Bu işlem seçili aralık için blok istisnası oluşturur. Haftalık müsaitlik kuralı korunur.
+              {t.blockTimeRangeDesc}
             </AlertDialogDescription>
           </AlertDialogHeader>
 
@@ -4065,26 +4105,26 @@ export function DoctorCalendar({
               <div className="rounded-2xl border border-border/60 bg-muted/40 p-4 space-y-2 text-sm">
                 {doctorName ? (
                   <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Doktor</span>
+                    <span className="text-muted-foreground">{t.doctor}</span>
                     <span className="font-medium">{doctorName}</span>
                   </div>
                 ) : null}
                 <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Tarih</span>
+                  <span className="text-muted-foreground">{t.date}</span>
                   <span className="font-medium">{blockActionState.dateLabel}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Saat</span>
+                  <span className="text-muted-foreground">{t.time}</span>
                   <span className="font-medium">{blockActionState.timeLabel}</span>
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label className="text-sm">Not (isteğe bağlı)</Label>
+                <Label className="text-sm">{t.optionalNote}</Label>
                 <Textarea
                   value={blockReason}
                   onChange={(e) => setBlockReason(e.target.value)}
-                  placeholder="Bu bloğun sebebini yazın..."
+                  placeholder={t.blockReasonPlaceholder}
                   className="rounded-xl resize-none text-sm"
                   rows={3}
                 />
@@ -4093,7 +4133,7 @@ export function DoctorCalendar({
           ) : null}
 
           <AlertDialogFooter>
-            <AlertDialogCancel>İptal</AlertDialogCancel>
+            <AlertDialogCancel>{t.cancel}</AlertDialogCancel>
             <Button
               type="button"
               variant="destructive"
@@ -4108,7 +4148,7 @@ export function DoctorCalendar({
                 }
               }}
             >
-              {createQuickBlock.isPending ? "Bloklanıyor..." : "Bu Zamanı Blokla"}
+              {createQuickBlock.isPending ? t.blocking : t.blockThisTime}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -4145,7 +4185,7 @@ export function DoctorCalendar({
               handleOpenOverrideCreate(contextMenuState.date, "blackout")
             }
           >
-            Bu gunu kapat
+            {t.closeThisDate}
           </DropdownMenuItem>
           <DropdownMenuItem
             onClick={() =>
@@ -4153,7 +4193,7 @@ export function DoctorCalendar({
               handleOpenOverrideCreate(contextMenuState.date, "custom_hours")
             }
           >
-            Bu gune blok istisnasi ekle
+            {t.addBlockExceptionThisDate}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -4169,11 +4209,9 @@ export function DoctorCalendar({
       >
         <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-lg">
           <SheetHeader className="pb-2">
-            <SheetTitle className="text-lg font-semibold">Müsaitlik Paneli</SheetTitle>
+            <SheetTitle className="text-lg font-semibold">{t.manageAvailability}</SheetTitle>
             <SheetDescription className="text-sm text-muted-foreground">
-              Haftalık slotlar panelden düzenlenir, aktiflik durumunu
-              degistirebilir veya yeni slot ekleyebilirsiniz. Takvimdeki yesil alanlar
-              yalnizca gosterimdir.
+              {t.availabilityPanelDesc}
             </SheetDescription>
           </SheetHeader>
 
@@ -4182,10 +4220,10 @@ export function DoctorCalendar({
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                    Haftalik Slotlar
+                    {t.weeklySlots}
                   </h3>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    Duzenli calisma saatlerinizi yonetin.
+                    {t.weeklySlotsDesc}
                   </p>
                 </div>
                 <Button
@@ -4194,7 +4232,7 @@ export function DoctorCalendar({
                   className="rounded-xl text-sm"
                   onClick={() => setAvailabilityModal({ open: true, mode: "create" })}
                 >
-                  + Yeni Slot Ekle
+                  + {t.addNewSlot}
                 </Button>
               </div>
 
@@ -4207,10 +4245,10 @@ export function DoctorCalendar({
                     >
                       <div className="flex items-center gap-3 min-w-0">
                         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-xs font-bold text-primary">
-                          {dayLabels[slot.day_of_week]?.slice(0, 3)}
+                          {localizedDayLabels[slot.day_of_week]?.slice(0, 3)}
                         </div>
                         <div className="min-w-0">
-                          <div className="text-sm font-semibold leading-tight">{dayLabels[slot.day_of_week]}</div>
+                          <div className="text-sm font-semibold leading-tight">{localizedDayLabels[slot.day_of_week]}</div>
                           <div className="text-xs text-muted-foreground">
                             {formatTimeRange(slot.start_time, slot.end_time)} · {slot.slot_duration} dk
                           </div>
@@ -4224,15 +4262,15 @@ export function DoctorCalendar({
                             api.availability
                               .update(slot.id, { isActive: checked })
                               .then(() => {
-                                toast.success("Musaitlik durumu guncellendi");
+                                toast.success(t.availabilityStatusUpdated);
                                 return queryClient.invalidateQueries({ queryKey: ["availability", doctorId] });
                               })
                               .then(() => queryClient.invalidateQueries({ queryKey: ["doctor-calendar", doctorId] }))
                               .catch((error: unknown) => {
-                                toast.error(error instanceof Error ? error.message : "Musaitlik durumu guncellenemedi");
+                                toast.error(error instanceof Error ? error.message : t.availabilityStatusUpdateFailed);
                               });
                           }}
-                          aria-label={`${dayLabels[slot.day_of_week]} musaitlik durumu`}
+                          aria-label={t.availabilityPanelSlotAria.replace("{{day}}", localizedDayLabels[slot.day_of_week])}
                         />
                         <Button
                           type="button"
@@ -4258,7 +4296,7 @@ export function DoctorCalendar({
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed py-8 text-center">
-                  <p className="text-sm text-muted-foreground">Henuz tanimli musaitlik slotu bulunmuyor.</p>
+                  <p className="text-sm text-muted-foreground">{t.noAvailabilitySlotsDefined}</p>
                 </div>
               )}
             </section>
@@ -4268,10 +4306,10 @@ export function DoctorCalendar({
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                      TARİHE ÖZEL MÜSAİTLİKLER
+                      {t.specificDateAvailability}
                     </h3>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      Belirli bir tarihe özel eklenen çalışma saatleri.
+                      {t.specificDateAvailabilityDesc}
                     </p>
                   </div>
                 </div>
@@ -4282,12 +4320,12 @@ export function DoctorCalendar({
                       className="flex items-center justify-between gap-3 rounded-2xl border border-border/60 bg-muted/30 px-4 py-3"
                     >
                       <div className="flex items-center gap-3 min-w-0">
-                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 text-xs font-bold">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-xs font-bold text-emerald-700 dark:bg-emerald-950/45 dark:text-emerald-200">
                           {format(parseISO(slot.specific_date! + "T00:00:00"), "dd")}
                         </div>
                         <div className="min-w-0">
                           <p className="text-sm font-medium truncate">
-                            {format(parseISO(slot.specific_date! + "T00:00:00"), "d MMMM yyyy", { locale: tr })}
+                            {format(parseISO(slot.specific_date! + "T00:00:00"), "d MMMM yyyy", { locale })}
                           </p>
                           <p className="text-xs text-muted-foreground">
                             {slot.start_time.slice(0, 5)} – {slot.end_time.slice(0, 5)}
@@ -4322,10 +4360,10 @@ export function DoctorCalendar({
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                    Istisnalar
+                    {t.exceptions}
                   </h3>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    Son 30 gun ve gelecek icin kapanis ve bloklu zaman istisnalari.
+                    {t.exceptionsDesc}
                   </p>
                 </div>
                 <Button
@@ -4345,7 +4383,7 @@ export function DoctorCalendar({
                     })
                   }
                 >
-                  + Istisna Ekle
+                  + {t.addException}
                 </Button>
               </div>
 
@@ -4358,7 +4396,10 @@ export function DoctorCalendar({
               ) : sortedOverrides.length > 0 ? (
                 <div className="space-y-2">
                   {sortedOverrides.map((override) => {
-                    const badge = getOverrideBadge(override.type);
+                    const badge = {
+                      ...getOverrideBadge(override.type),
+                      label: override.type === "blackout" ? t.closedDay : t.defineCustomHours,
+                    };
                     return (
                       <div
                         key={override.id}
@@ -4369,11 +4410,11 @@ export function DoctorCalendar({
                             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-xs font-bold"
                             style={{ backgroundColor: `${badge.color}18`, color: badge.color }}
                           >
-                            {format(parseDateOnly(override.date), "dd", { locale: tr })}
+                            {format(parseDateOnly(override.date), "dd", { locale })}
                           </div>
                           <div className="min-w-0">
                             <div className="text-sm font-semibold leading-tight">
-                              {format(parseDateOnly(override.date), "d MMMM yyyy", { locale: tr })}
+                              {format(parseDateOnly(override.date), "d MMMM yyyy", { locale })}
                             </div>
                             <div className="flex items-center gap-1.5 mt-0.5">
                               <span
@@ -4430,7 +4471,7 @@ export function DoctorCalendar({
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed py-8 text-center">
-                  <p className="text-sm text-muted-foreground">Tanimli istisna bulunmuyor.</p>
+                  <p className="text-sm text-muted-foreground">{t.noExceptionsDefined}</p>
                 </div>
               )}
             </section>
@@ -4441,19 +4482,18 @@ export function DoctorCalendar({
       <AlertDialog open={Boolean(slotToDelete)} onOpenChange={() => {}}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Musaitlik silinsin mi?</AlertDialogTitle>
+            <AlertDialogTitle>{t.deleteAvailabilityTitle}</AlertDialogTitle>
             <AlertDialogDescription>
               {slotToDelete
-                ? `${dayLabels[slotToDelete.day_of_week]} gunundeki ${formatTimeRange(
-                    slotToDelete.start_time,
-                    slotToDelete.end_time,
-                  )} araligi kaldirilacak.`
-                : "Bu musaitlik slotu kaldirilacak."}
+                ? t.deleteAvailabilityRangeDesc
+                    .replace("{{day}}", localizedDayLabels[slotToDelete.day_of_week])
+                    .replace("{{range}}", formatTimeRange(slotToDelete.start_time, slotToDelete.end_time))
+                : t.deleteAvailabilityDesc}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setSlotToDelete(null)}>
-              İptal
+              {t.cancel}
             </AlertDialogCancel>
             <Button
               variant="destructive"
@@ -4464,7 +4504,7 @@ export function DoctorCalendar({
                 }
               }}
             >
-              {removeAvailability.isPending ? "Siliniyor..." : "Sil"}
+              {removeAvailability.isPending ? t.deleting : t.delete}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -4476,11 +4516,11 @@ export function DoctorCalendar({
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Müsaitliği Sil</AlertDialogTitle>
-            <AlertDialogDescription>Bu tarihe özel müsaitlik silinecek. Emin misiniz?</AlertDialogDescription>
+            <AlertDialogTitle>{t.deleteSpecificAvailabilityTitle}</AlertDialogTitle>
+            <AlertDialogDescription>{t.deleteSpecificAvailabilityDesc}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Vazgeç</AlertDialogCancel>
+            <AlertDialogCancel>{t.discard}</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => {
@@ -4490,7 +4530,7 @@ export function DoctorCalendar({
                 setDeleteSpecificSlotId(null);
               }}
             >
-              Sil
+              {t.delete}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -4499,18 +4539,19 @@ export function DoctorCalendar({
       <AlertDialog open={Boolean(overrideToDelete)} onOpenChange={() => {}}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Istisna silinsin mi?</AlertDialogTitle>
+            <AlertDialogTitle>{t.deleteOverrideTitle}</AlertDialogTitle>
             <AlertDialogDescription>
               {overrideToDelete
-                ? `${format(parseDateOnly(overrideToDelete.date), "d MMMM yyyy", {
-                    locale: tr,
-                  })} tarihli istisna kaldirilacak.`
-                : "Bu istisna kaldirilacak."}
+                ? t.deleteOverrideDateDesc.replace(
+                    "{{date}}",
+                    format(parseDateOnly(overrideToDelete.date), "d MMMM yyyy", { locale }),
+                  )
+                : t.deleteOverrideDesc}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setOverrideToDelete(null)}>
-              İptal
+              {t.cancel}
             </AlertDialogCancel>
             <Button
               variant="destructive"
@@ -4521,7 +4562,7 @@ export function DoctorCalendar({
                 }
               }}
             >
-              {removeOverride.isPending ? "Siliniyor..." : "Sil"}
+              {removeOverride.isPending ? t.deleting : t.delete}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>

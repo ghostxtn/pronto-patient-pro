@@ -48,6 +48,21 @@ export class DoctorsController {
     return this.doctorsService.findPublicDiscoveryByClinic(clinicId);
   }
 
+  @Get(':id/booking')
+  @Public()
+  findBookingProfile(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() request: TenantRequest,
+  ) {
+    const clinicId = request.tenant?.clinicId;
+
+    if (!clinicId) {
+      throw new NotFoundException('Clinic not found');
+    }
+
+    return this.doctorsService.findBookingProfileByClinic(id, clinicId);
+  }
+
   @Get()
   @Roles('owner', 'admin', 'doctor', 'staff')
   findAll(

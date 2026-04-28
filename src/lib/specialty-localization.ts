@@ -13,7 +13,7 @@ const specialtyLocalization: Record<
     enName: "General Consultation",
     trName: "Genel Konsultasyon",
     enDescription: "A starting point for initial assessment and appropriate specialty direction.",
-    trDescription: "Ilk degerlendirme ve dogru uzmanlik yonlendirmesi icin baslangic alani.",
+    trDescription: "İlk değerlendirme ve doğru uzmanlık yönlendirmesi için başlangıç alanı.",
   },
   "kardiyoloji": {
     enName: "Cardiology",
@@ -37,12 +37,12 @@ const specialtyLocalization: Record<
   },
   "kadin-sagligi": {
     enName: "Women's Health",
-    trName: "Kadin Sagligi",
+    trName: "Kadın Sağlığı",
     enDescription: "Care coordination for routine women's health needs and follow-up.",
   },
   "kadin-hastaliklari-ve-dogum": {
     enName: "Obstetrics and Gynecology",
-    trName: "Kadin Hastaliklari ve Dogum",
+    trName: "Kadın Hastalıkları ve Doğum",
     enDescription: "Specialist care for women's health, gynecologic needs, and pregnancy follow-up.",
   },
   "pediatri": {
@@ -52,7 +52,7 @@ const specialtyLocalization: Record<
   },
   "goz-hastaliklari": {
     enName: "Ophthalmology",
-    trName: "Goz Hastaliklari",
+    trName: "Göz Hastalıkları",
     enDescription: "Evaluation and follow-up support for eye health and vision-related needs.",
   },
   "noroloji": {

@@ -78,10 +78,10 @@ export default function AdminDashboard() {
   });
 
   const statCards = [
-    { label: t.totalPatients, value: stats?.patients ?? 0, icon: Users, iconBg: "#eaf5ff", iconColor: "#4f8fe6", to: "/admin/patients" },
-    { label: t.activeDoctors, value: stats?.doctors ?? 0, icon: Stethoscope, iconBg: "#e6f4ef", iconColor: "#65a98f", to: "/admin/doctors" },
-    { label: t.appointments, value: stats?.appointments ?? 0, icon: CalendarDays, iconBg: "#fff8e6", iconColor: "#f5a623", to: "/admin/appointments" },
-    { label: t.confirmedAppointments, value: stats?.confirmed ?? 0, icon: Clock, iconBg: "#eaf5ff", iconColor: "#2f75ca", to: "/admin/appointments?status=confirmed" },
+    { label: t.totalPatients, value: stats?.patients ?? 0, icon: Users, iconClassName: "bg-blue-50 text-blue-600 dark:bg-blue-950/45 dark:text-blue-300", to: "/admin/patients" },
+    { label: t.activeDoctors, value: stats?.doctors ?? 0, icon: Stethoscope, iconClassName: "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/45 dark:text-emerald-300", to: "/admin/doctors" },
+    { label: t.appointments, value: stats?.appointments ?? 0, icon: CalendarDays, iconClassName: "bg-amber-50 text-amber-600 dark:bg-amber-950/45 dark:text-amber-300", to: "/admin/appointments" },
+    { label: t.confirmedAppointments, value: stats?.confirmed ?? 0, icon: Clock, iconClassName: "bg-sky-50 text-sky-600 dark:bg-sky-950/45 dark:text-sky-300", to: "/admin/appointments?status=confirmed" },
   ];
 
   const statusLabels: Record<string, string> = {
@@ -119,8 +119,8 @@ export default function AdminDashboard() {
               >
                 <CardContent className="p-5">
                   <div className="mb-4 flex items-start justify-between gap-3">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-xl" style={{ backgroundColor: s.iconBg }}>
-                      <s.icon className="h-5 w-5" style={{ color: s.iconColor }} />
+                    <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${s.iconClassName}`}>
+                      <s.icon className="h-5 w-5" />
                     </div>
                     <TrendingUp className="h-4 w-4 shrink-0 text-emerald-500 dark:text-emerald-300" />
                   </div>
@@ -171,7 +171,7 @@ export default function AdminDashboard() {
               </CardTitle>
               <input
                 type="text"
-                placeholder="Hasta veya doktor ara..."
+                placeholder={t.adminAppointmentSearchPlaceholder}
                 value={appointmentSearch}
                 onChange={(e) => setAppointmentSearch(e.target.value)}
                 className="h-8 w-56 rounded-lg border border-border bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
@@ -182,7 +182,7 @@ export default function AdminDashboard() {
               <div className="max-h-[480px] overflow-y-auto pr-1">
                 {!filteredAppointments.length ? (
                   <p className="py-4 text-center text-sm text-muted-foreground" style={{ fontFamily: "Inter, sans-serif" }}>
-                    {appointmentSearch ? "Sonuç bulunamadı." : t.noAppointmentsYetAdmin}
+                    {appointmentSearch ? t.noResultsFound : t.noAppointmentsYetAdmin}
                   </p>
                 ) : (
                   <div className="space-y-3">

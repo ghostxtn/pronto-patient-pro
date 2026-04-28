@@ -107,8 +107,9 @@ function getDoctorPreviewText(
   presentation: DoctorPresentation | undefined,
   lang: Language,
 ) {
-  if (presentation?.previewText) {
-    return presentation.previewText;
+  const localizedPresentationText = lang === "tr" ? presentation?.previewTextTr : presentation?.previewText;
+  if (localizedPresentationText) {
+    return localizedPresentationText;
   }
 
   if (doctor.bio?.trim()) {
@@ -122,8 +123,8 @@ function getDoctorPreviewText(
 
   if (lang === "tr") {
     return specialtyName
-      ? `${specialtyName} odaginda duzenli degerlendirme ve koordinasyon yaklasimiyla calisir.`
-      : "Koordinasyon destekli klinik bakim surecinde calisir.";
+      ? `${specialtyName} odağında düzenli değerlendirme ve koordinasyon yaklaşımıyla çalışır.`
+      : "Koordinasyon destekli klinik bakım sürecinde çalışır.";
   }
 
   return specialtyName
@@ -136,8 +137,9 @@ function getDoctorFocusTags(
   presentation: DoctorPresentation | undefined,
   lang: Language,
 ) {
-  if (presentation?.focusTags?.length) {
-    return presentation.focusTags;
+  const localizedFocusTags = lang === "tr" ? presentation?.focusTagsTr : presentation?.focusTags;
+  if (localizedFocusTags?.length) {
+    return localizedFocusTags;
   }
 
   const specialtySlug = toHomepageSlug(doctor.specialization?.name?.trim() || "");
@@ -146,7 +148,7 @@ function getDoctorFocusTags(
     doctor.specialization?.name?.trim();
 
   if (!specialtyName) {
-    return lang === "tr" ? ["Klinik Surec"] : ["Clinic Flow"];
+    return lang === "tr" ? ["Klinik Süreç"] : ["Clinic Flow"];
   }
 
   return [specialtyName];
@@ -156,7 +158,9 @@ function mapDoctorPreviewItem(
   doctor: HomepagePreviewDoctorRecord,
   lang: Language,
 ): HomepageDoctorPreviewItem {
-  const name = [doctor.firstName, doctor.lastName].filter(Boolean).join(" ").trim() || "Doktor";
+  const name =
+    [doctor.firstName, doctor.lastName].filter(Boolean).join(" ").trim() ||
+    (lang === "tr" ? "Doktor" : "Doctor");
   const slug = toHomepageSlug(name);
   const presentation = matchDoctorPresentation(doctor, slug);
   const specialtySlug = toHomepageSlug(doctor.specialization?.name?.trim() || "");
@@ -192,10 +196,10 @@ function mapSpecialtyPreviewItem(
       localizedSpecialty.description ||
       specialty.description?.trim() ||
       (lang === "tr"
-        ? "Klinik ekip degerlendirmesiyle desteklenen uzmanlik alani."
+        ? "Klinik ekip değerlendirmesiyle desteklenen uzmanlık alanı."
         : "A specialty area supported by coordinated clinic review."),
     imageSrc: specialty.imageUrl?.trim() ? specialty.imageUrl.trim() : SPECIALTY_FALLBACK_IMAGE,
-    previewText: presentation?.previewText,
+    previewText: lang === "tr" ? presentation?.previewTextTr : presentation?.previewText,
     homepagePriority: presentation?.homepagePriority,
   };
 }

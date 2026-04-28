@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Loader2, Trash2, CalendarIcon } from "lucide-react";
 import { format, parseISO } from "date-fns";
-import { tr } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import api, { ApiError } from "@/services/api";
@@ -36,6 +35,7 @@ import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { getDateFnsLocale } from "@/lib/date-localization";
 
 export interface OverrideModalProps {
   open: boolean;
@@ -66,7 +66,8 @@ export function OverrideModal({
   conflictingAppointments,
   onSaved,
 }: OverrideModalProps) {
-  const { t } = useLanguage();
+  const { lang, t } = useLanguage();
+  const locale = useMemo(() => getDateFnsLocale(lang), [lang]);
   const [date, setDate] = useState("");
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [type, setType] = useState<"blackout" | "custom_hours">("blackout");
@@ -205,9 +206,9 @@ export function OverrideModal({
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       {date ? (
-                        format(parseISO(date + "T00:00:00"), "d MMMM yyyy", { locale: tr })
+                        format(parseISO(date + "T00:00:00"), "d MMMM yyyy", { locale })
                       ) : (
-                        <span>Tarih Seçin</span>
+                        <span>{t.selectDatePlaceholder}</span>
                       )}
                     </Button>
                   </PopoverTrigger>
@@ -222,7 +223,7 @@ export function OverrideModal({
                         }
                       }}
                       initialFocus
-                      locale={tr}
+                      locale={locale}
                       weekStartsOn={1}
                     />
                   </PopoverContent>
@@ -230,16 +231,16 @@ export function OverrideModal({
               </div>
 
               <div className="space-y-2">
-                <Label>Sebep / Not</Label>
+                <Label>{t.reason}</Label>
                 <Textarea
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
-                  placeholder="Bu bloğun sebebini yazın..."
+                  placeholder={t.blockReasonPlaceholder}
                   className="rounded-xl resize-none text-sm"
                   rows={3}
                 />
                 <p className="text-xs text-muted-foreground mt-1">
-                  Takvimde görünmez, sadece kayıt amaçlıdır.
+                  {t.reasonPrivateNote}
                 </p>
               </div>
 
@@ -321,10 +322,10 @@ export function OverrideModal({
                 <span className="mt-0.5 text-base">⚠️</span>
                 <div>
                   <p className="font-medium">
-                    Bu günde {conflictingAppointments.length} aktif randevu bulunuyor.
+                    {t.conflictingAppointmentsOnDate.replace("{{count}}", String(conflictingAppointments.length))}
                   </p>
                   <p className="mt-0.5 text-amber-700 text-xs">
-                    Blok uygulanırsa mevcut randevular etkilenebilir.
+                    {t.blackoutMayAffectAppointments}
                   </p>
                 </div>
               </div>
