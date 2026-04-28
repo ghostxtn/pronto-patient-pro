@@ -107,7 +107,7 @@ export default function ClinicSettings() {
       toast.success(t.settingsSaved);
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : "Klinik bilgileri kaydedilemedi");
+      toast.error(error instanceof Error ? error.message : t.clinicInfoSaveFailed);
     },
   });
 
@@ -126,7 +126,7 @@ export default function ClinicSettings() {
       toast.success(t.settingsSaved);
     },
     onError: (error) => {
-      toast.error(error instanceof Error ? error.message : "Randevu ayarlari kaydedilemedi");
+      toast.error(error instanceof Error ? error.message : t.appointmentSettingsSaveFailed);
     },
   });
 
@@ -138,9 +138,9 @@ export default function ClinicSettings() {
     try {
       await api.specializations.uploadImage(specId, file);
       await qc.invalidateQueries({ queryKey: ["specializations"] });
-      toast.success("Uzmanlik gorseli yuklendi");
+      toast.success(t.specializationImageUploaded);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Gorsel yuklenemedi");
+      toast.error(error instanceof Error ? error.message : t.imageUploadFailed);
     } finally {
       setUploadingSpecIds((current) => ({ ...current, [specId]: false }));
     }
@@ -153,16 +153,16 @@ export default function ClinicSettings() {
       await api.clinics.uploadLogo(user.clinic_id, file);
       await qc.invalidateQueries({ queryKey: ["clinic", user.clinic_id] });
       await qc.invalidateQueries({ queryKey: ["clinic-branding", user.clinic_id] });
-      toast.success("Klinik logosu guncellendi");
+      toast.success(t.clinicLogoUpdated);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Klinik logosu yuklenemedi");
+      toast.error(error instanceof Error ? error.message : t.clinicLogoUploadFailed);
     }
   };
 
   const navItems = [
-    ...(canManageClinic ? [{ id: "clinic", label: "Klinik Profili", icon: Building2 }] : []),
-    ...(canManageClinic ? [{ id: "appointments", label: "Randevu Ayarlari", icon: CalendarDays }] : []),
-    ...(canManageClinic ? [{ id: "owner", label: "Owner Kontrolleri", icon: Shield }] : []),
+    ...(canManageClinic ? [{ id: "clinic", label: t.clinicProfile, icon: Building2 }] : []),
+    ...(canManageClinic ? [{ id: "appointments", label: t.appointmentSettings, icon: CalendarDays }] : []),
+    ...(canManageClinic ? [{ id: "owner", label: t.ownerControlsLabel, icon: Shield }] : []),
   ];
 
   return (
@@ -198,9 +198,9 @@ export default function ClinicSettings() {
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-lg text-foreground">
                       <Building2 className="h-5 w-5 text-primary" />
-                      Klinik Profili
+                      {t.clinicProfile}
                     </CardTitle>
-                    <CardDescription>Klinik adi, iletisim bilgileri, adres ve logo burada yonetilir.</CardDescription>
+                    <CardDescription>{t.clinicProfileDesc}</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-6">
                     <div className="flex flex-col gap-4 md:flex-row md:items-start">
@@ -224,30 +224,30 @@ export default function ClinicSettings() {
                           {clinic?.logo_url ? (
                             <img
                               src={`${clinic.logo_url}?t=${new Date(clinic.updated_at).getTime()}`}
-                              alt={clinic.name ?? "Klinik logosu"}
+                              alt={clinic.name ?? t.clinicLogoAlt}
                               className="h-full w-full object-cover"
                             />
                           ) : (
                             <div className="flex flex-col items-center gap-2 px-3 text-center text-xs text-muted-foreground">
                               <Upload className="h-5 w-5" />
-                              Logo yok
+                              {t.noLogo}
                             </div>
                           )}
                         </button>
                         <div className="space-y-1 text-xs text-muted-foreground">
-                          <p>JPEG, PNG veya WebP</p>
-                          <p>{isOwner ? "Logoyu degistirmek icin tiklayin" : "Logo yukleme sadece owner rolunde acik"}</p>
+                          <p>{t.imageFormatsHint}</p>
+                          <p>{isOwner ? t.clickToChangeLogo : t.logoOwnerOnly}</p>
                         </div>
                       </div>
 
                       <div className="grid flex-1 gap-4 md:grid-cols-2">
                         <div className="space-y-2 md:col-span-2">
-                          <Label htmlFor="clinic-name">Klinik Adi</Label>
+                          <Label htmlFor="clinic-name">{t.clinicName}</Label>
                           <Input
                             id="clinic-name"
                             value={clinicName}
                             onChange={(event) => setClinicName(event.target.value)}
-                            placeholder="Klinik adi"
+                            placeholder={t.clinicName}
                             className="rounded-xl"
                             disabled={isClinicLoading}
                           />
@@ -307,9 +307,9 @@ export default function ClinicSettings() {
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-lg text-foreground">
                       <CalendarDays className="h-5 w-5 text-primary" />
-                      Randevu Ayarlari
+                      {t.appointmentSettings}
                     </CardTitle>
-                    <CardDescription>Randevu sureleri, onay akisi, ileri tarih siniri ve iptal deadline burada yonetilir.</CardDescription>
+                    <CardDescription>{t.appointmentSettingsLongDesc}</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-6">
                     <div className="grid gap-4 md:grid-cols-2">

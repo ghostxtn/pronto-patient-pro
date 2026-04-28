@@ -34,6 +34,25 @@ export class ClinicsService {
     return clinic;
   }
 
+  async findBrandingById(id: string) {
+    const [clinic] = await this.db
+      .select({
+        id: clinics.id,
+        name: clinics.name,
+        logo_url: clinics.logo_url,
+        updated_at: clinics.updated_at,
+      })
+      .from(clinics)
+      .where(and(eq(clinics.id, id), eq(clinics.is_active, true)))
+      .limit(1);
+
+    if (!clinic) {
+      throw new NotFoundException('Clinic not found');
+    }
+
+    return clinic;
+  }
+
   async update(id: string, dto: UpdateClinicDto) {
     const [clinic] = await this.db
       .update(clinics)

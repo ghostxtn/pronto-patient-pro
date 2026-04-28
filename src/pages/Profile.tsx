@@ -165,16 +165,16 @@ export default function Profile() {
                   <div className="space-y-2">
                     <Label htmlFor="firstName" className="flex items-center gap-2">
                       <User className="h-3.5 w-3.5 text-muted-foreground" />
-                      {t.firstName || "Ad"}
+                      {t.firstName}
                     </Label>
-                    <Input id="firstName" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="Ad" className="rounded-xl" />
+                    <Input id="firstName" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder={t.firstName} className="rounded-xl" />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="lastName" className="flex items-center gap-2">
                       <Phone className="h-3.5 w-3.5 text-muted-foreground" />
-                      {t.lastName || "Soyad"}
+                      {t.lastName}
                     </Label>
-                    <Input id="lastName" value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Soyad" className="rounded-xl" />
+                    <Input id="lastName" value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder={t.lastName} className="rounded-xl" />
                   </div>
                 </div>
 

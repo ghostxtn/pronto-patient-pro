@@ -7,6 +7,7 @@ import AppLayout from "@/components/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import api from "@/services/api";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 const fadeUp = {
   hidden: { opacity: 0, y: 20 },
@@ -29,7 +30,7 @@ interface PatientRecord {
   phone?: string | null;
 }
 
-function getPatientName(patient: PatientRecord) {
+function getPatientName(patient: PatientRecord, fallback: string) {
   return (
     patient.full_name
     ?? patient.fullName
@@ -37,7 +38,7 @@ function getPatientName(patient: PatientRecord) {
       .filter(Boolean)
       .join(" ")
       .trim()
-  ) || "İsimsiz Hasta";
+  ) || fallback;
 }
 
 function getInitials(fullName: string) {
@@ -47,6 +48,7 @@ function getInitials(fullName: string) {
 
 export default function DoctorPatients() {
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const [search, setSearch] = useState("");
 
   const { data: patientsResult, isLoading } = useQuery({
@@ -64,21 +66,21 @@ export default function DoctorPatients() {
     if (!query) return patients;
 
     return patients.filter((patient) => {
-      const name = getPatientName(patient).toLowerCase();
+      const name = getPatientName(patient, t.unnamedPatient).toLowerCase();
       const email = patient.email?.toLowerCase() ?? "";
       return name.includes(query) || email.includes(query);
     });
-  }, [patients, search]);
+  }, [patients, search, t.unnamedPatient]);
 
   return (
     <AppLayout>
       <motion.div initial="hidden" animate="visible" className="space-y-6 rounded-[28px] bg-background/40 p-1">
         <motion.div custom={0} variants={fadeUp}>
           <h1 className="text-3xl font-bold tracking-tight text-foreground" style={{ fontFamily: "Manrope, sans-serif" }}>
-            Hastalarım
+            {t.myPatients}
           </h1>
           <p className="mt-2 text-sm text-muted-foreground" style={{ fontFamily: "Inter, sans-serif" }}>
-            Kayıtlı hastaları görüntüleyin ve hasta detaylarına geçin.
+            {t.doctorPatientsDesc}
           </p>
         </motion.div>
 
@@ -88,7 +90,7 @@ export default function DoctorPatients() {
             <input
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Ad veya e-posta ile ara"
+            placeholder={t.patientSearchByNameEmail}
               className="h-10 w-full rounded-xl border border-border bg-card pl-10 pr-4 text-sm text-foreground shadow-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
               style={{ fontFamily: "Inter, sans-serif" }}
             />
@@ -117,7 +119,7 @@ export default function DoctorPatients() {
           ) : filteredPatients.length > 0 ? (
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3" style={{ maxHeight: "560px", overflowY: "auto" }}>
               {filteredPatients.map((patient, index) => {
-                const fullName = getPatientName(patient);
+                const fullName = getPatientName(patient, t.unnamedPatient);
 
                 return (
                   <motion.div key={patient.id} custom={index} variants={fadeUp}>
@@ -132,14 +134,14 @@ export default function DoctorPatients() {
                           <div className="min-w-0">
                             <p className="truncate font-semibold text-foreground" style={{ fontFamily: "Manrope, sans-serif" }}>{fullName}</p>
                             <p className="truncate text-sm text-muted-foreground" style={{ fontFamily: "Inter, sans-serif" }}>
-                              {patient.email || "E-posta bilgisi yok"}
+                              {patient.email || t.noEmailInfo}
                             </p>
                           </div>
                         </div>
 
                         <div className="space-y-1 text-sm text-muted-foreground" style={{ fontFamily: "Inter, sans-serif" }}>
-                          <p>{patient.email || "E-posta bilgisi yok"}</p>
-                          <p>{patient.phone || "Telefon bilgisi yok"}</p>
+                          <p>{patient.email || t.noEmailInfo}</p>
+                          <p>{patient.phone || t.noPhoneInfo}</p>
                         </div>
 
                         <button
@@ -147,7 +149,7 @@ export default function DoctorPatients() {
                           style={{ fontFamily: "Inter, sans-serif" }}
                           onClick={() => navigate(`/doctor/patients/${patient.id}`)}
                         >
-                          Görüntüle
+                          {t.view}
                         </button>
                       </CardContent>
                     </Card>
@@ -162,9 +164,9 @@ export default function DoctorPatients() {
                   <Users className="h-6 w-6 text-primary" />
                 </div>
                 <div className="space-y-1">
-                  <p className="font-medium text-[#1a2e3b]" style={{ fontFamily: "Manrope, sans-serif" }}>Hasta bulunamadı</p>
+                  <p className="font-medium text-foreground" style={{ fontFamily: "Manrope, sans-serif" }}>{t.patientNotFound}</p>
                   <p className="text-sm" style={{ color: "#5a7a8a", fontFamily: "Inter, sans-serif" }}>
-                    Arama kriterlerini değiştirerek tekrar deneyin.
+                    {t.adjustSearchCriteria}
                   </p>
                 </div>
               </CardContent>

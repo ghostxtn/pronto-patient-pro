@@ -145,6 +145,41 @@ export class DoctorsService {
       .where(and(eq(doctors.clinic_id, clinicId), eq(doctors.is_active, true)));
   }
 
+  async findBookingProfileByClinic(id: string, clinicId: string) {
+    const [doctor] = await this.db
+      .select({
+        id: doctors.id,
+        title: doctors.title,
+        bio: doctors.bio,
+        is_active: doctors.is_active,
+        firstName: users.first_name,
+        lastName: users.last_name,
+        avatarUrl: users.avatar_url,
+        specialization: {
+          id: specializations.id,
+          name: specializations.name,
+          description: specializations.description,
+        },
+      })
+      .from(doctors)
+      .innerJoin(users, eq(doctors.user_id, users.id))
+      .leftJoin(specializations, eq(doctors.specialization_id, specializations.id))
+      .where(
+        and(
+          eq(doctors.id, id),
+          eq(doctors.clinic_id, clinicId),
+          eq(doctors.is_active, true),
+        ),
+      )
+      .limit(1);
+
+    if (!doctor) {
+      throw new NotFoundException('Doctor not found');
+    }
+
+    return doctor;
+  }
+
   async findById(
     id: string,
     clinicId: string,
@@ -153,6 +188,7 @@ export class DoctorsService {
     const [doctor] = await this.db
       .select({
         id: doctors.id,
+        clinic_id: doctors.clinic_id,
         user_id: doctors.user_id,
         specialization_id: doctors.specialization_id,
         title: doctors.title,

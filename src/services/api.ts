@@ -1,6 +1,7 @@
 const API_BASE = import.meta.env.VITE_API_URL || "/api";
 
 let _accessToken: string | null = null;
+let _refreshPromise: Promise<string> | null = null;
 
 export const setAccessToken = (token: string | null) => {
   _accessToken = token;
@@ -54,12 +55,20 @@ async function parseResponse(response: Response) {
   return text || null;
 }
 
-async function refreshAccessToken() {
+async function refreshAccessTokenRequest() {
   debugAuthLog("refreshAccessToken start");
+
+  const headers = new Headers();
+  const clinicDomain = getClinicDomainHeader();
+
+  if (clinicDomain) {
+    headers.set("X-Clinic-Domain", clinicDomain);
+  }
 
   const response = await fetch(`${API_BASE}/auth/refresh`, {
     method: "POST",
     credentials: "include",
+    headers,
   });
 
   const body = await parseResponse(response);
@@ -85,6 +94,18 @@ async function refreshAccessToken() {
   setAccessToken(accessToken);
   debugAuthLog("refreshAccessToken success");
   return accessToken;
+}
+
+async function refreshAccessToken() {
+  if (!_refreshPromise) {
+    _refreshPromise = refreshAccessTokenRequest().finally(() => {
+      _refreshPromise = null;
+    });
+  } else {
+    debugAuthLog("joining in-flight refresh request");
+  }
+
+  return _refreshPromise;
 }
 
 export async function request<T>(
@@ -273,6 +294,18 @@ const api = {
   clinics: {
     list: () => request<any[]>("/clinics"),
     current: () => request<any>("/clinics/current"),
+    branding: async () => {
+      try {
+        return await request<any>("/clinics/current/branding", { omitAuth: true }, false);
+      } catch (error) {
+        if (error instanceof ApiError && error.status === 404) {
+          const preview = await request<{ clinic?: any | null }>("/homepage-preview", { omitAuth: true }, false);
+          return preview.clinic ?? null;
+        }
+
+        throw error;
+      }
+    },
     get: (id: string) => request<any>(`/clinics/${id}`),
     create: (data: unknown) =>
       request<any>("/clinics", {
@@ -396,6 +429,22 @@ const api = {
           } | null;
         }>
       >("/doctors/public-discovery"),
+    bookingProfile: async (id: string) => {
+      try {
+        return await request<any>(`/doctors/${id}/booking`, { omitAuth: true }, false);
+      } catch (error) {
+        if (error instanceof ApiError && error.status === 404) {
+          const doctors = await request<any[]>("/doctors/public-discovery", { omitAuth: true }, false);
+          const doctor = doctors.find((entry) => entry.id === id);
+
+          if (doctor) {
+            return doctor;
+          }
+        }
+
+        throw error;
+      }
+    },
     get: (id: string) => request<any>(`/doctors/${id}`),
     me: () => request<any>("/doctors/me"),
     update: (id: string, data: unknown) =>

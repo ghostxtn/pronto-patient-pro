@@ -30,29 +30,29 @@ const fadeUp = {
   }),
 };
 
-function humanizeError(err: any): string {
+function humanizeError(err: any, t: Record<string, string>): string {
   const raw = err?.response?.data?.message ?? err?.message;
   const messages = Array.isArray(raw) ? raw : raw ? [raw] : [];
 
   const map: Record<string, string> = {
-    "firstName should not be empty": "Ad boş bırakılamaz",
-    "lastName should not be empty": "Soyad boş bırakılamaz",
-    "email must be an email": "Geçerli bir e-posta adresi girin",
-    "email should not be empty": "E-posta boş bırakılamaz",
+    "firstName should not be empty": t.fieldRequired.replace("{{field}}", t.firstName),
+    "lastName should not be empty": t.fieldRequired.replace("{{field}}", t.lastName),
+    "email must be an email": t.invalidEmail,
+    "email should not be empty": t.fieldRequired.replace("{{field}}", t.email),
     "password must be longer than or equal to 6 characters":
-      "Şifre en az 6 karakter olmalıdır",
-    "password should not be empty": "Şifre boş bırakılamaz",
-    "specializationId should not be empty": "Uzmanlık alanı seçiniz",
-    "specializationId must be a UUID": "Uzmanlık alanı seçiniz",
-    "title should not be empty": "Unvan boş bırakılamaz",
-    "bio should not be empty": "Biyografi boş bırakılamaz",
-    "phone should not be empty": "Telefon boş bırakılamaz",
-    "role should not be empty": "Rol seçiniz",
-    "Email already exists": "Bu e-posta adresi zaten kullanılıyor",
+      t.passwordTooShort.replace("{{min}}", "6"),
+    "password should not be empty": t.fieldRequired.replace("{{field}}", t.password),
+    "specializationId should not be empty": t.selectSpecialization,
+    "specializationId must be a UUID": t.selectSpecialization,
+    "title should not be empty": t.fieldRequired.replace("{{field}}", t.title),
+    "bio should not be empty": t.fieldRequired.replace("{{field}}", t.bio),
+    "phone should not be empty": t.fieldRequired.replace("{{field}}", t.phone),
+    "role should not be empty": t.selectRoleRequired,
+    "Email already exists": t.emailAlreadyExists,
   };
 
   const first = messages[0];
-  if (!first) return "Bir hata oluştu. Lütfen tekrar deneyin.";
+  if (!first) return t.unknownError;
   return map[first] ?? first;
 }
 
@@ -144,7 +144,7 @@ export default function ManageDoctors() {
           body: JSON.stringify({ isActive }),
         });
       } catch (err: any) {
-        toast.error(humanizeError(err));
+        toast.error(humanizeError(err, t));
         throw err;
       }
     },
@@ -170,7 +170,7 @@ export default function ManageDoctors() {
           }),
         });
       } catch (err: any) {
-        toast.error(humanizeError(err));
+        toast.error(humanizeError(err, t));
         throw err;
       }
     },
@@ -192,7 +192,7 @@ export default function ManageDoctors() {
       setAddOpen(false);
       window.location.reload();
     } catch (err: any) {
-      toast.error(humanizeError(err));
+      toast.error(humanizeError(err, t));
     }
   };
 

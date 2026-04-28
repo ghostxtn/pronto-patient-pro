@@ -5,8 +5,10 @@ export type DoctorPresentation = {
   slug?: string;
   imageSrc: string;
   previewText?: string;
+  previewTextTr?: string;
   shortBio?: string;
   focusTags?: string[];
+  focusTagsTr?: string[];
   homepagePriority?: number;
   listingPriority?: number;
 };
@@ -17,16 +19,20 @@ export const doctorPresentation: DoctorPresentation[] = [
   {
     slug: "deniz-yilmaz",
     imageSrc: DOCTOR_FALLBACK_IMAGE,
-    previewText: "Koordinasyon destekli klinik akista degerlendirme ve takip odakli calisir.",
-    focusTags: ["Koordinasyon", "Takip"],
+    previewText: "Works with a coordination-led clinical flow focused on assessment and follow-up.",
+    previewTextTr: "Koordinasyon destekli klinik akışta değerlendirme ve takip odaklı çalışır.",
+    focusTags: ["Coordination", "Follow-up"],
+    focusTagsTr: ["Koordinasyon", "Takip"],
     homepagePriority: 1,
     listingPriority: 1,
   },
   {
     slug: "mert-kaya",
     imageSrc: DOCTOR_FALLBACK_IMAGE,
-    previewText: "Ilk degerlendirme ve duzenli klinik yonlendirme yaklasimiyla calisir.",
-    focusTags: ["Genel Degerlendirme", "Klinik Akis"],
+    previewText: "Works with an initial assessment and structured clinical direction approach.",
+    previewTextTr: "İlk değerlendirme ve düzenli klinik yönlendirme yaklaşımıyla çalışır.",
+    focusTags: ["General Assessment", "Clinical Flow"],
+    focusTagsTr: ["Genel Değerlendirme", "Klinik Akış"],
     homepagePriority: 2,
     listingPriority: 2,
   },

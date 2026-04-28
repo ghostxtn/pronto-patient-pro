@@ -26,6 +26,7 @@ export function parseDateOnly(value: string) {
 export function availabilityToEvents(
   slots: AvailabilitySlot[],
   weekStart: Date,
+  labels: { available: string } = { available: "Available" },
 ): CalendarEvent[] {
   const sundayBase = startOfWeek(subDays(weekStart, 1), { weekStartsOn: 0 });
 
@@ -43,7 +44,7 @@ export function availabilityToEvents(
     return [
       {
         id: `availability-${slot.id}-${format(slotDate, "yyyy-MM-dd")}`,
-        title: "Musait",
+        title: labels.available,
         start: parseTimeToDate(slotDate, slot.start_time),
         end: parseTimeToDate(slotDate, slot.end_time),
         type: "availability" as const,
@@ -71,6 +72,10 @@ export function appointmentsToEvents(
 
 export function overridesToEvents(
   overrides: AvailabilityOverride[],
+  labels: { closed: string; closedDay: string } = {
+    closed: "Closed",
+    closedDay: "Closed Day",
+  },
 ): CalendarEvent[] {
   return overrides.map((override) => {
     const baseDate = parseISO(override.date);
@@ -79,7 +84,7 @@ export function overridesToEvents(
       const blackoutDate = new Date(override.date);
       return {
         id: override.id,
-        title: "Kapalı",
+        title: labels.closed,
         start: blackoutDate,
         end: blackoutDate,
         allDay: true,
@@ -99,7 +104,7 @@ export function overridesToEvents(
 
     return {
       id: override.id,
-      title: "Kapalı Gün",
+      title: labels.closedDay,
       start,
       end,
       type: override.type,

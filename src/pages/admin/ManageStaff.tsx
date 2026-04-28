@@ -23,11 +23,11 @@ const fadeUp = {
   }),
 };
 
-function humanizeError(err: any): string {
+function humanizeError(err: any, fallback: string): string {
   const raw = err?.response?.data?.message ?? err?.message;
   const messages = Array.isArray(raw) ? raw : raw ? [raw] : [];
   const first = messages[0];
-  return first || "Bir hata oluştu. Lütfen tekrar deneyin.";
+  return first || fallback;
 }
 
 type StaffCreateFormState = {
@@ -67,7 +67,7 @@ export default function ManageStaff() {
       try {
         return await api.staff.create(payload);
       } catch (err: any) {
-        toast.error(humanizeError(err));
+        toast.error(humanizeError(err, t.unknownError));
         throw err;
       }
     },
@@ -88,7 +88,7 @@ export default function ManageStaff() {
       try {
         return await api.staff.update(payload.id, payload);
       } catch (err: any) {
-        toast.error(humanizeError(err));
+        toast.error(humanizeError(err, t.unknownError));
         throw err;
       }
     },
@@ -104,7 +104,7 @@ export default function ManageStaff() {
       try {
         return await api.staff.setStatus(id, isActive);
       } catch (err: any) {
-        toast.error(humanizeError(err));
+        toast.error(humanizeError(err, t.unknownError));
         throw err;
       }
     },
@@ -119,7 +119,7 @@ export default function ManageStaff() {
       try {
         return await api.staff.delete(id);
       } catch (err: any) {
-        toast.error(humanizeError(err));
+        toast.error(humanizeError(err, t.unknownError));
         throw err;
       }
     },

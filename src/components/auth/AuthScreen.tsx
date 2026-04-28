@@ -36,7 +36,7 @@ export default function AuthScreen({ children }: AuthScreenProps) {
                 <rect x="13" y="22" width="18" height="22" rx="9" fill="#4f8fe6" />
               </svg>
               <span className="font-medium tracking-tight text-[#081e2a]" style={{ fontFamily: "Manrope, sans-serif" }}>
-                Pronto Klinik
+                {t.landingHeroBrand}
               </span>
             </div>
 
@@ -86,7 +86,7 @@ export default function AuthScreen({ children }: AuthScreenProps) {
                 <rect x="13" y="22" width="18" height="22" rx="9" fill="#4f8fe6" />
               </svg>
               <span className="text-[15px] font-light tracking-tight text-foreground" style={{ fontFamily: "Manrope, sans-serif" }}>
-                Pronto Klinik
+                {t.landingHeroBrand}
               </span>
             </div>
 

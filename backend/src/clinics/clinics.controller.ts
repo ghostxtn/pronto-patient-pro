@@ -57,6 +57,18 @@ export class ClinicsController {
     return this.clinicsService.findById(clinicId);
   }
 
+  @Get('current/branding')
+  @Public()
+  findCurrentBranding(@Req() request: TenantRequest) {
+    const clinicId = request.tenant?.clinicId;
+
+    if (!clinicId) {
+      throw new NotFoundException('Clinic not found');
+    }
+
+    return this.clinicsService.findBrandingById(clinicId);
+  }
+
   @Get(':id')
   @Roles('owner', 'admin')
   findById(@Param('id') id: string) {
