@@ -113,3 +113,6 @@ slot-height-discovery.md
 calendar-timegrid-discovery.md
 backend/package-lock.json
 event-colors-discovery.md
+.env.production
+.env.local
+.env.*.local
