@@ -40,7 +40,7 @@ export class StorageController {
   @Post('avatar')
   @Audit('UPLOAD_AVATAR', 'file')
   @Roles('owner', 'admin', 'doctor', 'staff', 'patient')
-  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @Throttle({ global: { limit: 10, ttl: 60000 } })
   @UseInterceptors(FileInterceptor('file', avatarMulterOptions))
   async uploadAvatar(
     @CurrentUser() user: { userId: string },
@@ -57,7 +57,7 @@ export class StorageController {
   @Audit('UPLOAD_AVATAR', 'file')
   @UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
   @Roles('owner', 'admin')
-  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @Throttle({ global: { limit: 10, ttl: 60000 } })
   @UseInterceptors(FileInterceptor('avatar', avatarMulterOptions))
   async uploadAvatarForUser(
     @Param('userId', ParseUUIDPipe) userId: string,
@@ -84,7 +84,7 @@ export class StorageController {
   @Post('appointments/:appointmentId/files')
   @Audit('UPLOAD_FILE', 'file')
   @Roles('owner', 'admin', 'doctor')
-  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @Throttle({ global: { limit: 10, ttl: 60000 } })
   @UseInterceptors(FileInterceptor('file', appointmentFileMulterOptions))
   async uploadAppointmentFile(
     @Param('appointmentId', ParseUUIDPipe) appointmentId: string,
@@ -105,7 +105,7 @@ export class StorageController {
 
   @Get('appointments/:appointmentId/files')
   @Roles('owner', 'admin', 'doctor')
-  @Throttle({ default: { limit: 30, ttl: 60000 } })
+  @Throttle({ global: { limit: 30, ttl: 60000 } })
   getAppointmentFiles(
     @Param('appointmentId', ParseUUIDPipe) appointmentId: string,
     @CurrentUser() user: { clinicId: string },
@@ -119,7 +119,7 @@ export class StorageController {
   @Get('files/:fileId/download')
   @Audit('DOWNLOAD_FILE', 'file')
   @Roles('owner', 'doctor', 'staff')
-  @Throttle({ default: { limit: 30, ttl: 60000 } })
+  @Throttle({ global: { limit: 30, ttl: 60000 } })
   async downloadFile(
     @Param('fileId', ParseUUIDPipe) fileId: string,
     @CurrentUser() user: { clinicId: string; role: string; userId: string },
