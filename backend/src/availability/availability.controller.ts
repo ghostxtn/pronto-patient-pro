@@ -33,7 +33,7 @@ export class AvailabilityController {
 
   @Public()
   @UseGuards(TenantGuard)
-  @Throttle({ default: { limit: 30, ttl: 60000 } })
+  @Throttle({ global: { limit: 30, ttl: 60000 } })
   @Get('slots')
   getSlots(@Query() query: GetSlotsDto, @Req() req: TenantRequest) {
     return this.availabilityService.getBookableSlots(
